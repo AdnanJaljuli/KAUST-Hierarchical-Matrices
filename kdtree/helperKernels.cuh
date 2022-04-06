@@ -1,5 +1,5 @@
 #include <cub/cub.cuh>
-#define BUCKET_SIZE 1<<3
+#define BUCKET_SIZE 1<<4
 
 typedef double H2Opus_Real;
 
@@ -62,5 +62,34 @@ __global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_i
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
         keys_in[i] = dataset[(long long)currDimArray[i/segment_size]*n + (long long)values_in[i]];
+    }
+}
+
+__global__ void fillPaddedElements(int n, int padded_n, int dim, H2Opus_Real* dataset, H2Opus_Real* maxValue){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i<padded_n-n){
+        for(unsigned int j=0; j<dim; ++j){
+            dataset[j*padded_n + n+i] = maxValue[j];
+        }
+
+    }
+}
+
+__device__ H2Opus_Real interaction(int padded_n, int col, int row, H2Opus_Real* dataset){
+    H2Opus_Real ans=0;
+    for(unsigned int i=0; i<dim; ++i){
+        for(unsigned int j=0; j<dim; ++j){
+            ans += dataset[i*padded_n + row]*dataset[j*padded_n + col];
+        }
+    }
+    return ans;
+}
+
+__global__ void generateInputMatrix(int n, int padded_n, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i<n*n){
+        int col = i%n;
+        int row = i/n;
+        matrix[col*n+row] = interaction(padded_n, index_map[col], index_map[row], dataset);
     }
 }

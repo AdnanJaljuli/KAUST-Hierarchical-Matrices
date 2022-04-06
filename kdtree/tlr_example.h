@@ -49,17 +49,24 @@ template <class T> class PointCloud : public H2OpusDataSet<T>
 };
 
 template <typename T>
-void generateGrid(PointCloud<T> &pt_cloud)
+void generateGrid(PointCloud<T> &pt_cloud, int n, int padded_n)
 {
     srand (time(NULL));
     int randomNum;
-    for (int i = 0; i < pt_cloud.num_points; ++i)
+    for (int i = 0; i < n; ++i)
     {
         for(int j=0; j<pt_cloud.dimension; ++j){
-            randomNum = rand() % 100000 + 1;
+            randomNum = rand() % 1000 + 1;
             pt_cloud.pts[j][i] = randomNum;
         }
     }
+
+    // for (int i = n; i < padded_n; ++i)
+    // {
+    //     for(int j=0; j<pt_cloud.dimension; ++j){
+    //         pt_cloud.pts[j][i] = (float)INT_MAX;
+    //     }
+    // }
 }
 
 #endif

@@ -18,14 +18,21 @@ void printCountersInFile(unsigned int iteration, unsigned int segment_size, unsi
     fclose(output_file);
 }
 
-int lower_power_of_two(int v){
-        v |= v >> 1;
-        v |= v >> 2;
-        v |= v >> 4;
-        v |= v >> 8;
-        v |= v >> 16;
-        v -= (v>>1);
-        return v;
+int upper_power_of_two(int v){
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+bool isPowerOfTwo (int x)
+{
+    /* First x in the below expression is for the case when x is 0 */
+    return x && (!(x&(x-1)));
 }
 
 #endif
