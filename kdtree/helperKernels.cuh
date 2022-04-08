@@ -1,6 +1,5 @@
 #include <cub/cub.cuh>
-#define BUCKET_SIZE 1<<4
-
+#define BUCKET_SIZE 1<<3
 typedef double H2Opus_Real;
 
 __global__ void fillOffsetsArrays(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* offsets_sort, int* offsets_reduce){
@@ -65,31 +64,44 @@ __global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_i
     }
 }
 
-__global__ void fillPaddedElements(int n, int padded_n, int dim, H2Opus_Real* dataset, H2Opus_Real* maxValue){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<padded_n-n){
-        for(unsigned int j=0; j<dim; ++j){
-            dataset[j*padded_n + n+i] = maxValue[j];
-        }
-
-    }
-}
-
-__device__ H2Opus_Real interaction(int padded_n, int col, int row, H2Opus_Real* dataset){
+__device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real* dataset){
     H2Opus_Real ans=0;
     for(unsigned int i=0; i<dim; ++i){
         for(unsigned int j=0; j<dim; ++j){
-            ans += dataset[i*padded_n + row]*dataset[j*padded_n + col];
+            ans += dataset[i*n + row]*dataset[j*n + col];
         }
     }
     return ans;
 }
 
-__global__ void generateInputMatrix(int n, int padded_n, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset){
+__global__ void generateInputMatrix(int n, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n*n){
         int col = i%n;
         int row = i/n;
-        matrix[col*n+row] = interaction(padded_n, index_map[col], index_map[row], dataset);
+        matrix[col*n+row] = interaction(n, dim, index_map[col], index_map[row], dataset);
+    }
+}
+
+// __global__ void calcMemNeeded(int n, int padded_n, int* K, H2Opus_Real* S, float eps){
+//     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+//     __shared__ int k=0;
+//     if(i<BUCKET_SIZE){
+//         if((S[BUCKET_SIZE*blockIdx.x + i]/S[BUCKET_SIZE*blockIdx.x]) > eps){
+//             atomicAdd(k, 1);
+//         }
+//     }
+//     __syncthreads();
+//     K[blockIdx.x] = k;
+// }
+
+__global__ void tileMatrix(int n, int padded_n, H2Opus_Real* S, H2Opus_Real* U, H2Opus_Real* V, H2Opus_Real* STiled, H2Opus_Real* UTiled, H2Opus_Real* VTiled, int* K, int* KScan){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i<K[blockIdx.x]){
+        STiled[blockIdx.x + i] = S[blockIdx.x*BUCKET_SIZE + i];
+        for(unsigned int j=0; j<BUCKET_SIZE;++j){
+            UTiled[KScan[blockIdx.x]*BUCKET_SIZE + i*BUCKET_SIZE + j]= U[blockIdx.x*BUCKET_SIZE*BUCKET_SIZE + i*BUCKET_SIZE + j];
+            VTiled[KScan[blockIdx.x]*BUCKET_SIZE + j*K[blockIdx.x] + i]= V[blockIdx.x*BUCKET_SIZE*BUCKET_SIZE + i*BUCKET_SIZE + j];
+        }
     }
 }
