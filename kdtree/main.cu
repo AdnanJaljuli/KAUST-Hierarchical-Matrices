@@ -8,17 +8,18 @@
 #include <assert.h>
 #include <math.h>
 
-#define eps  1e-4
-#define printOutput 1
+#define eps 1e-4
+#define PRINT_OUTPUT 1
 #define USE_SVD 0
+#define DIVIDE_IN_HALF 0
 using namespace std;
 
 // TODO: generate pointcloud and copy values of the pointcloud to ptr on GPU
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    int n = 1<<5;
-    int dim = 3;
+    int n = 21;
+    int dim = 2;
     printf("N = %d\n", n);
 
     // Create point cloud
@@ -27,7 +28,7 @@ int main(){
     printf("dimension: %d\n", pt_cloud.getDimension());
     printf("bucket size: %d\n", BUCKET_SIZE);
 
-    #if printOutput
+    #if PRINT_OUTPUT
     printf("created point cloud\n");
     for(int i=0; i<n; ++i){
         for(int j=0; j<dim;++j){
@@ -53,7 +54,7 @@ int main(){
     cudaMalloc((void**) &d_dataset, (long long)n*(long long)dim*(long long)sizeof(H2Opus_Real));
     cudaMemcpy(d_dataset, dataset, (long long)n*(long long)dim*(long long)sizeof(H2Opus_Real*), cudaMemcpyHostToDevice);
 
-    unsigned long long segment_size = n;
+    unsigned long long segment_size = upper_power_of_two(n);
     unsigned long long  num_segments = 1;
     unsigned long long num_segments_reduce = num_segments*dim;
 
@@ -65,17 +66,15 @@ int main(){
     int  *d_values_out;      // e.g., [-, -, -, -, -, -, -]
     int *currDimArray_d;
     H2Opus_Real *d_reduce_in;
-    int *d_reduce_min_out;
-    int *d_reduce_max_out;
+    H2Opus_Real *d_reduce_min_out;
+    H2Opus_Real *d_reduce_max_out;
     int *d_temp;
     H2Opus_Real *d_span;
     int* d_span_offsets;
     cub::KeyValuePair<int, H2Opus_Real> *d_span_reduce_out;
     float* timer_arr = (float*)malloc(numTimers*sizeof(float));
-    H2Opus_Real* d_reduce_max_aux_out;
     H2Opus_Real* d_input_matrix;
 
-    cudaMalloc((void**) &d_reduce_max_aux_out, dim*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_temp, n*sizeof(int));
     cudaMalloc((void**) &d_offsets_sort, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(int));
     cudaMalloc((void**) &d_offsets_reduce, (long long)((n+BUCKET_SIZE-1)/BUCKET_SIZE)*dim*(long long)sizeof(int));
@@ -126,24 +125,6 @@ int main(){
         cudaEventDestroy(startFillOffsets_k);
         cudaEventDestroy(stopFillOffsets_k);
         cudaDeviceSynchronize();
-
-        // int num_items_reduce_max_out = segment_size-(((n+segment_size-1)/segment_size)*segment_size-n);
-        // printf("num items reduce max out: %d\n", num_items_reduce_max_out);
-        // for(unsigned int i=0; i<dim; ++i){
-        //     d_temp_storage = NULL;
-        //     temp_storage_bytes = 0;
-        //     cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, dataset+(n/segment_size)*segment_size, d_reduce_max_aux_out[i], num_items_reduce_max_out);
-        //     // Allocate temporary storage
-        //     cudaMalloc(&d_temp_storage, temp_storage_bytes);
-        //     // Run min-reduction
-        //     cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, dataset+(n/segment_size)*segment_size, d_reduce_max_aux_out[i], num_items_reduce_max_out);
-        // }
-        // H2Opus_Real* tmpArr = (H2Opus_Real*)malloc(dim*sizeof(H2Opus_Real));
-        // cudaMemcpy(tmpArr, d_reduce_max_aux_out, dim*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-        // printf("d_reduce_max_aux_out\n");
-        // for(unsigned int i=0;i<dim; ++i){
-        //     printf("%f\n", tmpArr[i]);
-        // }
 
         numThreadsPerBlock = 1024;
         numBlocks = (long long)((long long)n*(long long)dim + numThreadsPerBlock-1)/numThreadsPerBlock;
@@ -301,9 +282,9 @@ int main(){
         printCountersInFile(iteration, segment_size, num_segments, timer_arr);
 
         ++iteration;
-        num_segments*=2;
-        num_segments_reduce=num_segments*dim;
-        segment_size/=2;
+        segment_size /= 2;
+        num_segments = (n/segment_size) + 1;
+        num_segments_reduce = num_segments*dim;
     }
 
     cudaEventRecord(stopWhileLoop);
@@ -401,7 +382,7 @@ int main(){
     free(Vs);
     #endif
 
-    #if printOutput
+    #if PRINT_OUTPUT
     int *index_map = (int*)malloc(n*sizeof(int));
     cudaMemcpy(index_map, d_values_in, n*sizeof(int), cudaMemcpyDeviceToHost);
     for(int i=0; i<n; ++i){
@@ -430,6 +411,5 @@ int main(){
     cudaFree(d_span_reduce_out);
     cudaFree(d_span);
     cudaFree(d_span_offsets);
-    cudaFree(d_reduce_max_aux_out);
     cudaFree(d_input_matrix);
 }

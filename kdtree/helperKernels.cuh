@@ -2,23 +2,6 @@
 #define BUCKET_SIZE 1<<3
 typedef double H2Opus_Real;
 
-__global__ void fillOffsetsArrays(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* offsets_sort, int* offsets_reduce){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<num_segments+1){
-        offsets_sort[i] = i*segment_size;
-
-        if(threadIdx.x==0 && blockIdx.x==0){
-            offsets_reduce[0] = 0;
-        }
-
-        for(unsigned int j=0; j<dim; ++j){
-            if(i < num_segments){
-                offsets_reduce[j*num_segments + i + 1] = (i+1)*segment_size + n*j;
-            }
-        }
-    }
-}
-
 __global__ void initializeArrays(int n, int* values_in, int* currDimArray){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
@@ -30,6 +13,26 @@ __global__ void initializeArrays(int n, int* values_in, int* currDimArray){
     }
 }
 
+__global__ void fillOffsetsArrays(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* offsets_sort, int* offsets_reduce){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    
+    if(i<num_segments+1){
+        // offsets_sort[i] = ((i*segment_size)<=n:(i*segment_size)?n);
+        offsets_sort[i] = (i<num_segments) ? (i*segment_size) : n;
+
+        if(threadIdx.x==0 && blockIdx.x==0){
+            offsets_reduce[0] = 0;
+        }
+
+        for(unsigned int j=0; j<dim; ++j){
+            if(i < num_segments){
+                // offsets_reduce[j*num_segments + i + 1] = (i+1)*segment_size + n*j;
+                offsets_reduce[j*num_segments + i + 1] = (i+1<num_segments) ? ((i+1)*segment_size + n*j) : n*(j+1);
+            }
+        }
+    }
+}
+
 __global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* dataset, int* values_in, H2Opus_Real* reduce_in){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<(long long)n*(long long)dim){
@@ -37,7 +40,7 @@ __global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* dataset
     }
 }
 
-__global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* reduce_min_out, int* reduce_max_out, H2Opus_Real* span, int* span_offsets){
+__global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, H2Opus_Real* reduce_min_out, H2Opus_Real* reduce_max_out, H2Opus_Real* span, int* span_offsets){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
         for(unsigned int j=0; j<dim; ++j){
@@ -47,6 +50,15 @@ __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, uns
     }
     if(threadIdx.x==0 && blockIdx.x==0){
         span_offsets[num_segments] = num_segments*dim;
+        printf("span offsets\n");
+        for(unsigned int j=0; j<=num_segments; ++j){
+            printf("%d ", span_offsets[j]);
+        }
+        printf("\nspan\n");
+        for(unsigned int j=0; j<num_segments*dim; ++j){
+            printf("%f ", span[j]);
+        }
+        printf("\n");
     }
 }
 
