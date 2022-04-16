@@ -3,12 +3,11 @@
 
 #define numTimers 9
 
-void printCountersInFile(unsigned int iteration, unsigned int segment_size, unsigned int num_segments, float* times){
+void printCountersInFile(unsigned int iteration, unsigned int num_segments, float* times){
     char filename[100] = "results/times.csv";
 
     FILE *output_file = fopen(filename, "a");
     fprintf(output_file, "%u,", iteration);
-    fprintf(output_file, "%u,", segment_size);
     fprintf(output_file, "%u", num_segments);
 
     for(unsigned int i = 0;i<numTimers; ++i){
@@ -29,9 +28,9 @@ int upper_power_of_two(int v){
     return v;
 }
 
-bool isPowerOfTwo (int x)
-{
+bool isPowerOfTwo (int x) {
     return x && (!(x&(x-1)));
 }
+
 
 #endif

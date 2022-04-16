@@ -2,10 +2,6 @@
 #include "helperFunctions.h"
 #include "helperKernels.cuh"
 
-#include <thrust/binary_search.h>
-#include <thrust/device_vector.h>
-#include <thrust/functional.h>
-#include <thrust/execution_policy.h>
 #include <iostream>
 #include <utility>
 #include <time.h>
@@ -15,14 +11,14 @@
 #define eps 1e-4
 #define PRINT_OUTPUT 1
 #define USE_SVD 0
-#define DIVIDE_IN_HALF 1
+#define DIVIDE_IN_HALF 0
 using namespace std;
 
 // TODO: generate pointcloud and copy values of the pointcloud to ptr on GPU
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    int n = 47;
+    int n = 21;
     int dim = 2;
     printf("N = %d\n", n);
 
@@ -61,10 +57,7 @@ int main(){
     unsigned long long  num_segments = 1;
     unsigned long long num_segments_reduce = num_segments*dim;
 
-    #if DIVIDE_IN_HALF==0
-    unsigned int segment_size = upper_power_of_two(n);
-    #endif
-
+    unsigned long long *d_segment_size;
     int *d_offsets_sort;         // e.g., [0, 3, 3, 7]
     int *d_offsets_reduce;
     H2Opus_Real *d_keys_in;         // e.g., [8, 6, 7, 5, 3, 0, 9]
@@ -82,18 +75,7 @@ int main(){
     float* timer_arr = (float*)malloc(numTimers*sizeof(float));
     H2Opus_Real* d_input_matrix;
 
-    #if DIVIDE_IN_HALF
-    int* A;
-    int* B;
-    int* output;
-    int* d_output;
-    int* d_input_search;
-    uint64_t* d_bit_vector;
-    int* d_aux_offsets_sort;
-    short int* d_popc_bit_vector;
-    short int* d_popc_scan;
-    #endif
-
+    cudaMalloc((void**) &d_segment_size, (upper_power_of_two(n)+BUCKET_SIZE-1)/BUCKET_SIZE*sizeof(int));
     cudaMalloc((void**) &d_temp, n*sizeof(int));
     cudaMalloc((void**) &d_offsets_sort, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(int));
     cudaMalloc((void**) &d_offsets_reduce, (long long)((n+BUCKET_SIZE-1)/BUCKET_SIZE)*dim*(long long)sizeof(int));
@@ -110,26 +92,9 @@ int main(){
     cudaMalloc((void**) &d_span_reduce_out, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
     cudaMalloc((void**) &d_input_matrix, (long long)n*(long long)n*(long long)sizeof(H2Opus_Real));
 
-    #if DIVIDE_IN_HALF
-    cudaMalloc((void**) &A, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(int));
-    cudaMalloc((void**) &B, n*sizeof(int));
-    cudaMalloc((void**) &output, n*sizeof(int));
-    cudaMalloc((void**) &d_input_search, n*sizeof(int));
-    cudaMalloc((void**) &d_output, n*sizeof(int));
-    cudaMalloc((void**) &d_bit_vector, (((n+BUCKET_SIZE-1)/BUCKET_SIZE + sizeof(uint64_t)*8 -1)/(sizeof(uint64_t)*8))*sizeof(uint64_t));
-    cudaMalloc((void**) &d_aux_offsets_sort, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(int));
-    cudaMalloc((void**) &d_popc_bit_vector, (((n+BUCKET_SIZE-1)/BUCKET_SIZE + sizeof(uint64_t)*8 -1)/(sizeof(uint64_t)*8))*sizeof(short int));
-    cudaMalloc((void**) &d_popc_scan, (((n+BUCKET_SIZE-1)/BUCKET_SIZE + sizeof(uint64_t)*8 -1)/(sizeof(uint64_t)*8))*sizeof(short int));
-    #endif
-
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (n+numThreadsPerBlock-1)/numThreadsPerBlock;
-
-    #if DIVIDE_IN_HALF
-    initializeArrays<<<numBlocks, numThreadsPerBlock>>>(n, dim, d_values_in, d_curr_dim, d_offsets_sort, d_offsets_reduce, d_input_search);
-    #else
-    initializeArrays<<<numBlocks, numThreadsPerBlock>>>(n, d_values_in, d_curr_dim);
-    #endif
+    initializeArrays<<<numBlocks, numThreadsPerBlock>>>(n, d_values_in, d_curr_dim, d_segment_size);
     cudaDeviceSynchronize();
 
     void *d_temp_storage = NULL;
@@ -142,24 +107,19 @@ int main(){
 
     unsigned int iteration = 0;
 
-    #if DIVIDE_IN_HALF
-    while(/*TODO: have a flag that is set to true if any of the segment sizes are greater than bucket size*/) {
-    #else
     while(segment_size > BUCKET_SIZE) {
-    #endif
         for(unsigned int i=0; i<numTimers; ++i){
             timer_arr[i]=0;
         }
-
+        // TODO: launch a kernel where each thread inserts the number of elements in its next 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+1+numThreadsPerBlock-1)/numThreadsPerBlock;
+
         cudaEvent_t startFillOffsets_k, stopFillOffsets_k;
         cudaEventCreate(&startFillOffsets_k);
         cudaEventCreate(&stopFillOffsets_k);
         cudaEventRecord(startFillOffsets_k);
-        #if DIVIDE_IN_HALF==0
-        fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
-        #endif
+        fillOffsetsArrays<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
         cudaEventRecord(stopFillOffsets_k);
         cudaEventSynchronize(stopFillOffsets_k);
         cudaEventElapsedTime(&timer_arr[0], startFillOffsets_k, stopFillOffsets_k);
@@ -231,7 +191,7 @@ int main(){
         cudaEventCreate(&startFindSpan_k);
         cudaEventCreate(&stopFindSpan_k);
         cudaEventRecord(startFindSpan_k);
-        findSpan<<<numBlocks, numThreadsPerBlock>>> (n, dim, num_segments, d_reduce_min_out, d_reduce_max_out, d_span, d_span_offsets);
+        findSpan<<<numBlocks, numThreadsPerBlock>>> (n, dim, num_segments, segment_size, d_reduce_min_out, d_reduce_max_out, d_span, d_span_offsets);
         cudaEventRecord(stopFindSpan_k);
         cudaEventSynchronize(stopFindSpan_k);
         cudaEventElapsedTime(&timer_arr[4], startFindSpan_k, stopFindSpan_k);
@@ -267,11 +227,7 @@ int main(){
         cudaEventCreate(&startfillCurrDim_k);
         cudaEventCreate(&stopFillCurrDim_k);
         cudaEventRecord(startfillCurrDim_k);
-        #if DIVIDE_IN_HALF
-        fillCurDim<<<numBlocks, numThreadsPerBlock>>> (n, num_segments, d_curr_dim, d_span_reduce_out, d_bit_vector);
-        #else
-        fillCurDim<<<numBlocks, numThreadsPerBlock>>> (n, num_segments, d_curr_dim, d_span_reduce_out);
-        #endif
+        fillCurDimArray<<<numBlocks, numThreadsPerBlock>>> (n, num_segments, d_curr_dim, d_span_reduce_out);
         cudaEventRecord(stopFillCurrDim_k);
         cudaEventSynchronize(stopFillCurrDim_k);
         cudaEventElapsedTime(&timer_arr[6], startfillCurrDim_k, stopFillCurrDim_k);
@@ -287,18 +243,7 @@ int main(){
         cudaEventCreate(&startfillKeysIn_k);
         cudaEventCreate(&stopKeysIn_k);
         cudaEventRecord(startfillKeysIn_k);
-        #if DIVIDE_IN_HALF
-
-        thrust::device_ptr<int> A = thrust::device_pointer_cast((int *)d_offsets_sort), B = thrust::device_pointer_cast((int *)d_input_search);
-        thrust::device_vector<int> output(n);
-        thrust::lower_bound(A, A + num_segments + 1, B, B + n, output.begin(), thrust::less<int>());
-        d_output = thrust::raw_pointer_cast(output);
-
-        fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, d_keys_in, d_curr_dim, d_values_in, d_dataset, d_offsets_sort, d_output);
-        // thrust::copy(output.begin(), output.end(), std::ostream_iterator<int>(std::cout, " "));
-        #else
         fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, segment_size, d_keys_in, d_curr_dim, d_values_in, d_dataset);
-        #endif
         cudaEventRecord(stopKeysIn_k);
         cudaEventSynchronize(stopKeysIn_k);
         cudaEventElapsedTime(&timer_arr[7], startfillKeysIn_k, stopKeysIn_k);
@@ -334,34 +279,12 @@ int main(){
         d_temp = d_values_in;
         d_values_in = d_values_out;
         d_values_out = d_temp;
-        printCountersInFile(iteration, num_segments, timer_arr);
+
+        printCountersInFile(iteration, segment_size, num_segments, timer_arr);
+
         ++iteration;
-
-        #if DIVIDE_IN_HALF
-        numThreadsPerBlock = 1024;
-        numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
-        fillBitVector<<<numBlocks, numThreadsPerBlock>>>(num_segments, d_bit_vector, d_offsets_sort);
-        cudaDeivceSynchronize();
-        fillPopCount<<<numBlocks, numThreadsPerBlock>>>(num_segments, d_bit_vector, d_popc_bit_vector);
-        cudaDeivceSynchronize();
-
-        d_temp_storage = NULL;
-        temp_storage_bytes = 0;
-        cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popc_bit_vector, d_popc_scan, num_segments);
-        // Allocate temporary storage
-        cudaMalloc(&d_temp_storage, temp_storage_bytes);
-        // Run exclusive prefix sum
-        cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popc_bit_vector, d_popc_scan, num_segments);
-
-        fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, d_offsets_sort, d_offsets_reduce, d_aux_offsets_sort, d_bit_vector);
-        cudaDeivceSynchronize();
-        d_temp = d_aux_offsets_sort;
-        d_aux_offsets_sort = d_offsets_sort;
-        d_offsets_sort = d_temp;
-        #else
         segment_size /= 2;
-        num_segments = (n+segment_size-1)/segment_size;
-        #endif
+        num_segments = (n/segment_size) + 1;
         num_segments_reduce = num_segments*dim;
     }
 
@@ -381,6 +304,7 @@ int main(){
     cudaDeivceSynchronize();
 
     int nBlocks = (n+BUCKET_SIZE-1)/BUCKET_SIZE;
+
     int NRows=BUCKET_SIZE;
     int NCols=BUCKET_SIZE;
 
@@ -398,6 +322,7 @@ int main(){
     cudaMalloc((void**) &d_U, Nrows*Ncols * nBlocks*nBlocks * sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_V, Nrows*Ncols * nBlocks*nBlocks * sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_K, nBlocks*nBlocks * sizeof(int));
+
     cudaMemcpy(d_S, S, min(Nrows, Ncols) * nBlocks*nBlocks * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
 
     // TODO: call a kernel to figure out size of each tile
@@ -471,6 +396,7 @@ int main(){
     #endif
 
     free(dataset);
+
     cudaFree(d_dataset);
     cudaFree(d_offsets_sort);
     cudaFree(d_offsets_reduce);
@@ -487,14 +413,4 @@ int main(){
     cudaFree(d_span);
     cudaFree(d_span_offsets);
     cudaFree(d_input_matrix);
-
-    #if DIVIDE_IN_HALF
-    cudaFree(A);
-    cudaFree(B);
-    cudaFree(output);
-    cudaFree(d_output);
-    cudaFree(d_input_search);
-    cudaFree(d_bit_vector);
-    cudaFree(d_aux_offsets_sort);
-    #endif
 }

@@ -1,4 +1,5 @@
 #include <cub/cub.cuh>
+#include "helperFunctions.h"
 #define BUCKET_SIZE 1<<3
 typedef double H2Opus_Real;
 
@@ -6,18 +7,34 @@ __global__ void initializeArrays(int n, int* values_in, int* currDimArray){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
         values_in[i] = i;
-        // currDimArray[i] = -1;
     }
     if(i<((n+BUCKET_SIZE-1)/BUCKET_SIZE)){
         currDimArray[i] = -1;
     }
 }
 
-__global__ void fillOffsetsArrays(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* offsets_sort, int* offsets_reduce){
+__global__ void initializeArrays(int n, int dim, int* values_in, int* currDimArray, int* offsets_sort, int* offsets_reduce, int* input_search){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    
+    if(i<n){
+        values_in[i] = i;
+        input_search[i] = i;
+    }
+    if(i<((n+BUCKET_SIZE-1)/BUCKET_SIZE)){
+        currDimArray[i] = -1;
+    }
+    if(threadIdx.x==0 && blockIdx.x==0){
+        offsets_sort[0] = 0;
+        offsets_sort[1] = n;
+        for(unsigned int j=0; j<dim+1; ++j){ //TODO: might have to be <dim+1
+            offsets_reduce[j] = j*n;
+        }
+    }
+}
+
+__global__ void fillOffsets(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* offsets_sort, int* offsets_reduce){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+
     if(i<num_segments+1){
-        // offsets_sort[i] = ((i*segment_size)<=n:(i*segment_size)?n);
         offsets_sort[i] = (i<num_segments) ? (i*segment_size) : n;
 
         if(threadIdx.x==0 && blockIdx.x==0){
@@ -26,10 +43,73 @@ __global__ void fillOffsetsArrays(int n, unsigned int dim, unsigned int num_segm
 
         for(unsigned int j=0; j<dim; ++j){
             if(i < num_segments){
-                // offsets_reduce[j*num_segments + i + 1] = (i+1)*segment_size + n*j;
                 offsets_reduce[j*num_segments + i + 1] = (i+1<num_segments) ? ((i+1)*segment_size + n*j) : n*(j+1);
             }
         }
+    }
+}
+
+__global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce, int* aux_offsets_sort, uint64_t* bit_vector, short* popc_scan, unsigned int* new_num_segments){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if(i<num_segments){
+        *new_num_segments = num_segments + popc_scan[num_segments - 1] + __popcll(bit_vector[((((num_segments+BUCKET_SIZE-1)/BUCKET_SIZE) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) - 1]);
+        if(threadIdx.x==0 && blockIdx.x==0){
+            aux_offsets_sort[*new_num_segments] = n;
+            
+        }
+
+        unsigned int pos = i%(sizeof(uint64_t)*8);
+        unsigned int sub = i/(sizeof(uint64_t)*8);
+        unsigned int onesToLeft = __popcll(bit_vector[sub]>>(sizeof(uint64_t)*8 - pos));
+
+        if(threadIdx.x==0 && blockIdx.x==0){
+            printf("ones to left: %d\n", onesToLeft);
+        }
+
+        unsigned int index = (popc_scan[i] + onesToLeft)*2 + (sizeof(uint64_t)*8*sub - popc_scan[i] + pos - onesToLeft);
+        if(threadIdx.x==0 && blockIdx.x==0){
+            printf("index: %d\n", index);
+        }
+        aux_offsets_sort[index] = offsets_sort[i];
+        if(offsets_sort[i+1] - offsets_sort[i] > BUCKET_SIZE){
+            aux_offsets_sort[index + 1] = (offsets_sort[i+1] - offsets_sort[i] + 1)/2 + offsets_sort[i];
+        }
+
+        // for(unsigned int j=0; j<dim; ++j){
+        //     offsets_reduce[j*(*new_num_segments) + i + 1] = ((offsets_sort[i+1] - offsets_sort[i] + 1)/2 + offsets_sort[i])*(n+j);
+        // }
+    }
+
+    if(threadIdx.x==0 && blockIdx.x==0){
+        printf("new num segment: %d\n", *new_num_segments);
+        printf("offsets sort\n");
+        for(unsigned int j=0; j<num_segments+1; ++j){
+            printf("%d ", offsets_sort[j]);
+        }
+        printf("\n");
+        printf(" newoffsets sort\n");
+        for(unsigned int j=0; j<*new_num_segments+1; ++j){
+            printf("%d ", aux_offsets_sort[j]);
+        }
+        printf("\n");
+    }
+}
+
+__global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(threadIdx.x==0 && blockIdx.x==0){
+        offsets_reduce[0] = 0;
+    }
+    for(unsigned int j=0; j<dim; ++j){
+            offsets_reduce[j*num_segments + i + 1] = offsets_sort[i + 1] + (n*j);
+    }
+    if(threadIdx.x==0 && blockIdx.x==0){
+        printf(" newoffsets reduce\n");
+        for(unsigned int j=0; j<num_segments*dim+1; ++j){
+            printf("%d ", offsets_reduce[j]);
+        }
+        printf("\n");
     }
 }
 
@@ -40,7 +120,7 @@ __global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* dataset
     }
 }
 
-__global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, H2Opus_Real* reduce_min_out, H2Opus_Real* reduce_max_out, H2Opus_Real* span, int* span_offsets){
+__global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2Opus_Real* reduce_min_out, H2Opus_Real* reduce_max_out, H2Opus_Real* span, int* span_offsets){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
         for(unsigned int j=0; j<dim; ++j){
@@ -48,24 +128,29 @@ __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, uns
         }
         span_offsets[i] = i*dim;
     }
+
     if(threadIdx.x==0 && blockIdx.x==0){
         span_offsets[num_segments] = num_segments*dim;
-        printf("span offsets\n");
-        for(unsigned int j=0; j<=num_segments; ++j){
-            printf("%d ", span_offsets[j]);
-        }
-        printf("\nspan\n");
-        for(unsigned int j=0; j<num_segments*dim; ++j){
-            printf("%f ", span[j]);
-        }
-        printf("\n");
     }
 }
 
-__global__ void fillCurDimArray(int n, unsigned int num_segments, int* currDimArray, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
+__global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
         currDimArray[i] = spanReduced[i].key;
+    }
+}
+
+// TODO: change the name of this kernel because it also changes the bit vector
+__global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray, cub::KeyValuePair<int, H2Opus_Real>* spanReduced, uint64_t* bit_vector){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i<num_segments){
+        currDimArray[i] = spanReduced[i].key;
+    }
+
+    unsigned int last_index = (num_segments+sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8);
+    if(i<last_index){
+        bit_vector[i] = 0ULL;
     }
 }
 
@@ -74,6 +159,26 @@ __global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_i
     if(i<n){
         keys_in[i] = dataset[(long long)currDimArray[i/segment_size]*n + (long long)values_in[i]];
     }
+}
+
+__global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currDimArray, int* values_in, H2Opus_Real* dataset, int* offsets_sort, int* output){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i<n){
+        int segment_index = output[i] - 1;
+        keys_in[i] = dataset[(long long)currDimArray[segment_index]*n + (long long)values_in[i]];
+    }
+    // if(threadIdx.x==0 && blockIdx.x==0){
+    //     printf("output\n");
+    //     for(unsigned int j=0; j<n; ++j){
+    //         printf("%d ", output[j]);
+    //     }
+    // }
+    // if(threadIdx.x==0 && blockIdx.x==0){
+    //     printf("keys in\n");
+    //     for(unsigned int j=0; j<n; ++j){
+    //         printf("%f ", keys_in[j]);
+    //     }
+    // }
 }
 
 __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real* dataset){
@@ -117,3 +222,37 @@ __global__ void tileMatrix(int n, int padded_n, H2Opus_Real* S, H2Opus_Real* U, 
         }
     }
 }
+
+__global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offsets_sort){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if(i<num_segments){
+        unsigned int pos = i%(sizeof(uint64_t)*8);
+        unsigned int sub = i/(sizeof(uint64_t)*8);
+        if(offsets_sort[i+1] - offsets_sort[i] > BUCKET_SIZE){
+            atomicOr((unsigned long long*)&bit_vector[sub], 1ULL<<(sizeof(uint64_t)*8-1-pos));
+        }
+    }
+}
+
+__global__ void  fillPopCount(int num_segments, uint64_t* bit_vector, short int* popc_bit_vector){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i<num_segments){
+        popc_bit_vector[i] = __popcll(bit_vector[i]);
+    }
+    // if(threadIdx.x==0 && blockIdx.x==0){
+    //     printf("pop count\n");
+    //     for(unsigned int j=0; j<num_segments; ++j){
+    //         printf("%hi", popc_bit_vector[j]);
+    //     }
+    // }
+}
+
+// __global__ void printPopcScan(int num_segments, short int* popc_scan){
+//     if(threadIdx.x==0 && blockIdx.x==0){
+//         printf("popc scan\n");
+//         for(unsigned int j=0; j<num_segments; ++j){
+//             printf("%hi", popc_scan[j]);
+//         }
+//     }
+// }
