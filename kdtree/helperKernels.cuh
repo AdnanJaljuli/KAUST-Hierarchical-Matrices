@@ -49,51 +49,53 @@ __global__ void fillOffsets(int n, unsigned int dim, unsigned int num_segments, 
     }
 }
 
-__global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce, int* aux_offsets_sort, uint64_t* bit_vector, short* popc_scan, unsigned int* new_num_segments){
+__global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce, int* aux_offsets_sort, uint64_t* bit_vector, short* popc_scan, unsigned int* new_num_segments, bool* workDone){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-
+    if(threadIdx.x==0 && blockIdx.x==0){
+        printf("num segments: %d\n", num_segments);
+    }
+    
     if(i<num_segments){
-        *new_num_segments = num_segments + popc_scan[num_segments - 1] + __popcll(bit_vector[((((num_segments+BUCKET_SIZE-1)/BUCKET_SIZE) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) - 1]);
+        // *new_num_segments = num_segments + popc_scan[num_segments - 1] + __popcll(bit_vector[((((num_segments+BUCKET_SIZE-1)/BUCKET_SIZE) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) - 1]);
+        *new_num_segments = num_segments + popc_scan[num_segments - 1] + __popcll(bit_vector[(num_segments + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8) - 1]);
         if(threadIdx.x==0 && blockIdx.x==0){
             aux_offsets_sort[*new_num_segments] = n;
-            
         }
 
         unsigned int pos = i%(sizeof(uint64_t)*8);
         unsigned int sub = i/(sizeof(uint64_t)*8);
         unsigned int onesToLeft = __popcll(bit_vector[sub]>>(sizeof(uint64_t)*8 - pos));
 
-        if(threadIdx.x==0 && blockIdx.x==0){
-            printf("ones to left: %d\n", onesToLeft);
-        }
+        printf("i: %d  onestoleft: %d\n", i, onesToLeft);
 
-        unsigned int index = (popc_scan[i] + onesToLeft)*2 + (sizeof(uint64_t)*8*sub - popc_scan[i] + pos - onesToLeft);
-        if(threadIdx.x==0 && blockIdx.x==0){
-            printf("index: %d\n", index);
-        }
+        unsigned int index = (popc_scan[sub] + onesToLeft)*2 + (sizeof(uint64_t)*8*sub - popc_scan[sub] + pos - onesToLeft);
+ 
+        printf("i: %d  index: %d\n", i, index);
         aux_offsets_sort[index] = offsets_sort[i];
         if(offsets_sort[i+1] - offsets_sort[i] > BUCKET_SIZE){
             aux_offsets_sort[index + 1] = (offsets_sort[i+1] - offsets_sort[i] + 1)/2 + offsets_sort[i];
         }
-
-        // for(unsigned int j=0; j<dim; ++j){
-        //     offsets_reduce[j*(*new_num_segments) + i + 1] = ((offsets_sort[i+1] - offsets_sort[i] + 1)/2 + offsets_sort[i])*(n+j);
-        // }
     }
 
     if(threadIdx.x==0 && blockIdx.x==0){
-        printf("new num segment: %d\n", *new_num_segments);
-        printf("offsets sort\n");
-        for(unsigned int j=0; j<num_segments+1; ++j){
-            printf("%d ", offsets_sort[j]);
+        if(aux_offsets_sort[1] - aux_offsets_sort[0] <= BUCKET_SIZE){
+            *workDone = true;
         }
-        printf("\n");
-        printf(" newoffsets sort\n");
-        for(unsigned int j=0; j<*new_num_segments+1; ++j){
-            printf("%d ", aux_offsets_sort[j]);
-        }
-        printf("\n");
     }
+
+    // if(threadIdx.x==0 && blockIdx.x==0){
+    //     printf("new num segment: %d\n", *new_num_segments);
+    //     printf("offsets sort\n");
+    //     for(unsigned int j=0; j<num_segments+1; ++j){
+    //         printf("%d ", offsets_sort[j]);
+    //     }
+    //     printf("\n");
+    //     printf(" newoffsets sort\n");
+    //     for(unsigned int j=0; j<*new_num_segments+1; ++j){
+    //         printf("%d ", aux_offsets_sort[j]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 __global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce){
@@ -235,11 +237,12 @@ __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offse
     }
 }
 
-__global__ void  fillPopCount(int num_segments, uint64_t* bit_vector, short int* popc_bit_vector){
+__global__ void  fillPopCount(int num_threads, uint64_t* bit_vector, short int* popc_bit_vector){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<num_segments){
+    if(i<num_threads){
         popc_bit_vector[i] = __popcll(bit_vector[i]);
     }
+
     // if(threadIdx.x==0 && blockIdx.x==0){
     //     printf("pop count\n");
     //     for(unsigned int j=0; j<num_segments; ++j){
@@ -248,11 +251,18 @@ __global__ void  fillPopCount(int num_segments, uint64_t* bit_vector, short int*
     // }
 }
 
-// __global__ void printPopcScan(int num_segments, short int* popc_scan){
-//     if(threadIdx.x==0 && blockIdx.x==0){
-//         printf("popc scan\n");
-//         for(unsigned int j=0; j<num_segments; ++j){
-//             printf("%hi", popc_scan[j]);
-//         }
-//     }
-// }
+__global__ void printPopcScan(int num_segments, short int* popc_scan){
+    if(threadIdx.x==0 && blockIdx.x==0){
+        printf("popc scan\n");
+        for(unsigned int j=0; j<num_segments; ++j){
+            printf("%hi ", popc_scan[j]);
+        }
+        printf("\n");
+    }
+}
+
+__global__ void isWorkDone(int num_segments, uint64_t* bit_vector, bool* workDone){
+    if(bit_vector[0] == 0ULL){
+        *workDone = true;
+    }
+}
