@@ -1,6 +1,8 @@
 #include "tlr_example.h"
 #include "helperFunctions.h"
 #include "helperKernels.cuh"
+#include "SVD.cuh"
+
 #include <thrust/binary_search.h>
 #include <thrust/device_vector.h>
 #include <thrust/functional.h>
@@ -79,7 +81,6 @@ int main(){
     int* d_span_offsets;
     cub::KeyValuePair<int, H2Opus_Real> *d_span_reduce_out;
     float* timer_arr = (float*)malloc(numTimers*sizeof(float));
-    H2Opus_Real* d_input_matrix;
 
     #if DIVIDE_IN_HALF
     bool workDone= false;
@@ -111,7 +112,6 @@ int main(){
     cudaMalloc((void**) &d_span, (long long)((n+BUCKET_SIZE-1)/BUCKET_SIZE)*dim*(long long)sizeof(int));
     cudaMalloc((void**) &d_span_offsets, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(int));
     cudaMalloc((void**) &d_span_reduce_out, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
-    cudaMalloc((void**) &d_input_matrix, (long long)n*(long long)n*(long long)sizeof(H2Opus_Real));
 
     #if DIVIDE_IN_HALF
     cudaMalloc((void**) &A, ((n+BUCKET_SIZE-1)/BUCKET_SIZE)*sizeof(int));
@@ -366,15 +366,14 @@ int main(){
         cudaDeviceSynchronize();
         cudaMemcpy(new_num_segments, d_new_num_segments, sizeof(unsigned int), cudaMemcpyDeviceToHost);
         cudaMemcpy(&workDone, d_workDone, sizeof(bool), cudaMemcpyDeviceToHost);
+        num_segments = *new_num_segments;
+        d_temp = d_aux_offsets_sort;
+        d_aux_offsets_sort = d_offsets_sort;
+        d_offsets_sort = d_temp;
 
         if(workDone){
             break;
         }
-
-        num_segments= *new_num_segments;
-        d_temp = d_aux_offsets_sort;
-        d_aux_offsets_sort = d_offsets_sort;
-        d_offsets_sort = d_temp;
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
@@ -396,22 +395,34 @@ int main(){
     cudaEventDestroy(startWhileLoop);
     cudaEventDestroy(stopWhileLoop);
 
-    // #if 0
-    // unsigned int numThreadsPerBlock = 1024;
-    // unsigned int numBlocks = (n*n+numThreadsPerBlock-1)/numThreadsPerBlock;
 
-    // generateInputMatrix<<<numBlocks, numThreadsPerBlock>>>(n, dim, d_values_in, d_input_matrix, d_dataset);
-    // cudaDeivceSynchronize();
+    int maxSegmentSize;
+    #if DIVIDE_IN_HALF
+    maxSegmentSize = getMaxSegmentSize(n, BUCKET_SIZE);
+    printf("max segment size: %d\n", maxSegmentSize);
+    printf("n: %d\n", n);
+    #else
+    maxSegmentSize = BUCKET_SIZE;
+    #endif
 
-    // int nBlocks = (n+BUCKET_SIZE-1)/BUCKET_SIZE;
-    // int NRows=BUCKET_SIZE;
-    // int NCols=BUCKET_SIZE;
+    H2Opus_Real* d_input_matrix;
+    H2Opus_Real* input_matrix = (H2Opus_Real*)malloc((long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
+    dim3 m_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
+    dim3 m_numBlocks(num_segments, num_segments);
+    generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, num_segments, maxSegmentSize, dim, d_values_in, d_input_matrix, d_dataset, d_offsets_sort);
+    cudaDeviceSynchronize();
+    cudaMemcpy(input_matrix, d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
 
-    // H2Opus_Real* S = (H2Opus_Real*)malloc(min(Nrows, Ncols) * nBlocks*nBlocks * sizeof(H2Opus_Real));
-    // H2Opus_Real* U = (H2Opus_Real*)malloc(Nrows * Ncols * nBlocks*nBlocks * sizeof(H2Opus_Real));
-    // H2Opus_Real* V = (H2Opus_Real*)malloc(Nrows * Ncols * nBlocks*nBlocks * sizeof(H2Opus_Real));
+    int nBlocks = (n+maxSegmentSize-1)/maxSegmentSize;
+    int NRows=maxSegmentSize;
+    int NCols=maxSegmentSize;
 
-    // SVD(n, BUCKET_SIZE, d_input_matrix, S, U, V);
+    H2Opus_Real* S = (H2Opus_Real*)malloc(min(NRows, NCols) * nBlocks*nBlocks * sizeof(H2Opus_Real));
+    H2Opus_Real* U = (H2Opus_Real*)malloc(NRows * NCols * nBlocks*nBlocks * sizeof(H2Opus_Real));
+    H2Opus_Real* V = (H2Opus_Real*)malloc(NRows * NCols * nBlocks*nBlocks * sizeof(H2Opus_Real));
+
+    SVD(n, BUCKET_SIZE, input_matrix, S, U, V, nBlocks, NRows, NCols);
 
     // int* d_K;
     // H2Opus_Real* d_S;
@@ -479,7 +490,6 @@ int main(){
     // free(Ss);
     // free(Us);
     // free(Vs);
-    // #endif
 
     #if PRINT_OUTPUT
     int *index_map = (int*)malloc(n*sizeof(int));
@@ -510,6 +520,7 @@ int main(){
     cudaFree(d_span);
     cudaFree(d_span_offsets);
     cudaFree(d_input_matrix);
+    free(input_matrix);
 
     #if DIVIDE_IN_HALF
     cudaFree(A);

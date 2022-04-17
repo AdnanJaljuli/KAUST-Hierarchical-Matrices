@@ -1,6 +1,6 @@
 #include <cub/cub.cuh>
 #include "helperFunctions.h"
-#define BUCKET_SIZE 1<<3
+#define BUCKET_SIZE 1<<4
 typedef double H2Opus_Real;
 
 __global__ void initializeArrays(int n, int* values_in, int* currDimArray){
@@ -57,7 +57,8 @@ __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segmen
     
     if(i<num_segments){
         // *new_num_segments = num_segments + popc_scan[num_segments - 1] + __popcll(bit_vector[((((num_segments+BUCKET_SIZE-1)/BUCKET_SIZE) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) - 1]);
-        *new_num_segments = num_segments + popc_scan[num_segments - 1] + __popcll(bit_vector[(num_segments + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8) - 1]);
+        *new_num_segments = num_segments + popc_scan[(num_segments + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8) - 1] + __popcll(bit_vector[(num_segments + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8) - 1]);
+
         if(threadIdx.x==0 && blockIdx.x==0){
             aux_offsets_sort[*new_num_segments] = n;
         }
@@ -193,12 +194,26 @@ __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real
     return ans;
 }
 
-__global__ void generateInputMatrix(int n, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<n*n){
-        int col = i%n;
-        int row = i/n;
-        matrix[col*n+row] = interaction(n, dim, index_map[col], index_map[row], dataset);
+__global__ void generateInputMatrix(int n, int num_segments, int maxSegmentSize, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset, int* offsets_sort){
+    int col = blockIdx.y*maxSegmentSize + threadIdx.y;
+    int row = blockIdx.x*maxSegmentSize + threadIdx.x;
+
+    unsigned int padded_n = num_segments*maxSegmentSize;
+    int xDim = offsets_sort[blockIdx.x + 1] - offsets_sort[blockIdx.x];
+    int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
+
+    if(threadIdx.x < maxSegmentSize && threadIdx.y < maxSegmentSize){
+        if(threadIdx.x >= xDim || threadIdx.y >= yDim) {
+            if(threadIdx.x == threadIdx.y){
+                matrix[col*padded_n + row] = 1;
+            }
+            else{
+                matrix[col*padded_n + row] = 0;
+            }
+        }
+        else{
+            matrix[col*padded_n + row] = interaction(n, dim, index_map[col], index_map[row], dataset);
+        }
     }
 }
 
@@ -264,5 +279,14 @@ __global__ void printPopcScan(int num_segments, short int* popc_scan){
 __global__ void isWorkDone(int num_segments, uint64_t* bit_vector, bool* workDone){
     if(bit_vector[0] == 0ULL){
         *workDone = true;
+    }
+}
+
+__global__ void printMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* matrix){
+    for(unsigned int i=0; i<num_segments*maxSegmentSize; ++i){
+        for(unsigned int j=0; j<num_segments*maxSegmentSize; ++j){
+           printf("%f ", matrix[i*num_segments*maxSegmentSize + j]);
+        }
+        printf("\n");
     }
 }

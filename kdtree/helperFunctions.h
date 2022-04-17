@@ -17,7 +17,7 @@ void printCountersInFile(unsigned int iteration, unsigned int num_segments, floa
     fclose(output_file);
 }
 
-int upper_power_of_two(int v){
+__device__ __host__ int upper_power_of_two(int v){
     v--;
     v |= v >> 1;
     v |= v >> 2;
@@ -32,5 +32,11 @@ bool isPowerOfTwo (int x) {
     return x && (!(x&(x-1)));
 }
 
+int getMaxSegmentSize(int n, int bucket_size){
+    while(n > bucket_size){
+        n = (n + 1)/2;
+    }
+    return n;
+}
 
 #endif
