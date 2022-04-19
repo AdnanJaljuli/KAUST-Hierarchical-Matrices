@@ -1,89 +1,199 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 
-#include<iostream>
-#include<iomanip>
-#include<stdlib.h>
-#include<stdio.h>
-#include<assert.h>
-#include<math.h>
-
+#include <cuda_runtime.h>
 #include <cusolverDn.h>
-#include <cuda_runtime_api.h>
 
 #include "utilities.cuh"
+// #include "TimingGPU.cuh"
 
-void SVD(unsigned int N, unsigned int blockSize, H2Opus_Real* matrix, H2Opus_Real* Ss, H2Opus_Real* Us, H2Opus_Real* Vs, int nBlocks, int Nrows, int Ncols){
-    int work_size = 0;
-    int *devInfo;
-    gpuErrchk(cudaMalloc(&devInfo, sizeof(int)));
+#define FULLSVD 1
+#define PRINTRESULTS 0
 
-    cusolverDnHandle_t solver_handle;
-    cusolverDnCreate(&solver_handle);
+void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, int NCols, int maxSegmentSize){
 
-    // unsigned int k = 3;
-    unsigned int numStreams = nBlocks*nBlocks;
-    cudaStream_t stream[numStreams];
-    for(unsigned int s=0; s<numStreams; ++s) {
-        cudaStreamCreate(&stream[s]);
-    }
+    const int           M = NRows;
+    const int           N = NCols;
+    const int           lda = M;
+    const int           numMatrices = num_segments*num_segments;
 
-    // --- host side SVD results space
-    H2Opus_Real *h_U = (H2Opus_Real *)malloc(Nrows * Nrows * numStreams * sizeof(H2Opus_Real));
-    H2Opus_Real *h_V = (H2Opus_Real *)malloc(Ncols * Ncols * numStreams * sizeof(H2Opus_Real));
-    H2Opus_Real *h_S = (H2Opus_Real *)malloc(min(Nrows, Ncols) * numStreams * sizeof(H2Opus_Real));
-
-    // --- device side SVD workspace and matrices
-    H2Opus_Real *d_U;            gpuErrchk(cudaMalloc(&d_U,  Nrows * Nrows * numStreams * sizeof(H2Opus_Real)));
-    H2Opus_Real *d_V;            gpuErrchk(cudaMalloc(&d_V,  Ncols * Ncols * numStreams * sizeof(H2Opus_Real)));
-    H2Opus_Real *d_S;            gpuErrchk(cudaMalloc(&d_S,  min(Nrows, Ncols) * numStreams * sizeof(H2Opus_Real)));
-
-    H2Opus_Real *d_A;
-    gpuErrchk(cudaMalloc(&d_A, Nrows * Ncols * numStreams * sizeof(H2Opus_Real)));
-
-    H2Opus_Real *work;
-    gpuErrchk(cudaMalloc(&work, work_size * numStreams * sizeof(H2Opus_Real)));
-
-    for(unsigned int str=0; str<numStreams; ++str) {
-        H2Opus_Real *h_A = (H2Opus_Real *) malloc(Nrows * Ncols * sizeof(H2Opus_Real));
-        for(int i = 0; i < Nrows; i++){
-            for(int j = 0; j < Ncols; j++){
-                h_A[j*Nrows + i] = matrix[(str%nBlocks)*N*blockSize + j*N + (str/nBlocks)*blockSize + i];
+    // --- Setting the host matrix
+    cuComplex *h_A = (cuComplex *)malloc(lda * N * numMatrices * sizeof(double));
+    for (unsigned int k = 0; k < numMatrices; k++)
+        for (unsigned int i = 0; i < M; i++)
+        {
+            for (unsigned int j = 0; j < N; j++)
+            {
+                h_A[k * M * N + j * M + i] = make_float2(matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i], matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i]);
+                h_A[k * M * N + j * M + i] = make_float2((1. / (k + 1)) * (i + j * j) * (i + j), (1. / (k + 1)) * (i + j * j) * (i + j));
             }
         }
 
-        gpuErrchk(cudaMemcpyAsync(&d_A[str*nBlocks*nBlocks], h_A, Nrows * Ncols * sizeof(H2Opus_Real), cudaMemcpyHostToDevice, stream[str]));
+    // --- Setting the device matrix and moving the host matrix to the device
+    cuComplex *d_A;         gpuErrchk(cudaMalloc(&d_A, M * N * numMatrices * sizeof(cuComplex)));
+    gpuErrchk(cudaMemcpy(d_A, h_A, M * N * numMatrices * sizeof(cuComplex), cudaMemcpyHostToDevice));
 
-        cusolverDnSetStream(solver_handle, stream[str]);
-        // --- CUDA SVD initialization
-        cusolveSafeCall(cusolverDnDgesvd_bufferSize(solver_handle, Nrows, Ncols, &work_size));
+    // --- host side SVD results space
+    float *h_S = (float *)malloc(N * numMatrices * sizeof(float));
+    cuComplex *h_U = NULL;
+    cuComplex *h_V = NULL;
+#ifdef FULLSVD
+    h_U = (cuComplex *)malloc(M * M * numMatrices * sizeof(cuComplex));
+    h_V = (cuComplex *)malloc(N * N * numMatrices * sizeof(cuComplex));
+#endif
 
-        // --- CUDA SVD execution
-        cusolveSafeCall(cusolverDnDgesvd(solver_handle, 'A', 'A', Nrows, Ncols, &d_A[str*nBlocks*nBlocks], Nrows, &d_S[str*nBlocks], &d_U[str*nBlocks*nBlocks], Nrows, &d_V[str*nBlocks*nBlocks], Ncols, &work[str*work_size], work_size, NULL, devInfo));
-        // int devInfo_h = 0;  gpuErrchk(cudaMemcpy(&devInfo_h, devInfo, sizeof(int), cudaMemcpyDeviceToHost));
-        // if (devInfo_h != 0) std::cout   << "Unsuccessful SVD execution\n\n";
+    // --- device side SVD workspace and matrices
+    int work_size = 0;
 
-        // // --- Moving the results from device to host
-        // gpuErrchk(cudaMemcpyAsync(&h_S[str*nBlocks], &d_S[str*nBlocks], min(Nrows, Ncols) * sizeof(H2Opus_Real), cudaMemcpyDeviceToHost, stream[str]));
-        // gpuErrchk(cudaMemcpyAsync(&h_U[str*nBlocks*nBlocks], &d_U[str*nBlocks*nBlocks], Nrows * Nrows     * sizeof(H2Opus_Real), cudaMemcpyDeviceToHost, stream[str]));
-        // gpuErrchk(cudaMemcpyAsync(&h_V[str*nBlocks*nBlocks], &d_V[str*nBlocks*nBlocks], Ncols * Ncols     * sizeof(H2Opus_Real), cudaMemcpyDeviceToHost, stream[str]));
+    int *devInfo;        gpuErrchk(cudaMalloc(&devInfo, sizeof(int)));
+    float *d_S;         gpuErrchk(cudaMalloc(&d_S, N * numMatrices * sizeof(float)));
+    cuComplex *d_U = NULL;
+    cuComplex *d_V = NULL;
+#ifdef FULLSVD
+    gpuErrchk(cudaMalloc(&d_U, M * M * numMatrices * sizeof(cuComplex)));
+    gpuErrchk(cudaMalloc(&d_V, N * N * numMatrices * sizeof(cuComplex)));
+#endif
 
-        // for(unsigned int i=0; i<min(Nrows, Ncols); ++i){
-        //     Ss[str*min(Nrows, Ncols) + i] = h_S[i];
-        // }
-        // for(unsigned int i=0; i<Nrows*Ncols; ++i){
-        //     Us[str*Nrows*Ncols + i] = h_U[i];
-        //     Vs[str*Nrows*Ncols + i] = h_V[i];
-        // }
-        free(h_A);
+    cuComplex *d_work = NULL; /* devie workspace for gesvdj */
+    int devInfo_h = 0; /* host copy of error devInfo_h */
+
+    // --- Parameters configuration of Jacobi-based SVD
+    const double            tol = 1.e-7;
+    const int               maxSweeps = 15;
+    cusolverEigMode_t jobz;                                   // --- CUSOLVER_EIG_MODE_VECTOR - Compute eigenvectors; CUSOLVER_EIG_MODE_NOVECTOR - Compute singular values only
+#ifdef FULLSVD
+    jobz = CUSOLVER_EIG_MODE_VECTOR;
+#else
+    jobz = CUSOLVER_EIG_MODE_NOVECTOR;
+#endif
+
+    const int               econ = 0;                            // --- econ = 1 for economy size 
+
+    // --- Numerical result parameters of gesvdj 
+    double                  residual = 0;
+    int                     executedSweeps = 0;
+
+    // --- CUDA solver initialization
+    cusolverDnHandle_t solver_handle = NULL;
+    cusolveSafeCall(cusolverDnCreate(&solver_handle));
+
+    // --- Configuration of gesvdj
+    gesvdjInfo_t gesvdj_params = NULL;
+    cusolveSafeCall(cusolverDnCreateGesvdjInfo(&gesvdj_params));
+
+    // --- Set the computation tolerance, since the default tolerance is machine precision
+    cusolveSafeCall(cusolverDnXgesvdjSetTolerance(gesvdj_params, tol));
+
+    // --- Set the maximum number of sweeps, since the default value of max. sweeps is 100
+    cusolveSafeCall(cusolverDnXgesvdjSetMaxSweeps(gesvdj_params, maxSweeps));
+
+    // --- Query the SVD workspace 
+    cusolveSafeCall(cusolverDnCgesvdjBatched_bufferSize(
+        solver_handle,
+        jobz,                                       // --- Compute the singular vectors or not
+        M,                                          // --- Number of rows of A, 0 <= M
+        N,                                          // --- Number of columns of A, 0 <= N 
+        d_A,                                        // --- M x N
+        lda,                                        // --- Leading dimension of A
+        d_S,                                        // --- Square matrix of size min(M, N) x min(M, N)
+        d_U,                                        // --- M x M if econ = 0, M x min(M, N) if econ = 1
+        lda,                                        // --- Leading dimension of U, ldu >= max(1, M)
+        d_V,                                        // --- N x N if econ = 0, N x min(M,N) if econ = 1
+        lda,                                        // --- Leading dimension of V, ldv >= max(1, N)
+        &work_size,
+        gesvdj_params,
+        numMatrices));
+
+    gpuErrchk(cudaMalloc(&d_work, sizeof(cuComplex) * work_size));
+
+    // --- Compute SVD
+    // timerGPU.StartCounter();
+    cusolveSafeCall(cusolverDnCgesvdjBatched(
+        solver_handle,
+        jobz,                                       // --- Compute the singular vectors or not
+        M,                                          // --- Number of rows of A, 0 <= M
+        N,                                          // --- Number of columns of A, 0 <= N 
+        d_A,                                        // --- M x N
+        lda,                                        // --- Leading dimension of A
+        d_S,                                        // --- Square matrix of size min(M, N) x min(M, N)
+        d_U,                                        // --- M x M if econ = 0, M x min(M, N) if econ = 1
+        lda,                                        // --- Leading dimension of U, ldu >= max(1, M)
+        d_V,                                        // --- N x N if econ = 0, N x min(M, N) if econ = 1
+        N,                                          // --- Leading dimension of V, ldv >= max(1, N)
+        d_work,
+        work_size,
+        devInfo,
+        gesvdj_params,
+        numMatrices));
+
+    // printf("Calculation of the singular values only: %f ms\n\n", timerGPU.GetCounter());
+
+    gpuErrchk(cudaMemcpy(&devInfo_h, devInfo, sizeof(int), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(h_S, d_S, sizeof(float) * N * numMatrices, cudaMemcpyDeviceToHost));
+#ifdef FULLSVD
+    gpuErrchk(cudaMemcpy(h_U, d_U, sizeof(cuComplex) * lda * M * numMatrices, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(h_V, d_V, sizeof(cuComplex) * N * N * numMatrices, cudaMemcpyDeviceToHost));
+#endif
+
+#ifdef PRINTRESULTS
+    printf("SINGULAR VALUES \n");
+    printf("_______________ \n");
+    for (int k = 0; k < numMatrices; k++)
+    {
+        for (int p = 0; p < N; p++)
+            printf("Matrix nr. %d; SV nr. %d; Value = %f\n", k, p, h_S[k * N + p]);
+        printf("\n");
+    }
+#if 0 //FULLSVD
+    printf("SINGULAR VECTORS U \n");
+    printf("__________________ \n");
+    for (int k = 0; k < numMatrices; k++)
+    {
+        for (int q = 0; q < (1 - econ) * M + econ * min(M, N); q++)
+            for (int p = 0; p < M; p++)
+                printf("Matrix nr. %d; U nr. %d; Value = %f\n", k, p, h_U[((1 - econ) * M + econ * min(M, N)) * M * k + q * M + p]);
+        printf("\n");
     }
 
-    free(h_U);
-    free(h_S);
-    free(h_V);
-    cudaFree(d_S);
-    cudaFree(d_V);
-    cudaFree(d_U);
-    cudaFree(devInfo);
-    cusolverDnDestroy(solver_handle);
+    printf("SINGULAR VECTORS V \n");
+    printf("__________________ \n");
+    for (int k = 0; k < numMatrices; k++)
+    {
+        for (int q = 0; q < (1 - econ) * N + econ * min(M, N); q++)
+            for (int p = 0; p < N; p++)
+                printf("Matrix nr. %d; V nr. %d; Value = %f\n", k, p, h_V[((1 - econ) * N + econ * min(M, N)) * N * k + q * N + p]);
+        printf("\n");
+    }
+#endif
+#endif
+
+    if (0 == devInfo_h)
+    {
+        printf("gesvdj converges \n");
+    }
+    else if (0 > devInfo_h)
+    {
+        printf("%d-th parameter is wrong \n", -devInfo_h);
+        exit(1);
+    }
+    else
+    {
+        printf("WARNING: devInfo_h = %d : gesvdj does not converge \n", devInfo_h);
+    }
+
+    // --- Free resources
+    // if (d_A) gpuErrchk(cudaFree(d_A));
+    // if (d_S) gpuErrchk(cudaFree(d_S));
+// #ifdef FULLSVD
+//     if (d_U) gpuErrchk(cudaFree(d_U));
+//     if (d_V) gpuErrchk(cudaFree(d_V));
+// #endif
+//     if (devInfo) gpuErrchk(cudaFree(devInfo));
+//     if (d_work) gpuErrchk(cudaFree(d_work));
+//     if (solver_handle) cusolveSafeCall(cusolverDnDestroy(solver_handle));
+//     if (gesvdj_params) cusolveSafeCall(cusolverDnDestroyGesvdjInfo(gesvdj_params));
+
+//     gpuErrchk(cudaDeviceReset());
 }

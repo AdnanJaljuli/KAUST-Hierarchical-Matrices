@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <assert.h>
 
 #include "cuda_runtime.h"
@@ -9,22 +8,28 @@
 /*******************/
 /* iDivUp FUNCTION */
 /*******************/
-extern "C" int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
+extern "C" int iDivUp(int a, int b) {
+    return ((a % b) != 0) ? (a / b + 1) : (a / b);
+}
 
 /********************/
 /* CUDA ERROR CHECK */
 /********************/
 // --- Credit to http://stackoverflow.com/questions/14038589/what-is-the-canonical-way-to-check-for-errors-using-the-cuda-runtime-api
-void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
+void gpuAssert(cudaError_t code, char *file, int line, bool abort = true)
 {
-   if (code != cudaSuccess)
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) { exit(code); }
-   }
+    if (code != cudaSuccess)
+    {
+        // fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) {
+            exit(code);
+        }
+    }
 }
 
-extern "C" void gpuErrchk(cudaError_t ans) { gpuAssert((ans), __FILE__, __LINE__); }
+extern "C" void gpuErrchk(cudaError_t ans) {
+    gpuAssert((ans), __FILE__, __LINE__);
+}
 
 /**************************/
 /* CUSOLVE ERROR CHECKING */
@@ -64,11 +69,13 @@ static const char *_cudaGetErrorEnum(cusolverStatus_t error)
 
 inline void __cusolveSafeCall(cusolverStatus_t err, const char *file, const int line)
 {
-    if(CUSOLVER_STATUS_SUCCESS != err) {
-        fprintf(stderr, "CUSOLVE error in file '%s', line %d\n %s\nerror %d: %s\nterminating!\n",__FILE__, __LINE__,err, \
-                                _cudaGetErrorEnum(err)); \
-        cudaDeviceReset(); assert(0); \
+    if (CUSOLVER_STATUS_SUCCESS != err) {
+        // fprintf(stderr, "CUSOLVE error in file '%s', line %d\n %s\nerror %d: %s\nterminating!\n", __FILE__, __LINE__, err, \
+        //         _cudaGetErrorEnum(err));
+            cudaDeviceReset(); assert(0);
     }
 }
 
-extern "C" void cusolveSafeCall(cusolverStatus_t err) { __cusolveSafeCall(err, __FILE__, __LINE__); }
+extern "C" void cusolveSafeCall(cusolverStatus_t err) {
+    __cusolveSafeCall(err, __FILE__, __LINE__);
+}
