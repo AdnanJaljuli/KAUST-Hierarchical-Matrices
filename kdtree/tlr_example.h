@@ -53,11 +53,11 @@ void generateGrid(PointCloud<T> &pt_cloud, int n)
 {
     srand (time(NULL));
     int randomNum;
+
     for (int i = 0; i < n; ++i)
     {
         for(int j=0; j<pt_cloud.dimension; ++j){
-            randomNum = rand() % 1000 + 1;
-            pt_cloud.pts[j][i] = randomNum;
+            pt_cloud.pts[j][i] = (float) rand()/RAND_MAX;
         }
     }
 }

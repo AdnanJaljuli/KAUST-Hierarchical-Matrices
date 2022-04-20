@@ -1,4 +1,4 @@
-NVCC_FLAGS= -O3 -w -gencode arch=compute_70,code=sm_70 -std=c++11 -I"cub-1.8.0" -lcusolver
+NVCC_FLAGS= -O3 -w -G -g -gencode arch=compute_70,code=sm_70 -std=c++11 -I"cub-1.8.0" -lcusolver
 
 output: main.o utilities.o
 	nvcc $(NVCC_FLAGS) main.o utilities.o -o output

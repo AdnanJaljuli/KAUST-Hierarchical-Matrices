@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <iostream>
 
 #include <cuda_runtime.h>
 #include <cusolverDn.h>
@@ -27,7 +28,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
             for (unsigned int j = 0; j < N; j++)
             {
                 h_A[k * M * N + j * M + i] = make_float2(matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i], matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i]);
-                h_A[k * M * N + j * M + i] = make_float2((1. / (k + 1)) * (i + j * j) * (i + j), (1. / (k + 1)) * (i + j * j) * (i + j));
+                // h_A[k * M * N + j * M + i] = make_float2((1. / (k + 1)) * (i + j * j) * (i + j), (1. / (k + 1)) * (i + j * j) * (i + j));
             }
         }
 
@@ -47,7 +48,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     // --- device side SVD workspace and matrices
     int work_size = 0;
 
-    int *devInfo;        gpuErrchk(cudaMalloc(&devInfo, sizeof(int)));
+    int *devInfo;        gpuErrchk(cudaMalloc(&devInfo, sizeof(int) * numMatrices));
     float *d_S;         gpuErrchk(cudaMalloc(&d_S, N * numMatrices * sizeof(float)));
     cuComplex *d_U = NULL;
     cuComplex *d_V = NULL;
@@ -182,6 +183,74 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     {
         printf("WARNING: devInfo_h = %d : gesvdj does not converge \n", devInfo_h);
     }
+
+    // printf("H_U\n");
+    // for(unsigned int i=0; i<M; ++i){
+    //     for(unsigned int j=0; j<M;++j){
+    //         printf("%f ", h_U[j*M + i].x);
+    //         printf("%f      ", h_U[j*M + i].y);
+    //         // std::cout << h_U[i*M + j].real << " ";
+    //     }
+    //     printf("\n");
+    // }
+    // printf("H_S\n");
+    // for(unsigned int i=0; i<M; ++i){
+    //     printf("%f ", h_S[i]);
+    // }
+    // printf("\n");
+    // printf("H_V\n");
+    // for(unsigned int i=0; i<M; ++i){
+    //     for(unsigned int j=0; j<M;++j){
+    //         printf("%f ", h_V[j*M + i].x);
+    //         printf("%f      ", h_V[j*M + i].y);
+    //         // std::cout << h_V[i*M + j] << " ";
+    //     }
+    //     printf("\n");
+    // }
+
+    // float* tmp = (float*) malloc(M * M * sizeof(float));
+    // float* ans = (float*) malloc(M * M * sizeof(float));
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         ans[j*M + i] = 0;
+    //         tmp[j*M + i] = 0;
+    //     }
+    // }
+
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         tmp[i*M + j] = h_U[i*M + j].x * h_S[i];
+    //     }
+    // }
+
+    // printf("tmp\n");
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0;j<M; ++j){
+    //         printf("%f ", tmp[j*M + i]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("\n");
+
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         ans[i*M + j] = 0.0;
+    //         for(int k=0; k<M; ++k){
+    //             printf("%f ", ans[i*M+j]);
+    //             ans[i*M + j] += (tmp[k*M + j] * h_V[i*M + k].x);
+    //         }
+    //         printf("\n");
+    //     }
+    //     printf("\n");
+    // }
+
+    // printf("ans\n");
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         printf("%f ", ans[j*M + i]);
+    //     }
+    //     printf("\n");
+    // }
 
     // --- Free resources
     // if (d_A) gpuErrchk(cudaFree(d_A));

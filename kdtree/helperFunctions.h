@@ -1,6 +1,7 @@
 #ifndef HELPERFUNCTIONS_H
 #define HELPERFUNCTIONS_H
 
+#include <utility>
 #define numTimers 9
 
 void printCountersInFile(unsigned int iteration, unsigned int num_segments, float* times){
@@ -32,11 +33,16 @@ bool isPowerOfTwo (int x) {
     return x && (!(x&(x-1)));
 }
 
-int getMaxSegmentSize(int n, int bucket_size){
+std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
+    int it=0;
     while(n > bucket_size){
         n = (n + 1)/2;
+        ++it;
     }
-    return n;
+    std::pair<int, int> p;
+    p.first = n;
+    p.second = it;
+    return p;
 }
 
 #endif
