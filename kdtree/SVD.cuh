@@ -13,7 +13,7 @@
 #define FULLSVD 1
 #define PRINTRESULTS 0
 
-void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, int NCols, int maxSegmentSize){
+void SVD(int n, int num_segments, H2Opus_Real* matrix, int NRows, int NCols, int maxSegmentSize, H2Opus_Real* h_S, H2Opus_Real* h_U, H2Opus_Real* h_V){
 
     const int           M = NRows;
     const int           N = NCols;
@@ -21,43 +21,43 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     const int           numMatrices = num_segments*num_segments;
 
     // --- Setting the host matrix
-    cuComplex *h_A = (cuComplex *)malloc(lda * N * numMatrices * sizeof(double));
-    for (unsigned int k = 0; k < numMatrices; k++)
+    H2Opus_Real *h_A = (H2Opus_Real *)malloc(lda * N * numMatrices * sizeof(double));
+    for (unsigned int k = 0; k < numMatrices; k++){
         for (unsigned int i = 0; i < M; i++)
         {
             for (unsigned int j = 0; j < N; j++)
             {
-                h_A[k * M * N + j * M + i] = make_float2(matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i], matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i]);
+                h_A[k * M * N + j * M + i] = matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i];
                 // h_A[k * M * N + j * M + i] = make_float2((1. / (k + 1)) * (i + j * j) * (i + j), (1. / (k + 1)) * (i + j * j) * (i + j));
             }
         }
-
+    }
     // --- Setting the device matrix and moving the host matrix to the device
-    cuComplex *d_A;         gpuErrchk(cudaMalloc(&d_A, M * N * numMatrices * sizeof(cuComplex)));
-    gpuErrchk(cudaMemcpy(d_A, h_A, M * N * numMatrices * sizeof(cuComplex), cudaMemcpyHostToDevice));
+    H2Opus_Real *d_A;         gpuErrchk(cudaMalloc(&d_A, M * N * numMatrices * sizeof(H2Opus_Real)));
+    gpuErrchk(cudaMemcpy(d_A, h_A, M * N * numMatrices * sizeof(H2Opus_Real), cudaMemcpyHostToDevice));
 
     // --- host side SVD results space
-    float *h_S = (float *)malloc(N * numMatrices * sizeof(float));
-    cuComplex *h_U = NULL;
-    cuComplex *h_V = NULL;
+    // H2Opus_Real *h_S = (H2Opus_Real *)malloc(N * numMatrices * sizeof(H2Opus_Real));
+    // H2Opus_Real *h_U = NULL;
+    // H2Opus_Real *h_V = NULL;
 #ifdef FULLSVD
-    h_U = (cuComplex *)malloc(M * M * numMatrices * sizeof(cuComplex));
-    h_V = (cuComplex *)malloc(N * N * numMatrices * sizeof(cuComplex));
+    // h_U = (H2Opus_Real *)malloc(M * M * numMatrices * sizeof(H2Opus_Real));
+    // h_V = (H2Opus_Real *)malloc(N * N * numMatrices * sizeof(H2Opus_Real));
 #endif
 
     // --- device side SVD workspace and matrices
     int work_size = 0;
 
     int *devInfo;        gpuErrchk(cudaMalloc(&devInfo, sizeof(int) * numMatrices));
-    float *d_S;         gpuErrchk(cudaMalloc(&d_S, N * numMatrices * sizeof(float)));
-    cuComplex *d_U = NULL;
-    cuComplex *d_V = NULL;
+    H2Opus_Real *d_S;         gpuErrchk(cudaMalloc(&d_S, N * numMatrices * sizeof(H2Opus_Real)));
+    H2Opus_Real *d_U = NULL;
+    H2Opus_Real *d_V = NULL;
 #ifdef FULLSVD
-    gpuErrchk(cudaMalloc(&d_U, M * M * numMatrices * sizeof(cuComplex)));
-    gpuErrchk(cudaMalloc(&d_V, N * N * numMatrices * sizeof(cuComplex)));
+    gpuErrchk(cudaMalloc(&d_U, M * M * numMatrices * sizeof(H2Opus_Real)));
+    gpuErrchk(cudaMalloc(&d_V, N * N * numMatrices * sizeof(H2Opus_Real)));
 #endif
 
-    cuComplex *d_work = NULL; /* devie workspace for gesvdj */
+    H2Opus_Real *d_work = NULL; /* devie workspace for gesvdj */
     int devInfo_h = 0; /* host copy of error devInfo_h */
 
     // --- Parameters configuration of Jacobi-based SVD
@@ -91,7 +91,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     cusolveSafeCall(cusolverDnXgesvdjSetMaxSweeps(gesvdj_params, maxSweeps));
 
     // --- Query the SVD workspace 
-    cusolveSafeCall(cusolverDnCgesvdjBatched_bufferSize(
+    cusolveSafeCall(cusolverDnDgesvdjBatched_bufferSize(
         solver_handle,
         jobz,                                       // --- Compute the singular vectors or not
         M,                                          // --- Number of rows of A, 0 <= M
@@ -107,11 +107,11 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
         gesvdj_params,
         numMatrices));
 
-    gpuErrchk(cudaMalloc(&d_work, sizeof(cuComplex) * work_size));
+    gpuErrchk(cudaMalloc(&d_work, sizeof(H2Opus_Real) * work_size));
 
     // --- Compute SVD
     // timerGPU.StartCounter();
-    cusolveSafeCall(cusolverDnCgesvdjBatched(
+    cusolveSafeCall(cusolverDnDgesvdjBatched(
         solver_handle,
         jobz,                                       // --- Compute the singular vectors or not
         M,                                          // --- Number of rows of A, 0 <= M
@@ -132,13 +132,13 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     // printf("Calculation of the singular values only: %f ms\n\n", timerGPU.GetCounter());
 
     gpuErrchk(cudaMemcpy(&devInfo_h, devInfo, sizeof(int), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(h_S, d_S, sizeof(float) * N * numMatrices, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(h_S, d_S, sizeof(H2Opus_Real) * N * numMatrices, cudaMemcpyDeviceToHost));
 #ifdef FULLSVD
-    gpuErrchk(cudaMemcpy(h_U, d_U, sizeof(cuComplex) * lda * M * numMatrices, cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(h_V, d_V, sizeof(cuComplex) * N * N * numMatrices, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(h_U, d_U, sizeof(H2Opus_Real) * lda * M * numMatrices, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(h_V, d_V, sizeof(H2Opus_Real) * N * N * numMatrices, cudaMemcpyDeviceToHost));
 #endif
 
-#ifdef PRINTRESULTS
+#if PRINTRESULTS
     printf("SINGULAR VALUES \n");
     printf("_______________ \n");
     for (int k = 0; k < numMatrices; k++)
@@ -187,8 +187,8 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     // printf("H_U\n");
     // for(unsigned int i=0; i<M; ++i){
     //     for(unsigned int j=0; j<M;++j){
-    //         printf("%f ", h_U[j*M + i].x);
-    //         printf("%f      ", h_U[j*M + i].y);
+    //         printf("%f ", h_U[j*M + i]);
+    //         printf("%f      ", h_U[j*M + i]);
     //         // std::cout << h_U[i*M + j].real << " ";
     //     }
     //     printf("\n");
@@ -201,15 +201,15 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     // printf("H_V\n");
     // for(unsigned int i=0; i<M; ++i){
     //     for(unsigned int j=0; j<M;++j){
-    //         printf("%f ", h_V[j*M + i].x);
-    //         printf("%f      ", h_V[j*M + i].y);
+    //         printf("%f ", h_V[j*M + i]);
+    //         printf("%f      ", h_V[j*M + i]);
     //         // std::cout << h_V[i*M + j] << " ";
     //     }
     //     printf("\n");
     // }
 
-    // float* tmp = (float*) malloc(M * M * sizeof(float));
-    // float* ans = (float*) malloc(M * M * sizeof(float));
+    // H2Opus_Real* tmp = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
+    // H2Opus_Real* ans = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
     // for(int i=0; i<M; ++i){
     //     for(int j=0; j<M; ++j){
     //         ans[j*M + i] = 0;
@@ -219,7 +219,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
 
     // for(int i=0; i<M; ++i){
     //     for(int j=0; j<M; ++j){
-    //         tmp[i*M + j] = h_U[i*M + j].x * h_S[i];
+    //         tmp[i*M + j] = h_U[i*M + j] * h_S[i];
     //     }
     // }
 
@@ -234,14 +234,10 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
 
     // for(int i=0; i<M; ++i){
     //     for(int j=0; j<M; ++j){
-    //         ans[i*M + j] = 0.0;
     //         for(int k=0; k<M; ++k){
-    //             printf("%f ", ans[i*M+j]);
-    //             ans[i*M + j] += (tmp[k*M + j] * h_V[i*M + k].x);
+    //             ans[i*M + j] += (tmp[k*M + j] * h_V[i*M + k]);
     //         }
-    //         printf("\n");
     //     }
-    //     printf("\n");
     // }
 
     // printf("ans\n");
@@ -253,16 +249,14 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int nBlocks, int NRows, i
     // }
 
     // --- Free resources
-    // if (d_A) gpuErrchk(cudaFree(d_A));
-    // if (d_S) gpuErrchk(cudaFree(d_S));
-// #ifdef FULLSVD
-//     if (d_U) gpuErrchk(cudaFree(d_U));
-//     if (d_V) gpuErrchk(cudaFree(d_V));
-// #endif
-//     if (devInfo) gpuErrchk(cudaFree(devInfo));
-//     if (d_work) gpuErrchk(cudaFree(d_work));
-//     if (solver_handle) cusolveSafeCall(cusolverDnDestroy(solver_handle));
-//     if (gesvdj_params) cusolveSafeCall(cusolverDnDestroyGesvdjInfo(gesvdj_params));
-
-//     gpuErrchk(cudaDeviceReset());
+    if (d_A) gpuErrchk(cudaFree(d_A));
+    if (d_S) gpuErrchk(cudaFree(d_S));
+#ifdef FULLSVD
+    if (d_U) gpuErrchk(cudaFree(d_U));
+    if (d_V) gpuErrchk(cudaFree(d_V));
+#endif
+    if (devInfo) gpuErrchk(cudaFree(devInfo));
+    if (d_work) gpuErrchk(cudaFree(d_work));
+    if (solver_handle) cusolveSafeCall(cusolverDnDestroy(solver_handle));
+    if (gesvdj_params) cusolveSafeCall(cusolverDnDestroyGesvdjInfo(gesvdj_params));
 }

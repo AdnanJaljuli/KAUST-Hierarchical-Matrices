@@ -15,7 +15,7 @@
 #include <typeinfo>
 
 #define eps 1e-4
-#define PRINT_OUTPUT 1
+#define PRINT_OUTPUT 0
 #define USE_SVD 0
 #define DIVISION_METHOD 2
 using namespace std;
@@ -24,7 +24,7 @@ using namespace std;
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    int n = 10;
+    int n = 40;
     int dim = 2;
     printf("N = %d\n", n);
 
@@ -172,7 +172,7 @@ int main(){
     #else
     while(largest_segment_size > BUCKET_SIZE) {
     #endif
-        printf("begin\n");
+        // printf("begin\n");
         for(unsigned int i=0; i<numTimers; ++i){
             timer_arr[i]=0;
         }
@@ -353,9 +353,6 @@ int main(){
         cudaEventDestroy(startSort_k);
         cudaEventDestroy(stopSort_k);
         cudaDeviceSynchronize();
-
-        printSort<<<1, 1>>> (n, d_keys_out, d_values_out);
-        cudaDeviceSynchronize();
         
         cudaFree(d_temp_storage);
 
@@ -424,12 +421,9 @@ int main(){
         cudaDeviceSynchronize();
         ++largest_segment_size;
         largest_segment_size /= 2;
-        printf("largest segment size: %d\n", largest_segment_size);
         #endif
 
         num_segments_reduce = num_segments*dim;
-        printf("num segments: %d\n", num_segments);
-        printf("end\n\n\n");
     }
 
     cudaEventRecord(stopWhileLoop);
@@ -465,6 +459,38 @@ int main(){
     free(index_map);
     #endif
 
+    // // _______________________________________________________________________________________________
+    // #if 0
+    // int maxSegmentSize;
+    // #if DIVISION_METHOD != 0
+    // maxSegmentSize = getMaxSegmentSize(n, BUCKET_SIZE).first;
+    // printf("max segment size: %d\n", maxSegmentSize);
+    // printf("n: %d\n", n);
+    // #else
+    // maxSegmentSize = BUCKET_SIZE;
+    // #endif
+
+    // H2Opus_Real* d_input_matrix;
+    // H2Opus_Real* input_matrix = (H2Opus_Real*)malloc((long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
+    // cudaMalloc((void**) &d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
+    
+    // dim3 m_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
+    // dim3 m_numBlocks(num_segments, num_segments);
+    // generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, num_segments, maxSegmentSize, dim, d_values_in, d_input_matrix, d_dataset, d_offsets_sort);
+    // cudaDeviceSynchronize();
+    // cudaMemcpy(input_matrix, d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+
+    // int NRows = maxSegmentSize;
+    // int NCols = maxSegmentSize;
+    // int numMatrices = num_segments*num_segments;
+
+    // H2Opus_Real *h_S = (H2Opus_Real *)malloc(maxSegmentSize * numMatrices * sizeof(H2Opus_Real));
+    // H2Opus_Real *h_U = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * numMatrices * sizeof(H2Opus_Real));
+    // H2Opus_Real *h_V = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * numMatrices * sizeof(H2Opus_Real));
+    // SVD(n, num_segments, input_matrix, NRows, NCols, maxSegmentSize, h_S, h_U, h_V);
+    // #endif
+    // // _______________________________________________________________________________________________
+
     int maxSegmentSize;
     #if DIVISION_METHOD != 0
     maxSegmentSize = getMaxSegmentSize(n, BUCKET_SIZE).first;
@@ -484,92 +510,86 @@ int main(){
     cudaDeviceSynchronize();
     cudaMemcpy(input_matrix, d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
 
+    #if PRINT_OUTPUT
     for(unsigned int i=0; i<num_segments*maxSegmentSize; ++i){
         for(unsigned int j=0; j<num_segments*maxSegmentSize; ++j){
             printf("%f ", input_matrix[i*num_segments*maxSegmentSize + j]);
         }
         printf("\n");
     }
+    #endif
 
     int nBlocks = num_segments;
     int NRows = maxSegmentSize;
     int NCols = maxSegmentSize;
 
-    H2Opus_Real* S = (H2Opus_Real*)malloc(min(NRows, NCols) * nBlocks*nBlocks * sizeof(H2Opus_Real));
-    H2Opus_Real* U = (H2Opus_Real*)malloc(NRows * NCols * nBlocks*nBlocks * sizeof(H2Opus_Real));
-    H2Opus_Real* V = (H2Opus_Real*)malloc(NRows * NCols * nBlocks*nBlocks * sizeof(H2Opus_Real));
+    H2Opus_Real *h_S = (H2Opus_Real *)malloc(maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
+    H2Opus_Real *h_U = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
+    H2Opus_Real *h_V = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
 
-    SVD(n, num_segments, input_matrix, nBlocks, NRows, NCols, maxSegmentSize);
+    SVD(n, num_segments, input_matrix, NRows, NCols, maxSegmentSize, h_S, h_U, h_V);
+    cudaDeviceSynchronize();
 
-    // int* d_K;
-    // H2Opus_Real* d_S;
-    // H2Opus_Real* d_U;
-    // H2Opus_Real* d_V;
-    // cudaMalloc((void**) &d_S, min(Nrows, Ncols) * nBlocks*nBlocks * sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_U, Nrows*Ncols * nBlocks*nBlocks * sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_V, Nrows*Ncols * nBlocks*nBlocks * sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_K, nBlocks*nBlocks * sizeof(int));
-    // cudaMemcpy(d_S, S, min(Nrows, Ncols) * nBlocks*nBlocks * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    int* d_K;
+    H2Opus_Real* d_S;
+    H2Opus_Real* d_U;
+    H2Opus_Real* d_V;
+    cudaMalloc((void**) &d_S, maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_U, maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_V, maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_K, num_segments*num_segments * sizeof(int));
+    cudaMemcpy(d_S, h_S, maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    
+    printf("num segments: %d\n", num_segments);
+    // TODO: call a kernel to figure out size of each tile
+    numThreadsPerBlock = maxSegmentSize; //TODO: make sure that bucket_size is less than 1024
+    numBlocks = num_segments*num_segments;
+    calcMemNeeded<<<numBlocks, numThreadsPerBlock>>> (n, maxSegmentSize, d_K, d_S, eps, d_offsets_sort, num_segments);
+    cudaDeviceSynchronize();
 
-    // // TODO: call a kernel to figure out size of each tile
-    // numThreadsPerBlock = BUCKET_SIZE; //TODO: make sure that bucket_size is less than 1024
-    // numBlocks = (nBlocks*nBlocks+numThreadsPerBlock-1)/numThreadsPerBlock;
-    // calcMemNeeded<<<numBlocks, numThreadsPerBlock>>> (n, d_K, d_S, eps);
-    // cudaDeviceSynchronize();
+    int* d_scan_K;
+    cudaMalloc((void**) &d_scan_K, num_segments*num_segments*sizeof(int));
+    d_temp_storage = NULL;
+    temp_storage_bytes = 0;
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_K, d_scan_K, num_segments*num_segments);
+    // Allocate temporary storage
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+    // Run exclusive prefix sum
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_K, d_scan_K, num_segments*num_segments);
 
-    // int* totalMem = (int*)malloc(sizeof(int));
-    // int* d_totalMem;
-    // cudaMalloc((void**) &d_totalMem, sizeof(int));
-    // d_temp_storage = NULL;
-    // temp_storage_bytes = 0;
-    // cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, d_K, d_totalMem, nBlocks*nBlocks);
-    // // Allocate temporary storage
-    // cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    // // Run sum-reduction
-    // cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, d_K, d_totalMem, nBlocks*nBlocks);
+    int* totalMem = (int*)malloc(sizeof(int));
+    int* d_totalMem;
+    cudaMalloc((void**) &d_totalMem, sizeof(int));
+    getTotalMem<<<1, 1>>> (d_totalMem, d_K, d_scan_K, num_segments);
+    cudaDeviceSynchronize();
+    cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost);
 
-    // cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost);
+    H2Opus_Real* d_U_tiled;
+    H2Opus_Real* d_V_tiled;
+    cudaMalloc((void**) &d_U_tiled, maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_V_tiled, maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real));
 
-    // // TODO: call a kernel to allocate the tiles, copy them from Us, Ss and Vs
-    // H2Opus_Real* d_STiled;
-    // H2Opus_Real* d_UTiled;
-    // H2Opus_Real* d_VTiled;
-    // cudaMalloc((void**) &d_STiles, totalMemNeeded * sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_UTiles, Nrows*totalMemNeeded * sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_VTiled, Nrows*totalMemNeeded * sizeof(H2Opus_Real));
+    // TODO: find the maximum rank using a max reduction
+    dim3 d_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
+    dim3 d_numBlocks(num_segments, num_segments);
+    tileMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (n, num_segments, maxSegmentSize, d_S, d_U, d_V, d_U_tiled, d_V_tiled, d_K, d_scan_K);
+    cudaDeviceSynchronize();
 
-    // int* maxMem = (int*)malloc(sizeof(int));
-    // int* d_maxMem;
-    // cudaMalloc((void**) &d_maxMem, sizeof(int));
-    // d_temp_storage = NULL;
-    // temp_storage_bytes = 0;
-    // cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_K, d_maxMem, nBlocks*nBlocks);
-    // // Allocate temporary storage
-    // cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    // // Run max-reduction
-    // cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_K, d_maxMem, nBlocks*nBlocks);
-    // cudaMemcpy(maxMem, d_maxMem, sizeof(int), cudaMemcpyDeviceToHost);
+    H2Opus_Real* expMatrix;
+    cudaMalloc((void**) &expMatrix, num_segments*num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
+    expandMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, expMatrix);
+    cudaDeviceSynchronize();
 
-    // int* d_KScan;
-    // cudaMalloc((void**) &d_maxMem, nBlocks*nBlocks*sizeof(int));
-    // d_temp_storage = NULL;
-    // temp_storage_bytes = 0;
-    // cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_K, d_out, nBlocks*nBlocks);
-    // // Allocate temporary storage
-    // cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    // // Run exclusive prefix sum
-    // cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_K, d_out, nBlocks*nBlocks);
+    H2Opus_Real* d_error;
+    H2Opus_Real* error = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
 
-    // numThreadsPerBlock = maxMem;
-    // numBlocks = (nBlocks*nBlocks+numThreadsPerBlock-1)/numThreadsPerBlock;
-    // tileMatrix<<<numBlocks, numThreadsPerBlock>>> (n, d_S, d_U, d_V, d_Siled, d_UTiled, d_VTiled, d_K, d_KScan);
-
-    // free(Ss);
-    // free(Us);
-    // free(Vs);
-
-
-
+    numThreadsPerBlock = 1024;
+    numBlocks = (num_segments*num_segments*maxSegmentSize*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
+    calcError<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, expMatrix, d_input_matrix, d_error);
+    cudaDeviceSynchronize();
+    cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    printf("error: %f\n", sqrt(*error));
     // free(dataset);
     // cudaFree(d_dataset);
     // cudaFree(d_offsets_sort);
