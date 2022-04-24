@@ -95,19 +95,19 @@ __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segmen
         aux_offsets_sort[index + 1] = (offsets_sort[i+1] - offsets_sort[i] + 1)/2 + offsets_sort[i];
     }
 
-    if(threadIdx.x==0 && blockIdx.x==0){
-        printf("new num segment: %d\n", num_segments*2);
-        printf("offsets sort\n");
-        for(unsigned int j=0; j<num_segments+1; ++j){
-            printf("%d ", offsets_sort[j]);
-        }
-        printf("\n");
-        printf(" newoffsets sort\n");
-        for(unsigned int j=0; j<num_segments*2+1; ++j){
-            printf("%d ", aux_offsets_sort[j]);
-        }
-        printf("\n");
-    }
+    // if(threadIdx.x==0 && blockIdx.x==0){
+    //     printf("new num segment: %d\n", num_segments*2);
+    //     printf("offsets sort\n");
+    //     for(unsigned int j=0; j<num_segments+1; ++j){
+    //         printf("%d ", offsets_sort[j]);
+    //     }
+    //     printf("\n");
+    //     printf(" newoffsets sort\n");
+    //     for(unsigned int j=0; j<num_segments*2+1; ++j){
+    //         printf("%d ", aux_offsets_sort[j]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 
@@ -310,16 +310,16 @@ __global__ void calcMemNeeded(int n, int maxSegmentSize, int* K, H2Opus_Real* S,
     }
     __syncthreads();
 
-    if(threadIdx.x == 0){
-        printf("block index: %d   k: %d\n", blockIdx.x, k);
-        if(k==0){
-            for(unsigned int j=0; j<maxSegmentSize; ++j){
-                printf("%f ", S[maxSegmentSize*blockIdx.x + j]);
-            }
-            printf("\n");
-        }
-        K[blockIdx.x] = k;
-    }
+    // if(threadIdx.x == 0){
+    //     printf("block index: %d   k: %d\n", blockIdx.x, k);
+    //     if(k==0){
+    //         for(unsigned int j=0; j<maxSegmentSize; ++j){
+    //             printf("%f ", S[maxSegmentSize*blockIdx.x + j]);
+    //         }
+    //         printf("\n");
+    //     }
+    //     K[blockIdx.x] = k;
+    // }
 }
 
 __global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_Real* S, H2Opus_Real* U, H2Opus_Real* V, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, int* K, int* K_scan){
@@ -403,7 +403,7 @@ __global__ void getTotalMem(int* totalMem, int* K, int* scan_K, int num_segments
 
 __global__ void expandMatrix(int num_segments, int maxSegmentSize, int* K, int* scan_K, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* expMatrix){
     if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
-        printf("here\n");
+        printf("expand matrix\n");
     }
     if(threadIdx.x < maxSegmentSize && threadIdx.y < maxSegmentSize){
         int col = blockIdx.y*maxSegmentSize + threadIdx.y;
@@ -416,11 +416,12 @@ __global__ void expandMatrix(int num_segments, int maxSegmentSize, int* K, int* 
     }
 }
 
-__global__ void calcError (int num_segments, int maxSegmentSize, H2Opus_Real* expMatrix, H2Opus_Real* input_matrix, H2Opus_Real* error){
+__global__ void calcError (int num_segments, int maxSegmentSize, H2Opus_Real* expMatrix, H2Opus_Real* input_matrix, H2Opus_Real* error, H2Opus_Real* tmp){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i < num_segments*num_segments*maxSegmentSize*maxSegmentSize){
         H2Opus_Real x = input_matrix[i];
         H2Opus_Real y = expMatrix[i];
+        atomicAdd(tmp, x*x);
         atomicAdd(error, (x-y)*(x-y));
     }
 }

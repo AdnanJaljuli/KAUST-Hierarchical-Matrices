@@ -24,7 +24,7 @@ using namespace std;
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    int n = 40;
+    int n = 1<<6;
     int dim = 2;
     printf("N = %d\n", n);
 
@@ -103,10 +103,10 @@ int main(){
     int* d_input_search;
     int* d_aux_offsets_sort;
     max_num_segments = 1<<(getMaxSegmentSize(n, BUCKET_SIZE).second);
-    printf("max num segments: %d\n", max_num_segments);
     #else
     max_num_segments = (n+BUCKET_SIZE-1)/BUCKET_SIZE;
     #endif
+    printf("max num segments: %d\n", max_num_segments);
 
     #if DIVISION_METHOD == 2
     int largest_segment_size = n;
@@ -584,12 +584,17 @@ int main(){
     H2Opus_Real* error = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
 
+    H2Opus_Real* d_tmp;
+    H2Opus_Real* tmp = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
+
     numThreadsPerBlock = 1024;
     numBlocks = (num_segments*num_segments*maxSegmentSize*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
-    calcError<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, expMatrix, d_input_matrix, d_error);
+    calcError<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, expMatrix, d_input_matrix, d_error, d_tmp);
     cudaDeviceSynchronize();
     cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error: %f\n", sqrt(*error));
+    cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    printf("error: %f\n", sqrt(*error)/sqrt(*tmp));
     // free(dataset);
     // cudaFree(d_dataset);
     // cudaFree(d_offsets_sort);
