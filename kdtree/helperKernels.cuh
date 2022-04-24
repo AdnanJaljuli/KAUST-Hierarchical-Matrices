@@ -1,5 +1,6 @@
-#include <cub/cub.cuh>
 #include "helperFunctions.h"
+#include <cub/cub.cuh>
+#include <assert.h>
 #define BUCKET_SIZE 8
 typedef double H2Opus_Real;
 
@@ -262,10 +263,10 @@ __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real
     return exp(-dist / getCorrelationLength(dim));
 }
 
-__global__ void generateInputMatrix(int n, int num_segments, int maxSegmentSize, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset, int* offsets_sort){
+__global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t maxSegmentSize, uint64_t dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset, int* offsets_sort){
 
-    int col = blockIdx.y*maxSegmentSize + threadIdx.y;
-    int row = blockIdx.x*maxSegmentSize + threadIdx.x;
+    unsigned int row = blockIdx.y*maxSegmentSize + threadIdx.y;
+    unsigned int col = blockIdx.x*maxSegmentSize + threadIdx.x;
 
     // if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
     //     printf("offsets sort\n");
@@ -274,22 +275,26 @@ __global__ void generateInputMatrix(int n, int num_segments, int maxSegmentSize,
     //     }
     //     printf("\n");
     // }
-
-    unsigned int padded_n = num_segments*maxSegmentSize;
+    // index:           293601280
+    // total elements:  4294967296
+    uint64_t num_elements = num_segments*maxSegmentSize;
     int xDim = offsets_sort[blockIdx.x + 1] - offsets_sort[blockIdx.x];
     int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
 
     if(threadIdx.x < maxSegmentSize && threadIdx.y < maxSegmentSize){
+        if(((uint64_t)col*num_elements + (uint64_t)row) >= (maxSegmentSize*maxSegmentSize*num_segments*num_segments)){
+            assert(0);
+        }
         if(threadIdx.x >= xDim || threadIdx.y >= yDim) {
             if(col == row){
-                matrix[col*padded_n + row] = 1;
+                matrix[(uint64_t)col*num_elements + (uint64_t)row] = 1;
             }
             else{
-                matrix[col*padded_n + row] = 0;
+                matrix[(uint64_t)col*num_elements + (uint64_t)row] = 0;
             }
         }
         else{
-            matrix[col*padded_n + row] = interaction(n, dim, index_map[offsets_sort[blockIdx.x] + threadIdx.x], index_map[offsets_sort[blockIdx.y] + threadIdx.y], dataset);
+            matrix[(uint64_t)col*num_elements + (uint64_t)row] = interaction(n, dim, index_map[offsets_sort[blockIdx.x] + threadIdx.x], index_map[offsets_sort[blockIdx.y] + threadIdx.y], dataset);
         }
     }
 }
@@ -310,7 +315,7 @@ __global__ void calcMemNeeded(int n, int maxSegmentSize, int* K, H2Opus_Real* S,
     }
     __syncthreads();
 
-    // if(threadIdx.x == 0){
+    if(threadIdx.x == 0){
     //     printf("block index: %d   k: %d\n", blockIdx.x, k);
     //     if(k==0){
     //         for(unsigned int j=0; j<maxSegmentSize; ++j){
@@ -318,8 +323,8 @@ __global__ void calcMemNeeded(int n, int maxSegmentSize, int* K, H2Opus_Real* S,
     //         }
     //         printf("\n");
     //     }
-    //     K[blockIdx.x] = k;
-    // }
+        K[blockIdx.x] = k;
+    }
 }
 
 __global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_Real* S, H2Opus_Real* U, H2Opus_Real* V, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, int* K, int* K_scan){
@@ -397,6 +402,10 @@ __global__ void printOffsetsSort(int num_segments, int* offsets_sort){
 }
 
 __global__ void getTotalMem(int* totalMem, int* K, int* scan_K, int num_segments){
+    printf("k scan\n");
+    for(int i=0; i<num_segments*num_segments; ++i){
+        printf("%d ", scan_K[i]);
+    }
     *totalMem = scan_K[num_segments*num_segments - 1] + K[num_segments*num_segments - 1];
     printf("total mem: %d\n", *totalMem);
 }

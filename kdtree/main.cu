@@ -24,9 +24,10 @@ using namespace std;
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    int n = 1<<6;
-    int dim = 2;
+    uint64_t n = 1<<5;
+    uint64_t dim = 2;
     printf("N = %d\n", n);
+    fflush(stdout);
 
     // Create point cloud
     PointCloud<H2Opus_Real> pt_cloud(dim, (size_t)n);
@@ -46,7 +47,7 @@ int main(){
     #endif
 
     H2Opus_Real *dataset;
-    dataset = (H2Opus_Real*)malloc((long long)n*(long long)dim*(long long)sizeof(H2Opus_Real));
+    dataset = (H2Opus_Real*)malloc(n*dim*(uint64_t)sizeof(H2Opus_Real));
     assert(dataset != NULL);
 
     // TODO: move this to a kernel
@@ -57,14 +58,14 @@ int main(){
     }
 
     H2Opus_Real *d_dataset;
-    cudaMalloc((void**) &d_dataset, (long long)n*(long long)dim*(long long)sizeof(H2Opus_Real));
-    cudaMemcpy(d_dataset, dataset, (long long)n*(long long)dim*(long long)sizeof(H2Opus_Real*), cudaMemcpyHostToDevice);
+    cudaMalloc((void**) &d_dataset, n*dim*(uint64_t)sizeof(H2Opus_Real));
+    cudaMemcpy(d_dataset, dataset, n*dim*(uint64_t)sizeof(H2Opus_Real*), cudaMemcpyHostToDevice);
 
-    unsigned int  num_segments = 1;
-    unsigned long long num_segments_reduce = num_segments*dim;
+    uint64_t num_segments = 1;
+    uint64_t num_segments_reduce = num_segments*dim;
 
     #if DIVISION_METHOD == 0
-    unsigned int segment_size = upper_power_of_two(n);
+    uint64_t segment_size = upper_power_of_two(n);
     #endif
 
     int *d_offsets_sort;         // e.g., [0, 3, 3, 7]
@@ -109,11 +110,11 @@ int main(){
     printf("max num segments: %d\n", max_num_segments);
 
     #if DIVISION_METHOD == 2
-    int largest_segment_size = n;
+    unsigned int largest_segment_size = n;
     #endif
 
     // TODO: fix memory allocated
-    cudaMalloc((void**) &d_temp, n*sizeof(int));
+    // cudaMalloc((void**) &d_temp, n*sizeof(int));
     cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int));
     cudaMalloc((void**) &d_offsets_reduce, (long long)((max_num_segments*dim + 1)*(long long)sizeof(int)));
     cudaMalloc((void**) &d_keys_in, n*sizeof(H2Opus_Real));
@@ -172,7 +173,8 @@ int main(){
     #else
     while(largest_segment_size > BUCKET_SIZE) {
     #endif
-        // printf("begin\n");
+        printf("begin\n");
+        fflush(stdout);
         for(unsigned int i=0; i<numTimers; ++i){
             timer_arr[i]=0;
         }
@@ -434,13 +436,6 @@ int main(){
     cudaEventDestroy(startWhileLoop);
     cudaEventDestroy(stopWhileLoop);
 
-    #if DIVISION_METHOD == 0
-    printf("num segments :%d\n", num_segments);
-    printf("segment size :%d\n", segment_size);
-    fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
-    cudaDeviceSynchronize();
-    #endif
-
     #if PRINT_OUTPUT
     int *index_map = (int*)malloc(n*sizeof(int));
     cudaMemcpy(index_map, d_values_in, n*sizeof(int), cudaMemcpyDeviceToHost);
@@ -449,7 +444,6 @@ int main(){
         printf("%d ", index_map[i]);
     }
     printf("\n");
-
     for(int i=0; i<n; ++i){
         for(int j=0; j<dim; ++j){
             printf("%f ", pt_cloud.pts[j][index_map[i]]);
@@ -459,56 +453,67 @@ int main(){
     free(index_map);
     #endif
 
-    // // _______________________________________________________________________________________________
-    // #if 0
-    // int maxSegmentSize;
-    // #if DIVISION_METHOD != 0
-    // maxSegmentSize = getMaxSegmentSize(n, BUCKET_SIZE).first;
-    // printf("max segment size: %d\n", maxSegmentSize);
-    // printf("n: %d\n", n);
-    // #else
-    // maxSegmentSize = BUCKET_SIZE;
-    // #endif
+    #if DIVISION_METHOD == 0
+    printf("num segments :%d\n", num_segments);
+    printf("segment size :%d\n", segment_size);
+    fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
+    cudaDeviceSynchronize();
+    #endif
 
-    // H2Opus_Real* d_input_matrix;
-    // H2Opus_Real* input_matrix = (H2Opus_Real*)malloc((long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
-    
-    // dim3 m_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
-    // dim3 m_numBlocks(num_segments, num_segments);
-    // generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, num_segments, maxSegmentSize, dim, d_values_in, d_input_matrix, d_dataset, d_offsets_sort);
-    // cudaDeviceSynchronize();
-    // cudaMemcpy(input_matrix, d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaFree(d_offsets_reduce);
+    cudaFree(d_keys_in);
+    cudaFree(d_keys_out);
+    cudaFree(d_values_out);
+    cudaFree(d_curr_dim);
+    cudaFree(d_reduce_in);
+    cudaFree(d_reduce_min_out);
+    cudaFree(d_reduce_max_out);
+    cudaFree(d_span_reduce_out);
+    cudaFree(d_span);
+    cudaFree(d_span_offsets);
+    #if DIVISION_METHOD != 0
+    cudaFree(d_aux_offsets_sort);
+    cudaFree(A);
+    cudaFree(B);
+    cudaFree(output);
+    cudaFree(d_output);
+    cudaFree(d_input_search);
+    #endif
+    #if DIVISION_METHOD == 1
+    cudaFree(d_bit_vector);
+    cudaFree(d_popc_bit_vector);
+    cudaFree(d_popc_scan);
+    cudaFree(d_new_num_segments);
+    cudaFree(d_workDone);
+    #endif
 
-    // int NRows = maxSegmentSize;
-    // int NCols = maxSegmentSize;
-    // int numMatrices = num_segments*num_segments;
-
-    // H2Opus_Real *h_S = (H2Opus_Real *)malloc(maxSegmentSize * numMatrices * sizeof(H2Opus_Real));
-    // H2Opus_Real *h_U = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * numMatrices * sizeof(H2Opus_Real));
-    // H2Opus_Real *h_V = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * numMatrices * sizeof(H2Opus_Real));
-    // SVD(n, num_segments, input_matrix, NRows, NCols, maxSegmentSize, h_S, h_U, h_V);
-    // #endif
-    // // _______________________________________________________________________________________________
-
-    int maxSegmentSize;
+    uint64_t maxSegmentSize;
     #if DIVISION_METHOD != 0
     maxSegmentSize = getMaxSegmentSize(n, BUCKET_SIZE).first;
-    printf("max segment size: %d\n", maxSegmentSize);
-    printf("n: %d\n", n);
     #else
     maxSegmentSize = BUCKET_SIZE;
     #endif
+    printf("num segments: %lu\n", num_segments);
+    printf("max segment size: %lu\n", maxSegmentSize);
 
     H2Opus_Real* d_input_matrix;
-    H2Opus_Real* input_matrix = (H2Opus_Real*)malloc((long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real));
-    
+    H2Opus_Real* input_matrix = (H2Opus_Real*)malloc(maxSegmentSize*num_segments*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real));
+    cudaError_t cudaErr = cudaMalloc((void**) &d_input_matrix, maxSegmentSize*num_segments*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real));
+    printf("mem allocated to input matrix: %lu\n", maxSegmentSize*num_segments*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+       // Possibly: exit(-1) if program cannot continue....
+    }
+
     dim3 m_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
     dim3 m_numBlocks(num_segments, num_segments);
     generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, num_segments, maxSegmentSize, dim, d_values_in, d_input_matrix, d_dataset, d_offsets_sort);
     cudaDeviceSynchronize();
-    cudaMemcpy(input_matrix, d_input_matrix, (long long)maxSegmentSize*num_segments*(long long)maxSegmentSize*num_segments*(long long)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(input_matrix, d_input_matrix, maxSegmentSize*num_segments*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+
+    free(dataset);
+    cudaFree(d_dataset);
 
     #if PRINT_OUTPUT
     for(unsigned int i=0; i<num_segments*maxSegmentSize; ++i){
@@ -595,33 +600,18 @@ int main(){
     cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     printf("error: %f\n", sqrt(*error)/sqrt(*tmp));
-    // free(dataset);
-    // cudaFree(d_dataset);
+
+    
+    
     // cudaFree(d_offsets_sort);
-    // cudaFree(d_offsets_reduce);
-    // cudaFree(d_keys_in);
-    // cudaFree(d_keys_out);
-    // cudaFree(d_values_in);
-    // cudaFree(d_values_out);
-    // cudaFree(d_curr_dim);
-    // cudaFree(d_reduce_in);
-    // cudaFree(d_reduce_min_out);
-    // cudaFree(d_reduce_max_out);
-    // cudaFree(d_temp);
-    // cudaFree(d_span_reduce_out);
-    // cudaFree(d_span);
-    // cudaFree(d_span_offsets);
     // cudaFree(d_input_matrix);
     // free(input_matrix);
 
     // #if DIVISION_METHOD == 1
     // cudaFree(A);
     // cudaFree(B);
-    // cudaFree(output);
-    // cudaFree(d_output);
-    // cudaFree(d_input_search);
+
     // cudaFree(d_bit_vector);
-    // cudaFree(d_aux_offsets_sort);
     // cudaFree(d_new_num_segments);
     // free(new_num_segments);
     // cudaFree(d_workDone);
