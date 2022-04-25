@@ -144,7 +144,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int NRows, int NCols, int
     for (int k = 0; k < numMatrices; k++)
     {
         for (int p = 0; p < N; p++)
-            printf("Matrix nr. %d; SV nr. %d; Value = %f\n", k, p, h_S[k * N + p]);
+            printf("Matrix nr. %d; SV nr. %d; Value = %lf\n", k, p, h_S[k * N + p]);
         printf("\n");
     }
 #if 0 //FULLSVD
@@ -154,7 +154,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int NRows, int NCols, int
     {
         for (int q = 0; q < (1 - econ) * M + econ * min(M, N); q++)
             for (int p = 0; p < M; p++)
-                printf("Matrix nr. %d; U nr. %d; Value = %f\n", k, p, h_U[((1 - econ) * M + econ * min(M, N)) * M * k + q * M + p]);
+                printf("Matrix nr. %d; U nr. %d; Value = %lf\n", k, p, h_U[((1 - econ) * M + econ * min(M, N)) * M * k + q * M + p]);
         printf("\n");
     }
 
@@ -164,7 +164,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int NRows, int NCols, int
     {
         for (int q = 0; q < (1 - econ) * N + econ * min(M, N); q++)
             for (int p = 0; p < N; p++)
-                printf("Matrix nr. %d; V nr. %d; Value = %f\n", k, p, h_V[((1 - econ) * N + econ * min(M, N)) * N * k + q * N + p]);
+                printf("Matrix nr. %d; V nr. %d; Value = %lf\n", k, p, h_V[((1 - econ) * N + econ * min(M, N)) * N * k + q * N + p]);
         printf("\n");
     }
 #endif
@@ -184,69 +184,72 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int NRows, int NCols, int
         printf("WARNING: devInfo_h = %d : gesvdj does not converge \n", devInfo_h);
     }
 
-    // printf("H_U\n");
-    // for(unsigned int i=0; i<M; ++i){
-    //     for(unsigned int j=0; j<M;++j){
-    //         printf("%f ", h_U[j*M + i]);
-    //         printf("%f      ", h_U[j*M + i]);
-    //         // std::cout << h_U[i*M + j].real << " ";
-    //     }
-    //     printf("\n");
-    // }
-    // printf("H_S\n");
-    // for(unsigned int i=0; i<M; ++i){
-    //     printf("%f ", h_S[i]);
-    // }
-    // printf("\n");
-    // printf("H_V\n");
-    // for(unsigned int i=0; i<M; ++i){
-    //     for(unsigned int j=0; j<M;++j){
-    //         printf("%f ", h_V[j*M + i]);
-    //         printf("%f      ", h_V[j*M + i]);
-    //         // std::cout << h_V[i*M + j] << " ";
-    //     }
-    //     printf("\n");
-    // }
+    printf("h_U\n");
+    for(unsigned int i=0; i<M; ++i){
+        for(unsigned int j=0; j<M;++j){
+            printf("%lf ", h_U[j*M + i]);
+        }
+        printf("\n");
+    }
+    printf("h_S\n");
+    for(unsigned int i=0; i<numMatrices; ++i){
+        for(unsigned int j=0;j<M; ++j){
+            printf("%lf ", h_S[i*M + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+    printf("h_V\n");
+    for(unsigned int i=0; i<M; ++i){
+        for(unsigned int j=0; j<M;++j){
+            printf("%lf ", h_V[i*M + j]);
+        }
+        printf("\n");
+    }
 
-    // H2Opus_Real* tmp = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
-    // H2Opus_Real* ans = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
-    // for(int i=0; i<M; ++i){
-    //     for(int j=0; j<M; ++j){
-    //         ans[j*M + i] = 0;
-    //         tmp[j*M + i] = 0;
-    //     }
-    // }
+    H2Opus_Real* tmp = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
+    H2Opus_Real* ans = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
+    for(int i=0; i<M; ++i){
+        for(int j=0; j<M; ++j){
+            ans[j*M + i] = 0;
+            tmp[j*M + i] = 0;
+        }
+    }
 
-    // for(int i=0; i<M; ++i){
-    //     for(int j=0; j<M; ++j){
-    //         tmp[i*M + j] = h_U[i*M + j] * h_S[i];
-    //     }
-    // }
+    for(int i=0; i<M; ++i){
+        for(int j=0; j<M; ++j){
+            tmp[i*M + j] = h_U[i*M + j] * h_S[i];
+        }
+    }
 
-    // printf("tmp\n");
-    // for(int i=0; i<M; ++i){
-    //     for(int j=0;j<M; ++j){
-    //         printf("%f ", tmp[j*M + i]);
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\n");
+    printf("tmp\n");
+    for(int i=0; i<M; ++i){
+        for(int j=0;j<M; ++j){
+            printf("%lf ", tmp[j*M + i]);
+        }
+        printf("\n");
+    }
+    printf("\n");
 
-    // for(int i=0; i<M; ++i){
-    //     for(int j=0; j<M; ++j){
-    //         for(int k=0; k<M; ++k){
-    //             ans[i*M + j] += (tmp[k*M + j] * h_V[i*M + k]);
-    //         }
-    //     }
-    // }
+    for(int i=0; i<M; ++i){
+        for(int j=0; j<M; ++j){
+            for(int k=0; k<M; ++k){
+                // ans[i*M + j] += (tmp[k*M + j] * h_V[i*M + k]);
+                ans[i*M + j] += (tmp[k*M + j] * h_V[k*M + i]);
+                // printf("tmp: %lf    V: %lf ", tmp[k*M + j], h_V[i*M + k]);
+            }
+            // printf("\n");
+        }
+        // printf("\n");
+    }
 
-    // printf("ans\n");
-    // for(int i=0; i<M; ++i){
-    //     for(int j=0; j<M; ++j){
-    //         printf("%f ", ans[j*M + i]);
-    //     }
-    //     printf("\n");
-    // }
+    printf("ans\n");
+    for(int i=0; i<M; ++i){
+        for(int j=0; j<M; ++j){
+            printf("%lf ", ans[i*M + j]);
+        }
+        printf("\n");
+    }
 
     // --- Free resources
     if (d_A) gpuErrchk(cudaFree(d_A));

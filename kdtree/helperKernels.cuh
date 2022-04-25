@@ -30,7 +30,6 @@ __global__ void initializeArrays(int n, int dim, int* values_in, int* currDimArr
             offsets_reduce[j] = j*n;
         }
     }
-
 }
 
 __global__ void fillOffsets(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* offsets_sort, int* offsets_reduce){
@@ -141,7 +140,7 @@ __global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* dataset
     // if(i==0){
     //     printf("reduction array\n");
     //     for(unsigned int j=0; j<n*dim; ++j){
-    //         printf("%f ", reduce_in[j]);
+    //         printf("%lf ", reduce_in[j]);
     //     }
     //     printf("\n");
     // }
@@ -164,7 +163,7 @@ __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2O
     //     printf("spans\n");
     //     for(unsigned int j=0;j<num_segments; ++j){
     //         for(int k=0; k<dim;++k){
-    //             printf("%f ", span[j*num_segments + k]);
+    //             printf("%lf ", span[j*num_segments + k]);
     //         }
     //         printf("\n");
     //     }
@@ -228,7 +227,7 @@ __global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currDimArray, int* 
     // if(i==0){
     //     printf("fill keys in\n");
     //     for(unsigned int j=0; j<n; ++j){
-    //         printf("%f ", keys_in[j]);
+    //         printf("%lf ", keys_in[j]);
     //     }
     //     printf("\n");
     // }
@@ -241,7 +240,7 @@ __global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currDimArray, int* 
     // if(threadIdx.x==0 && blockIdx.x==0){
     //     printf("keys in\n");
     //     for(unsigned int j=0; j<n; ++j){
-    //         printf("%f ", keys_in[j]);
+    //         printf("%lf ", keys_in[j]);
     //     }
     // }
 }
@@ -268,15 +267,6 @@ __global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t 
     unsigned int row = blockIdx.y*maxSegmentSize + threadIdx.y;
     unsigned int col = blockIdx.x*maxSegmentSize + threadIdx.x;
 
-    // if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
-    //     printf("offsets sort\n");
-    //     for(unsigned int j=0; j<num_segments + 1; ++j){
-    //         printf("%d ", offsets_sort[j]);
-    //     }
-    //     printf("\n");
-    // }
-    // index:           293601280
-    // total elements:  4294967296
     uint64_t num_elements = num_segments*maxSegmentSize;
     int xDim = offsets_sort[blockIdx.x + 1] - offsets_sort[blockIdx.x];
     int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
@@ -294,7 +284,8 @@ __global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t 
             }
         }
         else{
-            matrix[(uint64_t)col*num_elements + (uint64_t)row] = interaction(n, dim, index_map[offsets_sort[blockIdx.x] + threadIdx.x], index_map[offsets_sort[blockIdx.y] + threadIdx.y], dataset);
+            // matrix[(uint64_t)col*num_elements + (uint64_t)row] = interaction(n, dim, index_map[offsets_sort[blockIdx.x] + threadIdx.x], index_map[offsets_sort[blockIdx.y] + threadIdx.y], dataset);
+            matrix[blockIdx.x*maxSegmentSize*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[blockIdx.x] + threadIdx.x], index_map[offsets_sort[blockIdx.y] + threadIdx.y], dataset);
         }
     }
 }
@@ -316,23 +307,40 @@ __global__ void calcMemNeeded(int n, int maxSegmentSize, int* K, H2Opus_Real* S,
     __syncthreads();
 
     if(threadIdx.x == 0){
-    //     printf("block index: %d   k: %d\n", blockIdx.x, k);
-    //     if(k==0){
-    //         for(unsigned int j=0; j<maxSegmentSize; ++j){
-    //             printf("%f ", S[maxSegmentSize*blockIdx.x + j]);
-    //         }
-    //         printf("\n");
-    //     }
         K[blockIdx.x] = k;
     }
 }
 
 __global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_Real* S, H2Opus_Real* U, H2Opus_Real* V, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, int* K, int* K_scan){
     if(threadIdx.x < K[blockIdx.x*num_segments + blockIdx.y] && threadIdx.y < maxSegmentSize){
-        U_tiled[K_scan[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = U[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] * S[blockIdx.x*num_segments*maxSegmentSize + blockIdx.y*maxSegmentSize + threadIdx.x];
+        U_tiled[K_scan[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] 
+          = U[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] 
+          * S[blockIdx.x*num_segments*maxSegmentSize + blockIdx.y*maxSegmentSize + threadIdx.x];
     }
-    if(threadIdx.y < K[blockIdx.x*num_segments + blockIdx.y] && threadIdx.x < maxSegmentSize){
-        V_tiled[K_scan[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + threadIdx.x*K[blockIdx.x*num_segments + blockIdx.y] + threadIdx.y] = V[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
+
+    if(threadIdx.x < K[blockIdx.x*num_segments + blockIdx.y] && threadIdx.y < maxSegmentSize){
+        V_tiled[K_scan[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] 
+      = V[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
+    }
+
+    __syncthreads();
+    if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
+        printf("U\n");
+        for(int i=0; i<maxSegmentSize; ++i){
+            for(int j=0; j<K[blockIdx.x*num_segments + blockIdx.y]; ++j){
+                printf("%lf ", U_tiled[j*maxSegmentSize + i]);
+            }
+            printf("\n");
+        }
+    }
+    if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
+        printf("V\n");
+        for(int i=0; i<K[blockIdx.x*num_segments + blockIdx.y]; ++i){
+            for(int j=0; j<maxSegmentSize; ++j){
+                printf("%lf ", V_tiled[i*maxSegmentSize + j]);
+            }
+            printf("\n");
+        }
     }
 }
 
@@ -364,7 +372,7 @@ __global__ void isWorkDone(int num_segments, uint64_t* bit_vector, bool* workDon
 __global__ void printMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* matrix){
     for(unsigned int i=0; i<num_segments*maxSegmentSize; ++i){
         for(unsigned int j=0; j<num_segments*maxSegmentSize; ++j){
-           printf("%f ", matrix[i*num_segments*maxSegmentSize + j]);
+           printf("%lf ", matrix[i*num_segments*maxSegmentSize + j]);
         }
         printf("\n");
     }
@@ -373,7 +381,7 @@ __global__ void printMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* m
 __global__ void printSort(int n, H2Opus_Real* keys_out, int* values_out){
     printf("keys out\n");
     for(int i=0; i<n; ++i){
-        printf("%f ", keys_out[i]);
+        printf("%lf ", keys_out[i]);
     }
     printf("\n");
     printf("values out\n");
@@ -402,10 +410,11 @@ __global__ void printOffsetsSort(int num_segments, int* offsets_sort){
 }
 
 __global__ void getTotalMem(int* totalMem, int* K, int* scan_K, int num_segments){
-    printf("k scan\n");
-    for(int i=0; i<num_segments*num_segments; ++i){
-        printf("%d ", scan_K[i]);
-    }
+    // printf("k scan\n");
+    // for(int i=0; i<num_segments*num_segments; ++i){
+    //     printf("%d ", scan_K[i]);
+    // }
+    // printf("\n");
     *totalMem = scan_K[num_segments*num_segments - 1] + K[num_segments*num_segments - 1];
     printf("total mem: %d\n", *totalMem);
 }
@@ -414,13 +423,16 @@ __global__ void expandMatrix(int num_segments, int maxSegmentSize, int* K, int* 
     if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
         printf("expand matrix\n");
     }
+
     if(threadIdx.x < maxSegmentSize && threadIdx.y < maxSegmentSize){
-        int col = blockIdx.y*maxSegmentSize + threadIdx.y;
-        int row = blockIdx.x*maxSegmentSize + threadIdx.x;
+        int col = blockIdx.x*maxSegmentSize + threadIdx.x;
+        int row = blockIdx.y*maxSegmentSize + threadIdx.y;
         int index = blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y;
         expMatrix[index] = 0;
+
         for(unsigned int i = 0; i<K[blockIdx.x*num_segments + blockIdx.y]; ++i){
-            expMatrix[index] += U_tiled[scan_K[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + i*maxSegmentSize + threadIdx.y] * V_tiled[scan_K[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + threadIdx.x*K[blockIdx.x*num_segments + blockIdx.y] + i];
+            expMatrix[index] += (U_tiled[scan_K[blockIdx.x*num_segments + blockIdx.y] *maxSegmentSize + i*maxSegmentSize + threadIdx.y]
+                               * V_tiled[scan_K[blockIdx.x*num_segments + blockIdx.y] *maxSegmentSize + i*maxSegmentSize + threadIdx.x]);
         }
     }
 }
@@ -432,5 +444,22 @@ __global__ void calcError (int num_segments, int maxSegmentSize, H2Opus_Real* ex
         H2Opus_Real y = expMatrix[i];
         atomicAdd(tmp, x*x);
         atomicAdd(error, (x-y)*(x-y));
+        printf("x: %lf   y: %lf\n", x, y);
+    }
+}
+
+__global__ void printExpM(uint64_t num_segments, uint64_t maxSegmentSize, H2Opus_Real* expMatrix, H2Opus_Real* input_matrix){
+    printf("exp matrix\n");
+    // for(unsigned int i=0; i<num_segments*maxSegmentSize; ++i){
+    //     for(unsigned int j=0; j<num_segments*maxSegmentSize; ++j){
+    //         int xCoord = i/maxSegmentSize;
+    //         int yCoord = j/maxSegmentSize;
+    //         int index = xCoord*maxSegmentSize*maxSegmentSize*num_segments + yCoord*maxSegmentSize*maxSegmentSize + (i%maxSegmentSize)*maxSegmentSize + (j%maxSegmentSize);
+    //         printf("%lf ", expMatrix[index]);
+    //     }
+    //     printf("\n");
+    // }
+    for(unsigned int i=0; i<num_segments*maxSegmentSize*num_segments*maxSegmentSize; ++i){
+        printf("%lf %lf\n", expMatrix[i], input_matrix[i]);
     }
 }

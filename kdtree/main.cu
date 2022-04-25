@@ -15,7 +15,7 @@
 #include <typeinfo>
 
 #define eps 1e-4
-#define PRINT_OUTPUT 0
+#define PRINT_OUTPUT 1
 #define USE_SVD 0
 #define DIVISION_METHOD 2
 using namespace std;
@@ -24,7 +24,7 @@ using namespace std;
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    uint64_t n = 1<<5;
+    uint64_t n = 1<<4;
     uint64_t dim = 2;
     printf("N = %d\n", n);
     fflush(stdout);
@@ -39,7 +39,7 @@ int main(){
     printf("created point cloud\n");
     for(int i=0; i<n; ++i){
         for(int j=0; j<dim;++j){
-            printf("%f ", pt_cloud.pts[j][i]);
+            printf("%lf ", pt_cloud.pts[j][i]);
         }
         printf("\n");
     }
@@ -99,8 +99,8 @@ int main(){
     #if DIVISION_METHOD !=0 
     int* A;
     int* B;
-    int* output;
-    int* d_output;
+    int* d_bin_search_output;
+    int* d_thrust_v_bin_search_output;
     int* d_input_search;
     int* d_aux_offsets_sort;
     max_num_segments = 1<<(getMaxSegmentSize(n, BUCKET_SIZE).second);
@@ -141,8 +141,8 @@ int main(){
     cudaMalloc((void**) &d_aux_offsets_sort, (max_num_segments + 1) * sizeof(int));
     cudaMalloc((void**) &A, (max_num_segments + 1)*sizeof(int));
     cudaMalloc((void**) &B, n*sizeof(int));
-    cudaMalloc((void**) &output, n*sizeof(int));
-    cudaMalloc((void**) &d_output, n*sizeof(int));
+    cudaMalloc((void**) &d_bin_search_output, n*sizeof(int));
+    // cudaMalloc((void**) &d_output, n*sizeof(int));
     cudaMalloc((void**) &d_input_search, n*sizeof(int));
     #endif
 
@@ -230,6 +230,7 @@ int main(){
         cudaEventDestroy(startMinReduce_k);
         cudaEventDestroy(stopMinReduce_k);
         cudaDeviceSynchronize();
+        cudaFree(d_temp_storage);
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
@@ -251,6 +252,7 @@ int main(){
         cudaEventDestroy(startMaxReduce_k);
         cudaEventDestroy(stopMaxReduce_k);
         cudaDeviceSynchronize();
+        cudaFree(d_temp_storage);
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
@@ -287,6 +289,7 @@ int main(){
         cudaEventDestroy(startArgMaxReduce_k);
         cudaEventDestroy(stopArgMaxReduce_k);
         cudaDeviceSynchronize();
+        cudaFree(d_temp_storage);
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
@@ -318,10 +321,10 @@ int main(){
 
         #if DIVISION_METHOD != 0
         thrust::device_ptr<int> A = thrust::device_pointer_cast((int *)d_offsets_sort), B = thrust::device_pointer_cast((int *)d_input_search);
-        thrust::device_vector<int> output(n);
-        thrust::upper_bound(A, A + num_segments + 1, B, B + n, output.begin(), thrust::less<int>());
-        d_output = thrust::raw_pointer_cast(&output[0]);
-        fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, d_keys_in, d_curr_dim, d_values_in, d_dataset, d_offsets_sort, d_output);
+        thrust::device_vector<int> d_bin_search_output(n);
+        thrust::upper_bound(A, A + num_segments + 1, B, B + n, d_bin_search_output.begin(), thrust::less<int>());
+        d_thrust_v_bin_search_output = thrust::raw_pointer_cast(&d_bin_search_output[0]);
+        fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, d_keys_in, d_curr_dim, d_values_in, d_dataset, d_offsets_sort, d_thrust_v_bin_search_output);
         #else
         fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, segment_size, d_keys_in, d_curr_dim, d_values_in, d_dataset);
         #endif
@@ -355,7 +358,6 @@ int main(){
         cudaEventDestroy(startSort_k);
         cudaEventDestroy(stopSort_k);
         cudaDeviceSynchronize();
-        
         cudaFree(d_temp_storage);
 
         d_temp = d_values_in;
@@ -382,6 +384,7 @@ int main(){
         cudaMalloc(&d_temp_storage, temp_storage_bytes);
         // Run exclusive prefix sum
         cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popc_bit_vector, d_popc_scan, num_segments);
+        cudaFree(d_temp_storage);
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
@@ -446,7 +449,7 @@ int main(){
     printf("\n");
     for(int i=0; i<n; ++i){
         for(int j=0; j<dim; ++j){
-            printf("%f ", pt_cloud.pts[j][index_map[i]]);
+            printf("%lf ", pt_cloud.pts[j][index_map[i]]);
         }
         printf("\n");
     }
@@ -475,8 +478,7 @@ int main(){
     cudaFree(d_aux_offsets_sort);
     cudaFree(A);
     cudaFree(B);
-    cudaFree(output);
-    cudaFree(d_output);
+    cudaFree(d_bin_search_output);
     cudaFree(d_input_search);
     #endif
     #if DIVISION_METHOD == 1
@@ -503,7 +505,6 @@ int main(){
     if ( cudaErr != cudaSuccess )
     {
        printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
-       // Possibly: exit(-1) if program cannot continue....
     }
 
     dim3 m_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
@@ -516,9 +517,13 @@ int main(){
     cudaFree(d_dataset);
 
     #if PRINT_OUTPUT
+    printf("input matrix\n");
     for(unsigned int i=0; i<num_segments*maxSegmentSize; ++i){
         for(unsigned int j=0; j<num_segments*maxSegmentSize; ++j){
-            printf("%f ", input_matrix[i*num_segments*maxSegmentSize + j]);
+            int xCoord = i/maxSegmentSize;
+            int yCoord = j/maxSegmentSize;
+            int index = xCoord*maxSegmentSize*maxSegmentSize*num_segments + yCoord*maxSegmentSize*maxSegmentSize + (i%maxSegmentSize)*maxSegmentSize + (j%maxSegmentSize);
+            printf("%lf ", input_matrix[index]);
         }
         printf("\n");
     }
@@ -544,35 +549,60 @@ int main(){
     cudaMalloc((void**) &d_V, maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_K, num_segments*num_segments * sizeof(int));
     cudaMemcpy(d_S, h_S, maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    
+    cudaMemcpy(d_U, h_U, maxSegmentSize*maxSegmentSize*num_segments*num_segments * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_V, h_V, maxSegmentSize*maxSegmentSize*num_segments*num_segments * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+
     printf("num segments: %d\n", num_segments);
-    // TODO: call a kernel to figure out size of each tile
-    numThreadsPerBlock = maxSegmentSize; //TODO: make sure that bucket_size is less than 1024
+    numThreadsPerBlock = maxSegmentSize; //TODO: make sure that bucket_size is less than 1024   
     numBlocks = num_segments*num_segments;
     calcMemNeeded<<<numBlocks, numThreadsPerBlock>>> (n, maxSegmentSize, d_K, d_S, eps, d_offsets_sort, num_segments);
     cudaDeviceSynchronize();
 
+    printK<<<1, 1>>> (num_segments, d_K);
+    cudaDeviceSynchronize();
+
     int* d_scan_K;
-    cudaMalloc((void**) &d_scan_K, num_segments*num_segments*sizeof(int));
+    cudaErr = cudaMalloc((void**) &d_scan_K, num_segments*num_segments*sizeof(int));
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
+    printf("num segments: %d\n", num_segments);
+
     d_temp_storage = NULL;
     temp_storage_bytes = 0;
     cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_K, d_scan_K, num_segments*num_segments);
     // Allocate temporary storage
+    printf("temp storage bytes: %zu\n", temp_storage_bytes);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     // Run exclusive prefix sum
     cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_K, d_scan_K, num_segments*num_segments);
+    cudaDeviceSynchronize();
+    cudaFree(d_temp_storage);
 
     int* totalMem = (int*)malloc(sizeof(int));
     int* d_totalMem;
     cudaMalloc((void**) &d_totalMem, sizeof(int));
     getTotalMem<<<1, 1>>> (d_totalMem, d_K, d_scan_K, num_segments);
     cudaDeviceSynchronize();
-    cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaErr = cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost);
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
 
     H2Opus_Real* d_U_tiled;
     H2Opus_Real* d_V_tiled;
-    cudaMalloc((void**) &d_U_tiled, maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_V_tiled, maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real));
+    cudaErr = cudaMalloc((void**) &d_U_tiled, maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
+    cudaErr = cudaMalloc((void**) &d_V_tiled, maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
 
     // TODO: find the maximum rank using a max reduction
     dim3 d_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
@@ -580,11 +610,18 @@ int main(){
     tileMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (n, num_segments, maxSegmentSize, d_S, d_U, d_V, d_U_tiled, d_V_tiled, d_K, d_scan_K);
     cudaDeviceSynchronize();
 
-    H2Opus_Real* expMatrix;
-    cudaMalloc((void**) &expMatrix, num_segments*num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
-    expandMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, expMatrix);
+    H2Opus_Real* d_expMatrix;
+    cudaErr = cudaMalloc((void**) &d_expMatrix, num_segments*num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
+    expandMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_expMatrix);
     cudaDeviceSynchronize();
 
+    printExpM<<<1, 1>>> (num_segments, maxSegmentSize, d_expMatrix, d_input_matrix);
+    cudaDeviceSynchronize();
+    
     H2Opus_Real* d_error;
     H2Opus_Real* error = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
@@ -593,15 +630,28 @@ int main(){
     H2Opus_Real* tmp = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
 
+    *error = 0;
+    *tmp = 0;
+
+    cudaErr = cudaMemcpy(d_error, error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
+    cudaErr = cudaMemcpy(d_tmp, tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    if ( cudaErr != cudaSuccess )
+    {
+       printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
     numThreadsPerBlock = 1024;
     numBlocks = (num_segments*num_segments*maxSegmentSize*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
-    calcError<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, expMatrix, d_input_matrix, d_error, d_tmp);
+    calcError<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_expMatrix, d_input_matrix, d_error, d_tmp);
     cudaDeviceSynchronize();
+
     cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error: %f\n", sqrt(*error)/sqrt(*tmp));
-
-    
+    printf("err: %lf:   tmp: %lf \n", *error, *tmp);
+    printf("error: %lf\n", sqrt(*error)/sqrt(*tmp));
     
     // cudaFree(d_offsets_sort);
     // cudaFree(d_input_matrix);
