@@ -15,7 +15,7 @@
 #include <typeinfo>
 
 #define eps 1e-4
-#define PRINT_OUTPUT 1
+#define PRINT_OUTPUT 0
 #define USE_SVD 0
 #define DIVISION_METHOD 2
 using namespace std;
@@ -24,7 +24,7 @@ using namespace std;
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    uint64_t n = 1<<4;
+    uint64_t n = 1<<6;
     uint64_t dim = 2;
     printf("N = %d\n", n);
     fflush(stdout);
@@ -173,7 +173,6 @@ int main(){
     #else
     while(largest_segment_size > BUCKET_SIZE) {
     #endif
-        printf("begin\n");
         fflush(stdout);
         for(unsigned int i=0; i<numTimers; ++i){
             timer_arr[i]=0;
@@ -537,7 +536,7 @@ int main(){
     H2Opus_Real *h_U = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
     H2Opus_Real *h_V = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
 
-    SVD(n, num_segments, input_matrix, NRows, NCols, maxSegmentSize, h_S, h_U, h_V);
+    SVD(n, num_segments, input_matrix, maxSegmentSize, h_S, h_U, h_V);
     cudaDeviceSynchronize();
 
     int* d_K;
@@ -558,8 +557,10 @@ int main(){
     calcMemNeeded<<<numBlocks, numThreadsPerBlock>>> (n, maxSegmentSize, d_K, d_S, eps, d_offsets_sort, num_segments);
     cudaDeviceSynchronize();
 
+    #if PRINT_OUTPUT
     printK<<<1, 1>>> (num_segments, d_K);
     cudaDeviceSynchronize();
+    #endif
 
     int* d_scan_K;
     cudaErr = cudaMalloc((void**) &d_scan_K, num_segments*num_segments*sizeof(int));
@@ -619,8 +620,10 @@ int main(){
     expandMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_expMatrix);
     cudaDeviceSynchronize();
 
+    #if PRINT_OUTPUT
     printExpM<<<1, 1>>> (num_segments, maxSegmentSize, d_expMatrix, d_input_matrix);
     cudaDeviceSynchronize();
+    #endif
     
     H2Opus_Real* d_error;
     H2Opus_Real* error = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
@@ -650,7 +653,6 @@ int main(){
 
     cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("err: %lf:   tmp: %lf \n", *error, *tmp);
     printf("error: %lf\n", sqrt(*error)/sqrt(*tmp));
     
     // cudaFree(d_offsets_sort);

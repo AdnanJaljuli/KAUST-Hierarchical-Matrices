@@ -13,25 +13,24 @@
 #define FULLSVD 1
 #define PRINTRESULTS 0
 
-void SVD(int n, int num_segments, H2Opus_Real* matrix, int NRows, int NCols, int maxSegmentSize, H2Opus_Real* h_S, H2Opus_Real* h_U, H2Opus_Real* h_V){
+void SVD(int n, int num_segments, H2Opus_Real* matrix, int maxSegmentSize, H2Opus_Real* h_S, H2Opus_Real* h_U, H2Opus_Real* h_V){
 
-    const int           M = NRows;
-    const int           N = NCols;
+    const int           M = maxSegmentSize;
+    const int           N = maxSegmentSize;
     const int           lda = M;
     const int           numMatrices = num_segments*num_segments;
 
     // --- Setting the host matrix
     H2Opus_Real *h_A = (H2Opus_Real *)malloc(lda * N * numMatrices * sizeof(double));
-    for (unsigned int k = 0; k < numMatrices; k++){
-        for (unsigned int i = 0; i < M; i++)
-        {
-            for (unsigned int j = 0; j < N; j++)
-            {
-                h_A[k * M * N + j * M + i] = matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i];
-                // h_A[k * M * N + j * M + i] = make_float2((1. / (k + 1)) * (i + j * j) * (i + j), (1. / (k + 1)) * (i + j * j) * (i + j));
+    for (unsigned int k = 0; k < numMatrices; k++) {
+        for (unsigned int i = 0; i < M; i++) {
+            for (unsigned int j = 0; j < N; j++) {
+                // h_A[k * M * N + j * M + i] = matrix[(k%num_segments)*N*maxSegmentSize + j*N + (k/num_segments)*maxSegmentSize + i];
+                h_A[k * M * N + j * M + i] = matrix[k*N*maxSegmentSize + j*N + i];
             }
         }
     }
+
     // --- Setting the device matrix and moving the host matrix to the device
     H2Opus_Real *d_A;         gpuErrchk(cudaMalloc(&d_A, M * N * numMatrices * sizeof(H2Opus_Real)));
     gpuErrchk(cudaMemcpy(d_A, h_A, M * N * numMatrices * sizeof(H2Opus_Real), cudaMemcpyHostToDevice));
@@ -184,72 +183,70 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int NRows, int NCols, int
         printf("WARNING: devInfo_h = %d : gesvdj does not converge \n", devInfo_h);
     }
 
-    printf("h_U\n");
-    for(unsigned int i=0; i<M; ++i){
-        for(unsigned int j=0; j<M;++j){
-            printf("%lf ", h_U[j*M + i]);
-        }
-        printf("\n");
-    }
-    printf("h_S\n");
-    for(unsigned int i=0; i<numMatrices; ++i){
-        for(unsigned int j=0;j<M; ++j){
-            printf("%lf ", h_S[i*M + j]);
-        }
-        printf("\n");
-    }
-    printf("\n");
-    printf("h_V\n");
-    for(unsigned int i=0; i<M; ++i){
-        for(unsigned int j=0; j<M;++j){
-            printf("%lf ", h_V[i*M + j]);
-        }
-        printf("\n");
-    }
+    // int offset = maxSegmentSize*maxSegmentSize*num_segments;
+    // printf("h_U\n");
+    // for(unsigned int i=0; i<M; ++i){
+    //     for(unsigned int j=0; j<M;++j){
+    //         printf("%lf ", h_U[offset + j*M + i]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("h_S\n");
+    // for(unsigned int i=0; i<numMatrices; ++i){
+    //         printf("%lf ", h_S[maxSegmentSize*num_segments + i]);
+    // }
+    // printf("\n");
+    // printf("h_V\n");
+    // for(unsigned int i=0; i<M; ++i){
+    //     for(unsigned int j=0; j<M;++j){
+    //         printf("%lf ", h_V[offset + i*M + j]);
+    //     }
+    //     printf("\n");
+    // }
 
-    H2Opus_Real* tmp = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
-    H2Opus_Real* ans = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
-    for(int i=0; i<M; ++i){
-        for(int j=0; j<M; ++j){
-            ans[j*M + i] = 0;
-            tmp[j*M + i] = 0;
-        }
-    }
+    // H2Opus_Real* tmp = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
+    // H2Opus_Real* ans = (H2Opus_Real*) malloc(M * M * sizeof(H2Opus_Real));
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         ans[j*M + i] = 0;
+    //         tmp[j*M + i] = 0;
+    //     }
+    // }
 
-    for(int i=0; i<M; ++i){
-        for(int j=0; j<M; ++j){
-            tmp[i*M + j] = h_U[i*M + j] * h_S[i];
-        }
-    }
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         tmp[i*M + j] = h_U[offset + i*M + j] * h_S[maxSegmentSize*num_segments + i];
+    //     }
+    // }
 
-    printf("tmp\n");
-    for(int i=0; i<M; ++i){
-        for(int j=0;j<M; ++j){
-            printf("%lf ", tmp[j*M + i]);
-        }
-        printf("\n");
-    }
-    printf("\n");
+    // printf("tmp\n");
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0;j<M; ++j){
+    //         printf("%lf ", tmp[j*M + i]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("\n");
 
-    for(int i=0; i<M; ++i){
-        for(int j=0; j<M; ++j){
-            for(int k=0; k<M; ++k){
-                // ans[i*M + j] += (tmp[k*M + j] * h_V[i*M + k]);
-                ans[i*M + j] += (tmp[k*M + j] * h_V[k*M + i]);
-                // printf("tmp: %lf    V: %lf ", tmp[k*M + j], h_V[i*M + k]);
-            }
-            // printf("\n");
-        }
-        // printf("\n");
-    }
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         for(int k=0; k<M; ++k){
+    //             // ans[i*M + j] += (tmp[k*M + j] * h_V[i*M + k]);
+    //             ans[i*M + j] += (tmp[k*M + j] * h_V[offset + k*M + i]);
+    //             // printf("tmp: %lf    V: %lf ", tmp[k*M + j], h_V[i*M + k]);
+    //         }
+    //         // printf("\n");
+    //     }
+    //     // printf("\n");
+    // }
 
-    printf("ans\n");
-    for(int i=0; i<M; ++i){
-        for(int j=0; j<M; ++j){
-            printf("%lf ", ans[i*M + j]);
-        }
-        printf("\n");
-    }
+    // printf("ans\n");
+    // for(int i=0; i<M; ++i){
+    //     for(int j=0; j<M; ++j){
+    //         printf("%lf ", ans[i*M + j]);
+    //     }
+    //     printf("\n");
+    // }
 
     // --- Free resources
     if (d_A) gpuErrchk(cudaFree(d_A));
