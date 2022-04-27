@@ -24,7 +24,7 @@ using namespace std;
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    uint64_t n = 1<<6;
+    uint64_t n = 1<<5;
     uint64_t dim = 2;
     printf("N = %d\n", n);
     fflush(stdout);
@@ -655,9 +655,9 @@ int main(){
     cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     printf("error: %lf\n", sqrt(*error)/sqrt(*tmp));
     
-    // cudaFree(d_offsets_sort);
-    // cudaFree(d_input_matrix);
-    // free(input_matrix);
+    cudaFree(d_offsets_sort);
+    cudaFree(d_input_matrix);
+    free(input_matrix);
 
     // #if DIVISION_METHOD == 1
     // cudaFree(A);
@@ -668,4 +668,53 @@ int main(){
     // free(new_num_segments);
     // cudaFree(d_workDone);
     // #endif
+    
+
+
+    H2Opus_Real* d_buffer_vector;
+    H2Opus_Real* d_input_vector;
+    H2Opus_Real* d_output_vector;
+    cudaMalloc((void**) &d_buffer_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_input_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_output_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+
+    numThreadsPerBlock = 1024;
+    numBlocks = (num_segments*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
+    fillVector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_input_vector, d_output_vector, d_buffer_vector);
+    cudaDeviceSynchronize();
+
+    int* K = (int*)malloc(num_segments*num_segments*sizeof(int));
+    int* scan_K = (int*)malloc(num_segments*num_segments*sizeof(int));
+    cudaMemcpy(K, d_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(scan_K, d_scan_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
+
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    H2Opus_Real alf=1.0;
+    H2Opus_Real beta=0;
+
+    // cublasOperation_t CUBLAS_OP_T;
+    // cublasOperation_t CUBLAS_OP_N;
+    PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_input_vector);
+    cudaDeviceSynchronize();
+    printf("----------------\n");
+    PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_output_vector);
+    cudaDeviceSynchronize();
+    for(unsigned int i=0; i<num_segments; ++i){
+        for(unsigned int j=0; j<num_segments; ++j){
+            beta = 0;
+            cublasDgemv(handle, CUBLAS_OP_T, maxSegmentSize,  K[i*num_segments + j], &alf, &d_V_tiled[scan_K[i*num_segments + j]*maxSegmentSize], maxSegmentSize, &d_input_vector[i*maxSegmentSize], 1, &beta, d_buffer_vector, 1);
+            beta = 1;
+            cudaDeviceSynchronize();
+            cublasDgemv(handle, CUBLAS_OP_N, maxSegmentSize, K[i*num_segments + j], &alf, &d_U_tiled[scan_K[i*num_segments + j]*maxSegmentSize], maxSegmentSize, d_buffer_vector, 1, &beta, &d_output_vector[i*maxSegmentSize], 1);
+            printf("----------------\n");
+            cudaDeviceSynchronize();
+            PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_output_vector);
+            cudaDeviceSynchronize();
+        }
+    }
+    cublasDestroy(handle);
+   printf("----------------\n");
+    PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_output_vector);
+    cudaDeviceSynchronize();
 }

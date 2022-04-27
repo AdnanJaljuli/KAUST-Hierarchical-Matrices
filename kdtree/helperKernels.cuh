@@ -1,7 +1,8 @@
 #include "helperFunctions.h"
 #include <cub/cub.cuh>
 #include <assert.h>
-#define BUCKET_SIZE 32
+#include <curand_kernel.h>
+#define BUCKET_SIZE 8
 typedef double H2Opus_Real;
 
 __global__ void initializeArrays(int n, int* values_in, int* currDimArray, int max_num_segments){
@@ -461,4 +462,27 @@ __global__ void printExpM(uint64_t num_segments, uint64_t maxSegmentSize, H2Opus
         }
         printf("\n");
     }
+}
+
+__global__ void fillVector(int num_segments, int maxSegmentSize, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i < num_segments*maxSegmentSize){
+        unsigned int seed = i;
+        curandState s;
+        curand_init(seed, 0, 0, &s);
+        H2Opus_Real random_n = curand_uniform(&s);
+        input_vector[i]= random_n;
+        output_vector[i]= 0;
+        
+    }
+    if(i<maxSegmentSize){
+        buffer_vector[i]= 0;
+    }
+}
+
+__global__ void PrintVector(unsigned int num_segments, unsigned int maxSegmentSize, H2Opus_Real * d_output_vector){
+    for (unsigned int i = 0; i < num_segments*maxSegmentSize; ++i){
+        printf("%lf ", d_output_vector[i]);
+    }
+    printf("\n");
 }
