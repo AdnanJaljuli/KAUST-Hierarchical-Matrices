@@ -2,7 +2,7 @@
 #include <cub/cub.cuh>
 #include <assert.h>
 #include <curand_kernel.h>
-#define BUCKET_SIZE 8
+#define BUCKET_SIZE 32
 typedef double H2Opus_Real;
 
 __global__ void initializeArrays(int n, int* values_in, int* currDimArray, int max_num_segments){
@@ -447,7 +447,7 @@ __global__ void calcError (int num_segments, int maxSegmentSize, H2Opus_Real* ex
         H2Opus_Real y = expMatrix[i];
         atomicAdd(tmp, x*x);
         atomicAdd(error, (x-y)*(x-y));
-        printf("x: %lf   y: %lf\n", x, y);
+        // printf("x: %lf   y: %lf\n", x, y);
     }
 }
 
@@ -464,7 +464,7 @@ __global__ void printExpM(uint64_t num_segments, uint64_t maxSegmentSize, H2Opus
     }
 }
 
-__global__ void fillVector(int num_segments, int maxSegmentSize, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector){
+__global__ void fillVector(int num_segments, int maxSegmentSize, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* output_vector_org){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i < num_segments*maxSegmentSize){
         unsigned int seed = i;
@@ -473,10 +473,8 @@ __global__ void fillVector(int num_segments, int maxSegmentSize, H2Opus_Real* in
         H2Opus_Real random_n = curand_uniform(&s);
         input_vector[i]= random_n;
         output_vector[i]= 0;
+        output_vector_org[i]= 0;
         
-    }
-    if(i<maxSegmentSize){
-        buffer_vector[i]= 0;
     }
 }
 
@@ -485,4 +483,34 @@ __global__ void PrintVector(unsigned int num_segments, unsigned int maxSegmentSi
         printf("%lf ", d_output_vector[i]);
     }
     printf("\n");
+}
+
+__global__ void calcError_vector (int num_segments, int maxSegmentSize, H2Opus_Real* output_vector, H2Opus_Real* output_vector_org, H2Opus_Real* error_vector, H2Opus_Real* tmp_vector){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i < num_segments*maxSegmentSize){
+        H2Opus_Real x = output_vector_org[i];
+        H2Opus_Real y = output_vector[i];
+        atomicAdd(tmp_vector, x*x);
+        atomicAdd(error_vector, (x-y)*(x-y));
+        // printf("x: %lf   y: %lf\n", x, y);
+    }
+}
+
+__global__ void GEMV(int num_segments, int maxSegmentSize, int* K, int* scan_k, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(threadIdx.x < maxSegmentSize){
+        __shared__ input_vector_s[maxSegmentSize];
+        input_vector_s[threadIdx.x] = input_vector[threadIdx.x + maxSegmentSize*blockIdx.x];
+        __syncthreads();
+
+        for(unsigned int tile = 0; tile < num_segments; ++tile){
+            if(threadIdx.x < K[tile*num_segments + blockIdx.x]){
+                int tmp_sum = 0;
+                for(unsigned int v_tile_index=0; v_tile_index<maxSegmentSize; ++v_tile_index){
+                    tmp_sum += V_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector_s[v_tile_index];
+                }
+                input_vector_s[threadIdx.x] = tmp_sum;
+            }
+        }
+    }
 }

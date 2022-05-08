@@ -2,17 +2,14 @@
 #define HELPERFUNCTIONS_H
 
 #include <utility>
-#define numTimers 9
+#define numTimers 11
 
-void printCountersInFile(unsigned int iteration, unsigned int num_segments, float* times){
+void printCountersInFile(float* times){
     char filename[100] = "results/times.csv";
 
     FILE *output_file = fopen(filename, "a");
-    fprintf(output_file, "%u,", iteration);
-    fprintf(output_file, "%u", num_segments);
-
-    for(unsigned int i = 0;i<numTimers; ++i){
-        fprintf(output_file,",%f",times[i]);
+    for(unsigned int i = 0; i<numTimers; ++i){
+        fprintf(output_file,"%f, ",times[i]);
     }
     fprintf(output_file, "\n");
     fclose(output_file);

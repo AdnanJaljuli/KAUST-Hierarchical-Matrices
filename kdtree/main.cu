@@ -14,7 +14,7 @@
 #include <math.h>
 #include <typeinfo>
 
-#define eps 1e-4
+#define eps 1e-6
 #define PRINT_OUTPUT 0
 #define USE_SVD 0
 #define DIVISION_METHOD 2
@@ -24,10 +24,16 @@ using namespace std;
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    uint64_t n = 1<<5;
+    uint64_t n = 1<<13;
     uint64_t dim = 2;
     printf("N = %d\n", n);
     fflush(stdout);
+
+    float* timer_arr = (float*)malloc(numTimers*sizeof(float));
+    timer_arr[0] = (float)n;
+    timer_arr[1] = (float)BUCKET_SIZE;
+    timer_arr[2] = (float)dim;
+    timer_arr[3] = (float)eps;
 
     // Create point cloud
     PointCloud<H2Opus_Real> pt_cloud(dim, (size_t)n);
@@ -82,7 +88,6 @@ int main(){
     H2Opus_Real *d_span;
     int* d_span_offsets;
     cub::KeyValuePair<int, H2Opus_Real> *d_span_reduce_out;
-    float* timer_arr = (float*)malloc(numTimers*sizeof(float));
 
     #if DIVISION_METHOD == 1
     bool workDone= false;
@@ -173,49 +178,23 @@ int main(){
     #else
     while(largest_segment_size > BUCKET_SIZE) {
     #endif
-        fflush(stdout);
-        for(unsigned int i=0; i<numTimers; ++i){
-            timer_arr[i]=0;
-        }
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+1+numThreadsPerBlock-1)/numThreadsPerBlock;
-        cudaEvent_t startFillOffsets_k, stopFillOffsets_k;
-        cudaEventCreate(&startFillOffsets_k);
-        cudaEventCreate(&stopFillOffsets_k);
-        cudaEventRecord(startFillOffsets_k);
         #if DIVISION_METHOD==0
         fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
         #endif
-        cudaEventRecord(stopFillOffsets_k);
-        cudaEventSynchronize(stopFillOffsets_k);
-        cudaEventElapsedTime(&timer_arr[0], startFillOffsets_k, stopFillOffsets_k);
-        cudaEventDestroy(startFillOffsets_k);
-        cudaEventDestroy(stopFillOffsets_k);
         cudaDeviceSynchronize();
 
         numThreadsPerBlock = 1024;
         numBlocks = (long long)((long long)n*(long long)dim + numThreadsPerBlock-1)/numThreadsPerBlock;
 
-        cudaEvent_t startFillReduction_k, stopFillReduction_k;
-        cudaEventCreate(&startFillReduction_k);
-        cudaEventCreate(&stopFillReduction_k);
-        cudaEventRecord(startFillReduction_k);
         fillReductionArray<<<numBlocks, numThreadsPerBlock>>> (n, dim, d_dataset, d_values_in, d_reduce_in);
-        cudaEventRecord(stopFillReduction_k);
-        cudaEventSynchronize(stopFillReduction_k);
-        cudaEventElapsedTime(&timer_arr[1], startFillReduction_k, stopFillReduction_k);
-        cudaEventDestroy(startFillReduction_k);
-        cudaEventDestroy(stopFillReduction_k);
         cudaDeviceSynchronize();
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
-        cudaEvent_t startMinReduce_k, stopMinReduce_k;
-        cudaEventCreate(&startMinReduce_k);
-        cudaEventCreate(&stopMinReduce_k);
-        cudaEventRecord(startMinReduce_k);
         cub::DeviceSegmentedReduce::Min(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_min_out,
             num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
 
@@ -223,21 +202,12 @@ int main(){
 
         cub::DeviceSegmentedReduce::Min(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_min_out,
             num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
-        cudaEventRecord(stopMinReduce_k);
-        cudaEventSynchronize(stopMinReduce_k);
-        cudaEventElapsedTime(&timer_arr[2], startMinReduce_k, stopMinReduce_k);
-        cudaEventDestroy(startMinReduce_k);
-        cudaEventDestroy(stopMinReduce_k);
         cudaDeviceSynchronize();
         cudaFree(d_temp_storage);
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
-        cudaEvent_t startMaxReduce_k, stopMaxReduce_k;
-        cudaEventCreate(&startMaxReduce_k);
-        cudaEventCreate(&stopMaxReduce_k);
-        cudaEventRecord(startMaxReduce_k);
         cub::DeviceSegmentedReduce::Max(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_max_out,
             num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
 
@@ -245,36 +215,18 @@ int main(){
 
         cub::DeviceSegmentedReduce::Max(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_max_out,
             num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
-        cudaEventRecord(stopMaxReduce_k);
-        cudaEventSynchronize(stopMaxReduce_k);
-        cudaEventElapsedTime(&timer_arr[3], startMaxReduce_k, stopMaxReduce_k);
-        cudaEventDestroy(startMaxReduce_k);
-        cudaEventDestroy(stopMaxReduce_k);
         cudaDeviceSynchronize();
         cudaFree(d_temp_storage);
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
 
-        cudaEvent_t startFindSpan_k, stopFindSpan_k;
-        cudaEventCreate(&startFindSpan_k);
-        cudaEventCreate(&stopFindSpan_k);
-        cudaEventRecord(startFindSpan_k);
         findSpan<<<numBlocks, numThreadsPerBlock>>> (n, dim, num_segments, d_reduce_min_out, d_reduce_max_out, d_span, d_span_offsets);
-        cudaEventRecord(stopFindSpan_k);
-        cudaEventSynchronize(stopFindSpan_k);
-        cudaEventElapsedTime(&timer_arr[4], startFindSpan_k, stopFindSpan_k);
-        cudaEventDestroy(startFindSpan_k);
-        cudaEventDestroy(stopFindSpan_k);
         cudaDeviceSynchronize();
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
-        cudaEvent_t startArgMaxReduce_k, stopArgMaxReduce_k;
-        cudaEventCreate(&startArgMaxReduce_k);
-        cudaEventCreate(&stopArgMaxReduce_k);
-        cudaEventRecord(startArgMaxReduce_k);
         cub::DeviceSegmentedReduce::ArgMax(d_temp_storage, temp_storage_bytes, d_span, d_span_reduce_out,
             num_segments, d_span_offsets, d_span_offsets + 1);
         // Allocate temporary storage
@@ -282,41 +234,22 @@ int main(){
         // Run argmax-reduction
         cub::DeviceSegmentedReduce::ArgMax(d_temp_storage, temp_storage_bytes, d_span, d_span_reduce_out,
             num_segments, d_span_offsets, d_span_offsets + 1);
-        cudaEventRecord(stopArgMaxReduce_k);
-        cudaEventSynchronize(stopArgMaxReduce_k);
-        cudaEventElapsedTime(&timer_arr[5], startArgMaxReduce_k, stopArgMaxReduce_k);
-        cudaEventDestroy(startArgMaxReduce_k);
-        cudaEventDestroy(stopArgMaxReduce_k);
         cudaDeviceSynchronize();
         cudaFree(d_temp_storage);
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
 
-        cudaEvent_t startfillCurrDim_k, stopFillCurrDim_k;
-        cudaEventCreate(&startfillCurrDim_k);
-        cudaEventCreate(&stopFillCurrDim_k);
-        cudaEventRecord(startfillCurrDim_k);
         #if DIVISION_METHOD == 1
         fillCurrDim<<<numBlocks, numThreadsPerBlock>>> (n, num_segments, d_curr_dim, d_span_reduce_out, d_bit_vector);
         #else
         fillCurrDim<<<numBlocks, numThreadsPerBlock>>> (n, num_segments, d_curr_dim, d_span_reduce_out);
         #endif
         cudaDeviceSynchronize();
-        cudaEventRecord(stopFillCurrDim_k);
-        cudaEventSynchronize(stopFillCurrDim_k);
-        cudaEventElapsedTime(&timer_arr[6], startfillCurrDim_k, stopFillCurrDim_k);
-        cudaEventDestroy(startfillCurrDim_k);
-        cudaEventDestroy(stopFillCurrDim_k);
 
         // fill keys_in array
         numThreadsPerBlock = 1024;
         numBlocks = (n+numThreadsPerBlock-1)/numThreadsPerBlock;
-
-        cudaEvent_t startfillKeysIn_k, stopKeysIn_k;
-        cudaEventCreate(&startfillKeysIn_k);
-        cudaEventCreate(&stopKeysIn_k);
-        cudaEventRecord(startfillKeysIn_k);
 
         #if DIVISION_METHOD != 0
         thrust::device_ptr<int> A = thrust::device_pointer_cast((int *)d_offsets_sort), B = thrust::device_pointer_cast((int *)d_input_search);
@@ -327,21 +260,11 @@ int main(){
         #else
         fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, segment_size, d_keys_in, d_curr_dim, d_values_in, d_dataset);
         #endif
-
-        cudaEventRecord(stopKeysIn_k);
-        cudaEventSynchronize(stopKeysIn_k);
-        cudaEventElapsedTime(&timer_arr[7], startfillKeysIn_k, stopKeysIn_k);
-        cudaEventDestroy(startfillKeysIn_k);
-        cudaEventDestroy(stopKeysIn_k);
         cudaDeviceSynchronize();
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
-        cudaEvent_t startSort_k, stopSort_k;
-        cudaEventCreate(&startSort_k);
-        cudaEventCreate(&stopSort_k);
-        cudaEventRecord(startSort_k);
         cub::DeviceSegmentedRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
         d_keys_in, d_keys_out, d_values_in, d_values_out,
         n, num_segments, d_offsets_sort, d_offsets_sort + 1);
@@ -351,18 +274,12 @@ int main(){
         cub::DeviceSegmentedRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
         d_keys_in, d_keys_out, d_values_in, d_values_out,
         n, num_segments, d_offsets_sort, d_offsets_sort + 1);
-        cudaEventRecord(stopSort_k);
-        cudaEventSynchronize(stopSort_k);
-        cudaEventElapsedTime(&timer_arr[8], startSort_k, stopSort_k);
-        cudaEventDestroy(startSort_k);
-        cudaEventDestroy(stopSort_k);
         cudaDeviceSynchronize();
         cudaFree(d_temp_storage);
 
         d_temp = d_values_in;
         d_values_in = d_values_out;
         d_values_out = d_temp;
-        printCountersInFile(iteration, num_segments, timer_arr);
         ++iteration;
 
         #if DIVISION_METHOD == 1
@@ -434,7 +351,7 @@ int main(){
     cudaEventSynchronize(stopWhileLoop);
     float whileLoop_time = 0;
     cudaEventElapsedTime(&whileLoop_time, startWhileLoop, stopWhileLoop);
-    printf("total time taken for while loop: %f\n", whileLoop_time);
+    timer_arr[4] = whileLoop_time;
     cudaEventDestroy(startWhileLoop);
     cudaEventDestroy(stopWhileLoop);
 
@@ -508,7 +425,16 @@ int main(){
 
     dim3 m_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
     dim3 m_numBlocks(num_segments, num_segments);
+    cudaEvent_t startGenerateInputMatrix, stopGenerateInputMatrix;
+    cudaEventCreate(&startGenerateInputMatrix);
+    cudaEventCreate(&stopGenerateInputMatrix);
+    cudaEventRecord(startGenerateInputMatrix);
     generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, num_segments, maxSegmentSize, dim, d_values_in, d_input_matrix, d_dataset, d_offsets_sort);
+    cudaEventRecord(stopGenerateInputMatrix);
+    cudaEventSynchronize(stopGenerateInputMatrix);
+    cudaEventElapsedTime(&timer_arr[5], startGenerateInputMatrix, stopGenerateInputMatrix);
+    cudaEventDestroy(startGenerateInputMatrix);
+    cudaEventDestroy(stopGenerateInputMatrix);
     cudaDeviceSynchronize();
     cudaMemcpy(input_matrix, d_input_matrix, maxSegmentSize*num_segments*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
 
@@ -536,7 +462,17 @@ int main(){
     H2Opus_Real *h_U = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
     H2Opus_Real *h_V = (H2Opus_Real *)malloc(maxSegmentSize * maxSegmentSize * num_segments*num_segments * sizeof(H2Opus_Real));
 
+
+    cudaEvent_t startSVD, stopSVD;
+    cudaEventCreate(&startSVD);
+    cudaEventCreate(&stopSVD);
+    cudaEventRecord(startSVD);
     SVD(n, num_segments, input_matrix, maxSegmentSize, h_S, h_U, h_V);
+    cudaEventRecord(stopSVD);
+    cudaEventSynchronize(stopSVD);
+    cudaEventElapsedTime(&timer_arr[6], startSVD, stopSVD);
+    cudaEventDestroy(startSVD);
+    cudaEventDestroy(stopSVD);
     cudaDeviceSynchronize();
 
     int* d_K;
@@ -587,6 +523,10 @@ int main(){
     getTotalMem<<<1, 1>>> (d_totalMem, d_K, d_scan_K, num_segments);
     cudaDeviceSynchronize();
     cudaErr = cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost);
+    timer_arr[7] = maxSegmentSize*maxSegmentSize*num_segments*num_segments;
+    timer_arr[8] = (*totalMem)*maxSegmentSize;
+    printf("max mem: %d\n", maxSegmentSize*maxSegmentSize*num_segments*num_segments);
+    printf("total mem: %d\n", (*totalMem)*maxSegmentSize);
     if ( cudaErr != cudaSuccess )
     {
        printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
@@ -654,9 +594,9 @@ int main(){
     cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     printf("error: %lf\n", sqrt(*error)/sqrt(*tmp));
+    timer_arr[10] = sqrt(*error)/sqrt(*tmp);
     
     cudaFree(d_offsets_sort);
-    cudaFree(d_input_matrix);
     free(input_matrix);
 
     // #if DIVISION_METHOD == 1
@@ -668,53 +608,98 @@ int main(){
     // free(new_num_segments);
     // cudaFree(d_workDone);
     // #endif
-    
-
 
     H2Opus_Real* d_buffer_vector;
     H2Opus_Real* d_input_vector;
     H2Opus_Real* d_output_vector;
+    H2Opus_Real* d_output_vector_org;
     cudaMalloc((void**) &d_buffer_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_input_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_output_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_output_vector_org, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
 
     numThreadsPerBlock = 1024;
     numBlocks = (num_segments*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
-    fillVector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_input_vector, d_output_vector, d_buffer_vector);
+    fillVector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_input_vector, d_output_vector, d_output_vector_org);
     cudaDeviceSynchronize();
 
-    int* K = (int*)malloc(num_segments*num_segments*sizeof(int));
-    int* scan_K = (int*)malloc(num_segments*num_segments*sizeof(int));
-    cudaMemcpy(K, d_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(scan_K, d_scan_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
+    numThreadsPerBlock = upper_power_of_two(maxSegmentSize);
+    numBlocks = num_segments;
+    GEMV<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_input_vector, d_output_vector, d_buffer_vector);
 
-    cublasHandle_t handle;
-    cublasCreate(&handle);
-    H2Opus_Real alf=1.0;
-    H2Opus_Real beta=0;
+    // int* K = (int*)malloc(num_segments*num_segments*sizeof(int));
+    // int* scan_K = (int*)malloc(num_segments*num_segments*sizeof(int));
+    // cudaMemcpy(K, d_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(scan_K, d_scan_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
 
-    // cublasOperation_t CUBLAS_OP_T;
-    // cublasOperation_t CUBLAS_OP_N;
-    PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_input_vector);
-    cudaDeviceSynchronize();
-    printf("----------------\n");
-    PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_output_vector);
-    cudaDeviceSynchronize();
-    for(unsigned int i=0; i<num_segments; ++i){
-        for(unsigned int j=0; j<num_segments; ++j){
-            beta = 0;
-            cublasDgemv(handle, CUBLAS_OP_T, maxSegmentSize,  K[i*num_segments + j], &alf, &d_V_tiled[scan_K[i*num_segments + j]*maxSegmentSize], maxSegmentSize, &d_input_vector[i*maxSegmentSize], 1, &beta, d_buffer_vector, 1);
-            beta = 1;
-            cudaDeviceSynchronize();
-            cublasDgemv(handle, CUBLAS_OP_N, maxSegmentSize, K[i*num_segments + j], &alf, &d_U_tiled[scan_K[i*num_segments + j]*maxSegmentSize], maxSegmentSize, d_buffer_vector, 1, &beta, &d_output_vector[i*maxSegmentSize], 1);
-            printf("----------------\n");
-            cudaDeviceSynchronize();
-            PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_output_vector);
-            cudaDeviceSynchronize();
-        }
-    }
-    cublasDestroy(handle);
-   printf("----------------\n");
-    PrintVector<<<1, 1>>> (num_segments, maxSegmentSize, d_output_vector);
-    cudaDeviceSynchronize();
+    // cublasHandle_t handle;
+    // cublasCreate(&handle);
+    // H2Opus_Real alf=1.0;
+    // H2Opus_Real beta=0;
+    // unsigned int numStreams = num_segments;
+    // cudaStream_t stream[numStreams];
+    // for(unsigned int s=0; s<numStreams; ++s){
+    //     cudaStreamCreate(&stream[s]);
+    // }
+    // cudaDeviceSynchronize();
+
+    // cudaEvent_t startGEMV, stopGEMV;
+    // cudaEventCreate(&startGEMV);
+    // cudaEventCreate(&stopGEMV);
+    // cudaEventRecord(startGEMV);
+
+    // for(unsigned int i=0; i<num_segments; ++i){
+    //     cublasSetStream(handle, stream[i]);
+    //     for(unsigned int j=0; j<num_segments; ++j){
+    //         beta = 0;
+    //         cublasDgemv(handle, CUBLAS_OP_T, maxSegmentSize,  K[j*num_segments + i], &alf, &d_V_tiled[scan_K[j*num_segments + i]*maxSegmentSize], maxSegmentSize, &d_input_vector[j*maxSegmentSize], 1, &beta, &d_buffer_vector[i*maxSegmentSize], 1);
+    //         beta = 1;
+    //         cudaDeviceSynchronize();
+    //         cublasDgemv(handle, CUBLAS_OP_N, maxSegmentSize, K[j*num_segments + i], &alf, &d_U_tiled[scan_K[j*num_segments + i]*maxSegmentSize], maxSegmentSize, &d_buffer_vector[i*maxSegmentSize], 1, &beta, &d_output_vector[i*maxSegmentSize], 1);
+    //         cudaDeviceSynchronize();
+    //     }
+    // }
+
+    // cudaEventRecord(stopGEMV);
+    // cudaEventSynchronize(stopGEMV);
+    // float GEMV_time = 0;
+    // cudaEventElapsedTime(&GEMV_time, startGEMV, stopGEMV);
+    // printf("total time taken for GEMV: %f\n", GEMV_time);
+    // timer_arr[9] = GEMV_time;
+    // cudaEventDestroy(startGEMV);
+    // cudaEventDestroy(stopGEMV);
+
+    // beta = 1;
+    // for(unsigned int i=0; i<num_segments; ++i){
+    //     for(unsigned int j=0; j<num_segments; ++j){
+    //         cublasDgemv(handle, CUBLAS_OP_T, maxSegmentSize,  maxSegmentSize, &alf, &d_input_matrix[i*maxSegmentSize*maxSegmentSize*num_segments + j*maxSegmentSize*maxSegmentSize], maxSegmentSize, &d_input_vector[i*maxSegmentSize], 1, &beta, &d_output_vector_org[i*maxSegmentSize], 1);
+    //         cudaDeviceSynchronize();
+    //     }
+    // }
+    // cublasDestroy(handle);
+    // cudaFree(d_input_matrix);
+
+    // H2Opus_Real* d_error_vector;
+    // H2Opus_Real* error_vector = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
+    // cudaMalloc((void**) &d_error_vector, sizeof(H2Opus_Real));
+
+    // H2Opus_Real* d_tmp_vector;
+    // H2Opus_Real* tmp_vector = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
+    // cudaMalloc((void**) &d_tmp_vector, sizeof(H2Opus_Real));
+
+    // *error = 0;
+    // *tmp = 0;
+
+    // cudaMemcpy(d_error_vector, error_vector, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_tmp_vector, tmp_vector, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+
+    // numThreadsPerBlock = 1024;
+    // numBlocks = (num_segments*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
+    // calcError_vector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_output_vector, d_output_vector_org, d_error_vector, d_tmp_vector);
+    // cudaDeviceSynchronize();
+    // cudaMemcpy(error_vector, d_error_vector, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(tmp_vector, d_tmp_vector, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    // printf("error_vector: %lf\n", sqrt(*error_vector)/sqrt(*tmp_vector));
+    // printf("----------------\n");
+    printCountersInFile(timer_arr);
 }
