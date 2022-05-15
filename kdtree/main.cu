@@ -17,14 +17,14 @@
 #define eps 1e-6
 #define PRINT_OUTPUT 0
 #define USE_SVD 0
-#define DIVISION_METHOD 2
+#define DIVISION_METHOD 0
 using namespace std;
 
 // TODO: generate pointcloud and copy values of the pointcloud to ptr on GPU
 // TODO: fix makefile so main.cu depends on helperKerlens.cuh
 
 int main(){
-    uint64_t n = 1<<13;
+    uint64_t n = 1<<14;
     uint64_t dim = 2;
     printf("N = %d\n", n);
     fflush(stdout);
@@ -172,13 +172,13 @@ int main(){
     unsigned int iteration = 0;
 
     #if DIVISION_METHOD == 1
-    while(!workDone) {
+    while(!workDone)
     #elif DIVISION_METHOD == 0
-    while(segment_size > BUCKET_SIZE) {
+    while(segment_size > BUCKET_SIZE)
     #else
-    while(largest_segment_size > BUCKET_SIZE) {
+    while(largest_segment_size > BUCKET_SIZE)
     #endif
-
+    {
         numThreadsPerBlock = 1024;
         numBlocks = (num_segments+1+numThreadsPerBlock-1)/numThreadsPerBlock;
         #if DIVISION_METHOD==0
@@ -599,16 +599,6 @@ int main(){
     cudaFree(d_offsets_sort);
     free(input_matrix);
 
-    // #if DIVISION_METHOD == 1
-    // cudaFree(A);
-    // cudaFree(B);
-
-    // cudaFree(d_bit_vector);
-    // cudaFree(d_new_num_segments);
-    // free(new_num_segments);
-    // cudaFree(d_workDone);
-    // #endif
-
     H2Opus_Real* d_buffer_vector;
     H2Opus_Real* d_input_vector;
     H2Opus_Real* d_output_vector;
@@ -625,81 +615,21 @@ int main(){
 
     numThreadsPerBlock = upper_power_of_two(maxSegmentSize);
     numBlocks = num_segments;
+
+    cudaEvent_t startGEMV, stopGEMV;
+    cudaEventCreate(&startGEMV);
+    cudaEventCreate(&stopGEMV);
+    cudaEventRecord(startGEMV);
     GEMV<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_input_vector, d_output_vector, d_buffer_vector);
+    cudaDeviceSynchronize();
+    cudaEventRecord(stopGEMV);
+    cudaEventSynchronize(stopGEMV);
+    float GEMV_time = 0;
+    cudaEventElapsedTime(&GEMV_time, startGEMV, stopGEMV);
+    cudaEventDestroy(startGEMV);
+    cudaEventDestroy(stopGEMV);
+    timer_arr[9] = GEMV_time;
+    printf("total time taken for GEMV: %f\n", GEMV_time);
 
-    // int* K = (int*)malloc(num_segments*num_segments*sizeof(int));
-    // int* scan_K = (int*)malloc(num_segments*num_segments*sizeof(int));
-    // cudaMemcpy(K, d_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
-    // cudaMemcpy(scan_K, d_scan_K, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
-
-    // cublasHandle_t handle;
-    // cublasCreate(&handle);
-    // H2Opus_Real alf=1.0;
-    // H2Opus_Real beta=0;
-    // unsigned int numStreams = num_segments;
-    // cudaStream_t stream[numStreams];
-    // for(unsigned int s=0; s<numStreams; ++s){
-    //     cudaStreamCreate(&stream[s]);
-    // }
-    // cudaDeviceSynchronize();
-
-    // cudaEvent_t startGEMV, stopGEMV;
-    // cudaEventCreate(&startGEMV);
-    // cudaEventCreate(&stopGEMV);
-    // cudaEventRecord(startGEMV);
-
-    // for(unsigned int i=0; i<num_segments; ++i){
-    //     cublasSetStream(handle, stream[i]);
-    //     for(unsigned int j=0; j<num_segments; ++j){
-    //         beta = 0;
-    //         cublasDgemv(handle, CUBLAS_OP_T, maxSegmentSize,  K[j*num_segments + i], &alf, &d_V_tiled[scan_K[j*num_segments + i]*maxSegmentSize], maxSegmentSize, &d_input_vector[j*maxSegmentSize], 1, &beta, &d_buffer_vector[i*maxSegmentSize], 1);
-    //         beta = 1;
-    //         cudaDeviceSynchronize();
-    //         cublasDgemv(handle, CUBLAS_OP_N, maxSegmentSize, K[j*num_segments + i], &alf, &d_U_tiled[scan_K[j*num_segments + i]*maxSegmentSize], maxSegmentSize, &d_buffer_vector[i*maxSegmentSize], 1, &beta, &d_output_vector[i*maxSegmentSize], 1);
-    //         cudaDeviceSynchronize();
-    //     }
-    // }
-
-    // cudaEventRecord(stopGEMV);
-    // cudaEventSynchronize(stopGEMV);
-    // float GEMV_time = 0;
-    // cudaEventElapsedTime(&GEMV_time, startGEMV, stopGEMV);
-    // printf("total time taken for GEMV: %f\n", GEMV_time);
-    // timer_arr[9] = GEMV_time;
-    // cudaEventDestroy(startGEMV);
-    // cudaEventDestroy(stopGEMV);
-
-    // beta = 1;
-    // for(unsigned int i=0; i<num_segments; ++i){
-    //     for(unsigned int j=0; j<num_segments; ++j){
-    //         cublasDgemv(handle, CUBLAS_OP_T, maxSegmentSize,  maxSegmentSize, &alf, &d_input_matrix[i*maxSegmentSize*maxSegmentSize*num_segments + j*maxSegmentSize*maxSegmentSize], maxSegmentSize, &d_input_vector[i*maxSegmentSize], 1, &beta, &d_output_vector_org[i*maxSegmentSize], 1);
-    //         cudaDeviceSynchronize();
-    //     }
-    // }
-    // cublasDestroy(handle);
-    // cudaFree(d_input_matrix);
-
-    // H2Opus_Real* d_error_vector;
-    // H2Opus_Real* error_vector = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_error_vector, sizeof(H2Opus_Real));
-
-    // H2Opus_Real* d_tmp_vector;
-    // H2Opus_Real* tmp_vector = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
-    // cudaMalloc((void**) &d_tmp_vector, sizeof(H2Opus_Real));
-
-    // *error = 0;
-    // *tmp = 0;
-
-    // cudaMemcpy(d_error_vector, error_vector, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    // cudaMemcpy(d_tmp_vector, tmp_vector, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-
-    // numThreadsPerBlock = 1024;
-    // numBlocks = (num_segments*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
-    // calcError_vector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_output_vector, d_output_vector_org, d_error_vector, d_tmp_vector);
-    // cudaDeviceSynchronize();
-    // cudaMemcpy(error_vector, d_error_vector, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    // cudaMemcpy(tmp_vector, d_tmp_vector, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    // printf("error_vector: %lf\n", sqrt(*error_vector)/sqrt(*tmp_vector));
-    // printf("----------------\n");
     printCountersInFile(timer_arr);
 }

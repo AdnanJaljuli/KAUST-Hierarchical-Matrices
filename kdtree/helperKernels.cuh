@@ -474,7 +474,6 @@ __global__ void fillVector(int num_segments, int maxSegmentSize, H2Opus_Real* in
         input_vector[i]= random_n;
         output_vector[i]= 0;
         output_vector_org[i]= 0;
-        
     }
 }
 
@@ -498,19 +497,29 @@ __global__ void calcError_vector (int num_segments, int maxSegmentSize, H2Opus_R
 
 __global__ void GEMV(int num_segments, int maxSegmentSize, int* K, int* scan_k, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(threadIdx.x < maxSegmentSize){
-        __shared__ input_vector_s[maxSegmentSize];
-        input_vector_s[threadIdx.x] = input_vector[threadIdx.x + maxSegmentSize*blockIdx.x];
+    // __shared__ H2Opus_Real input_vector_s[maxSegmentSize];
+    // if(threadIdx.x < maxSegmentSize){
+    //     input_vector_s[threadIdx.x] = input_vector[threadIdx.x + maxSegmentSize*blockIdx.x];
+    // }
+    // __syncthreads();
+
+    for(unsigned int tile = 0; tile < num_segments; ++tile){
+        if(threadIdx.x < K[tile*num_segments + blockIdx.x]){
+            H2Opus_Real tmp_sum = 0;
+            for(unsigned int v_tile_index=0; v_tile_index<maxSegmentSize; ++v_tile_index){
+                tmp_sum += V_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector[maxSegmentSize*blockIdx.x + v_tile_index];
+            }
+            buffer_vector[K[tile*num_segments + blockIdx.x] - threadIdx.x + maxSegmentSize*blockIdx.x] = tmp_sum;
+        }
         __syncthreads();
 
-        for(unsigned int tile = 0; tile < num_segments; ++tile){
-            if(threadIdx.x < K[tile*num_segments + blockIdx.x]){
-                int tmp_sum = 0;
-                for(unsigned int v_tile_index=0; v_tile_index<maxSegmentSize; ++v_tile_index){
-                    tmp_sum += V_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector_s[v_tile_index];
-                }
-                input_vector_s[threadIdx.x] = tmp_sum;
+        if(threadIdx.x < maxSegmentSize){
+            H2Opus_Real tmp_sum = 0;
+            for(unsigned int u_tile_index=0; u_tile_index<K[tile*num_segments + blockIdx.x]; ++u_tile_index){
+                tmp_sum += U_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + u_tile_index*maxSegmentSize + threadIdx.x]*buffer_vector[maxSegmentSize*blockIdx.x + u_tile_index];
             }
+            output_vector[maxSegmentSize*blockIdx.x + threadIdx.x] += tmp_sum;
         }
+        __syncthreads();
     }
 }
