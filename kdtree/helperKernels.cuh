@@ -1,6 +1,7 @@
 #include "helperFunctions.h"
 #include <cub/cub.cuh>
 #include <assert.h>
+#include <curand_kernel.h>
 #define BUCKET_SIZE 32
 typedef double H2Opus_Real;
 
@@ -446,7 +447,7 @@ __global__ void calcError (int num_segments, int maxSegmentSize, H2Opus_Real* ex
         H2Opus_Real y = expMatrix[i];
         atomicAdd(tmp, x*x);
         atomicAdd(error, (x-y)*(x-y));
-        printf("x: %lf   y: %lf\n", x, y);
+        // printf("x: %lf   y: %lf\n", x, y);
     }
 }
 
@@ -460,5 +461,65 @@ __global__ void printExpM(uint64_t num_segments, uint64_t maxSegmentSize, H2Opus
             printf("%lf ", expMatrix[index]);
         }
         printf("\n");
+    }
+}
+
+__global__ void fillVector(int num_segments, int maxSegmentSize, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* output_vector_org){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i < num_segments*maxSegmentSize){
+        unsigned int seed = i;
+        curandState s;
+        curand_init(seed, 0, 0, &s);
+        H2Opus_Real random_n = curand_uniform(&s);
+        input_vector[i]= random_n;
+        output_vector[i]= 0;
+        output_vector_org[i]= 0;
+    }
+}
+
+__global__ void PrintVector(unsigned int num_segments, unsigned int maxSegmentSize, H2Opus_Real * d_output_vector){
+    for (unsigned int i = 0; i < num_segments*maxSegmentSize; ++i){
+        printf("%lf ", d_output_vector[i]);
+    }
+    printf("\n");
+}
+
+__global__ void calcError_vector (int num_segments, int maxSegmentSize, H2Opus_Real* output_vector, H2Opus_Real* output_vector_org, H2Opus_Real* error_vector, H2Opus_Real* tmp_vector){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i < num_segments*maxSegmentSize){
+        H2Opus_Real x = output_vector_org[i];
+        H2Opus_Real y = output_vector[i];
+        atomicAdd(tmp_vector, x*x);
+        atomicAdd(error_vector, (x-y)*(x-y));
+        // printf("x: %lf   y: %lf\n", x, y);
+    }
+}
+
+__global__ void GEMV(int num_segments, int maxSegmentSize, int* K, int* scan_k, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    // __shared__ H2Opus_Real input_vector_s[maxSegmentSize];
+    // if(threadIdx.x < maxSegmentSize){
+    //     input_vector_s[threadIdx.x] = input_vector[threadIdx.x + maxSegmentSize*blockIdx.x];
+    // }
+    // __syncthreads();
+
+    for(unsigned int tile = 0; tile < num_segments; ++tile){
+        if(threadIdx.x < K[tile*num_segments + blockIdx.x]){
+            H2Opus_Real tmp_sum = 0;
+            for(unsigned int v_tile_index=0; v_tile_index<maxSegmentSize; ++v_tile_index){
+                tmp_sum += V_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector[maxSegmentSize*blockIdx.x + v_tile_index];
+            }
+            buffer_vector[K[tile*num_segments + blockIdx.x] - threadIdx.x + maxSegmentSize*blockIdx.x] = tmp_sum;
+        }
+        __syncthreads();
+
+        if(threadIdx.x < maxSegmentSize){
+            H2Opus_Real tmp_sum = 0;
+            for(unsigned int u_tile_index=0; u_tile_index<K[tile*num_segments + blockIdx.x]; ++u_tile_index){
+                tmp_sum += U_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + u_tile_index*maxSegmentSize + threadIdx.x]*buffer_vector[maxSegmentSize*blockIdx.x + u_tile_index];
+            }
+            output_vector[maxSegmentSize*blockIdx.x + threadIdx.x] += tmp_sum;
+        }
+        __syncthreads();
     }
 }
