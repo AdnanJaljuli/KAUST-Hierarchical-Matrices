@@ -14,11 +14,11 @@
 #define PRINTRESULTS 0
 
 void SVD(int n, int num_segments, H2Opus_Real* matrix, int maxSegmentSize, H2Opus_Real* h_S, H2Opus_Real* h_U, H2Opus_Real* h_V){
-
+    // printf("SVD\n");
     const int           M = maxSegmentSize;
     const int           N = maxSegmentSize;
     const int           lda = M;
-    const int           numMatrices = num_segments*num_segments;
+    const int           numMatrices = num_segments;
 
     // --- Setting the host matrix
     H2Opus_Real *h_A = (H2Opus_Real *)malloc(lda * N * numMatrices * sizeof(double));
@@ -34,7 +34,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int maxSegmentSize, H2Opu
     // --- Setting the device matrix and moving the host matrix to the device
     H2Opus_Real *d_A;         gpuErrchk(cudaMalloc(&d_A, M * N * numMatrices * sizeof(H2Opus_Real)));
     gpuErrchk(cudaMemcpy(d_A, h_A, M * N * numMatrices * sizeof(H2Opus_Real), cudaMemcpyHostToDevice));
-
+    free(h_A);
     // --- host side SVD results space
     // H2Opus_Real *h_S = (H2Opus_Real *)malloc(N * numMatrices * sizeof(H2Opus_Real));
     // H2Opus_Real *h_U = NULL;
@@ -171,7 +171,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int maxSegmentSize, H2Opu
 
     if (0 == devInfo_h)
     {
-        printf("gesvdj converges \n");
+        // printf("gesvdj converges \n");
     }
     else if (0 > devInfo_h)
     {
@@ -249,6 +249,7 @@ void SVD(int n, int num_segments, H2Opus_Real* matrix, int maxSegmentSize, H2Opu
     // }
 
     // --- Free resources
+    // printf("ended SVD\n");
     if (d_A) gpuErrchk(cudaFree(d_A));
     if (d_S) gpuErrchk(cudaFree(d_S));
 #ifdef FULLSVD
