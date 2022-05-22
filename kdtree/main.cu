@@ -553,104 +553,104 @@ int main(){
         dim3 d_numBlocks(1, num_segments);
         tileMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (n, num_segments, maxSegmentSize, d_S, d_U, d_V, d_U_tiled, d_V_tiled, d_K, d_scan_K, segment);
         cudaDeviceSynchronize();
-
-        H2Opus_Real* d_expMatrix;
-        cudaErr = cudaMalloc((void**) &d_expMatrix, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
-        if ( cudaErr != cudaSuccess )
-        {
-            printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
-        }
-        expandMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_expMatrix);
-        cudaDeviceSynchronize();
-
-        #if 0
-        printExpM<<<1, 1>>> (num_segments, maxSegmentSize, d_expMatrix, d_input_matrix);
-        cudaDeviceSynchronize();
-        #endif
-
-        H2Opus_Real* d_error;
-        H2Opus_Real* error = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-
-        H2Opus_Real* d_tmp;
-        H2Opus_Real* tmp = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-
-        *error = 0;
-        *tmp = 0;
-
-        cudaErr = cudaMemcpy(d_error, error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-        if ( cudaErr != cudaSuccess )
-        {
-        printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
-        }
-        cudaErr = cudaMemcpy(d_tmp, tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-        if ( cudaErr != cudaSuccess )
-        {
-        printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
-        }
-        numThreadsPerBlock = 1024;
-        numBlocks = (num_segments*maxSegmentSize*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
-        calcError<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_expMatrix, d_input_matrix, d_error, d_tmp);
-        cudaDeviceSynchronize();
-
-
-        cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-        cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-        // printf("error: %lf\n", sqrt(*error)/sqrt(*tmp));
-        timer_arr[10] = sqrt(*error)/sqrt(*tmp);
-
-        // cudaFree(d_offsets_sort);
-        // free(input_matrix);
-    #if 1
-        H2Opus_Real* d_buffer_vector;
-        H2Opus_Real* d_input_vector;
-        H2Opus_Real* d_output_vector;
-        H2Opus_Real* d_output_vector_org;
-        cudaMalloc((void**) &d_buffer_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_input_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_output_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_output_vector_org, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
-
-        numThreadsPerBlock = 1024;
-        numBlocks = (num_segments*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
-        fillVector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_input_vector, d_output_vector, d_output_vector_org);
-        cudaDeviceSynchronize();
-
-        numThreadsPerBlock = upper_power_of_two(maxSegmentSize);
-        numBlocks = num_segments;
-
-        cudaEvent_t startGEMV, stopGEMV;
-        cudaEventCreate(&startGEMV);
-        cudaEventCreate(&stopGEMV);
-        cudaEventRecord(startGEMV);
-        GEMV<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_input_vector, d_output_vector, d_buffer_vector, segment);
-        cudaDeviceSynchronize();
-        cudaEventRecord(stopGEMV);
-        cudaEventSynchronize(stopGEMV);
-        float GEMV_time = 0;
-        cudaEventElapsedTime(&GEMV_time, startGEMV, stopGEMV);
-        cudaEventDestroy(startGEMV);
-        cudaEventDestroy(stopGEMV);
-        timer_arr[9] = GEMV_time;
-        // printf("total time taken for GEMV: %f\n", GEMV_time);
-    #endif
-        free(h_S);
-        free(h_U);
-        free(h_V);
-        cudaFree(d_S);
-        cudaFree(d_U);
-        cudaFree(d_V);
-        cudaFree(d_K);
-        cudaFree(d_scan_K);
-        cudaFree(d_U_tiled);
-        cudaFree(d_V_tiled);
-        cudaFree(d_expMatrix);
-        cudaFree(d_buffer_vector);
-        cudaFree(d_input_vector);
-        cudaFree(d_output_vector);
-        cudaFree(d_output_vector_org);
     }
+    H2Opus_Real* d_expMatrix;
+    cudaErr = cudaMalloc((void**) &d_expMatrix, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess )
+    {
+        printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
+    expandMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_expMatrix);
+    cudaDeviceSynchronize();
+
+    #if 0
+    printExpM<<<1, 1>>> (num_segments, maxSegmentSize, d_expMatrix, d_input_matrix);
+    cudaDeviceSynchronize();
+    #endif
+
+    H2Opus_Real* d_error;
+    H2Opus_Real* error = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
+
+    H2Opus_Real* d_tmp;
+    H2Opus_Real* tmp = (H2Opus_Real*) malloc(sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
+
+    *error = 0;
+    *tmp = 0;
+
+    cudaErr = cudaMemcpy(d_error, error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    if ( cudaErr != cudaSuccess )
+    {
+    printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
+    cudaErr = cudaMemcpy(d_tmp, tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    if ( cudaErr != cudaSuccess )
+    {
+    printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr));
+    }
+    numThreadsPerBlock = 1024;
+    numBlocks = (num_segments*maxSegmentSize*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
+    calcError<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_expMatrix, d_input_matrix, d_error, d_tmp);
+    cudaDeviceSynchronize();
+
+
+    cudaMemcpy(error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    // printf("error: %lf\n", sqrt(*error)/sqrt(*tmp));
+    timer_arr[10] = sqrt(*error)/sqrt(*tmp);
+
+    // cudaFree(d_offsets_sort);
+    // free(input_matrix);
+
+    H2Opus_Real* d_buffer_vector;
+    H2Opus_Real* d_input_vector;
+    H2Opus_Real* d_output_vector;
+    H2Opus_Real* d_output_vector_org;
+    cudaMalloc((void**) &d_buffer_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_input_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_output_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_output_vector_org, maxSegmentSize*num_segments*sizeof(H2Opus_Real));
+
+    numThreadsPerBlock = 1024;
+    numBlocks = (num_segments*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
+    fillVector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_input_vector, d_output_vector, d_output_vector_org);
+    cudaDeviceSynchronize();
+
+    numThreadsPerBlock = upper_power_of_two(maxSegmentSize);
+    numBlocks = num_segments;
+
+    cudaEvent_t startGEMV, stopGEMV;
+    cudaEventCreate(&startGEMV);
+    cudaEventCreate(&stopGEMV);
+    cudaEventRecord(startGEMV);
+    GEMV<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_K, d_scan_K, d_U_tiled, d_V_tiled, d_input_vector, d_output_vector, d_buffer_vector, segment);
+    cudaDeviceSynchronize();
+    cudaEventRecord(stopGEMV);
+    cudaEventSynchronize(stopGEMV);
+    float GEMV_time = 0;
+    cudaEventElapsedTime(&GEMV_time, startGEMV, stopGEMV);
+    cudaEventDestroy(startGEMV);
+    cudaEventDestroy(stopGEMV);
+    timer_arr[9] = GEMV_time;
+    // printf("total time taken for GEMV: %f\n", GEMV_time);
+
+    free(h_S);
+    free(h_U);
+    free(h_V);
+    cudaFree(d_S);
+    cudaFree(d_U);
+    cudaFree(d_V);
+    cudaFree(d_K);
+    cudaFree(d_scan_K);
+    cudaFree(d_U_tiled);
+    cudaFree(d_V_tiled);
+    cudaFree(d_expMatrix);
+    cudaFree(d_buffer_vector);
+    cudaFree(d_input_vector);
+    cudaFree(d_output_vector);
+    cudaFree(d_output_vector_org);
+    // }
     cudaDeviceSynchronize();
     cudaEventRecord(stopCode);
     cudaEventSynchronize(stopCode);
