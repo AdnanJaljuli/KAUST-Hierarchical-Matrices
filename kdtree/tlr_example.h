@@ -52,7 +52,6 @@ template <typename T>
 void generateGrid(PointCloud<T> &pt_cloud, int n)
 {
     srand (time(NULL));
-    int randomNum;
 
     for (int i = 0; i < n; ++i)
     {

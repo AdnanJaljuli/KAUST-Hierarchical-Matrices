@@ -1,4 +1,9 @@
 #include "helperFunctions.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <stddef.h>
 #include <cub/cub.cuh>
 #include <assert.h>
 #include <curand_kernel.h>
@@ -293,7 +298,7 @@ __global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t 
     }
 }
 
-__global__ void calcMemNeeded(int n, int maxSegmentSize, int* K, H2Opus_Real* S, float eps, int* offsets_sort, int num_segments){
+__global__ void calcMemNeeded(int maxSegmentSize, int* K, H2Opus_Real* S, float eps){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
 
     __shared__ int k;
@@ -393,6 +398,14 @@ __global__ void printSort(int n, H2Opus_Real* keys_out, int* values_out){
     }
     printf("\n");
 }
+
+// __global__ void printK(int num_segments, int* K){
+//     printf("ks\n");
+//     for(int i=0; i<num_segments; ++i){
+//         printf("%d ", K[i]);
+//     }
+//     printf("\n");
+// }
 
 __global__ void printK(int num_segments, int* K){
     printf("ks\n");
@@ -495,28 +508,108 @@ __global__ void calcError_vector (int num_segments, int maxSegmentSize, H2Opus_R
     }
 }
 
-__global__ void GEMV(int num_segments, int maxSegmentSize, int* K, int* scan_k, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector, int segment){
+__global__ void GEMV(int num_segments, int maxSegmentSize, int* K, int* scan_k, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     // __shared__ H2Opus_Real input_vector_s[maxSegmentSize];
     // if(threadIdx.x < maxSegmentSize){
     //     input_vector_s[threadIdx.x] = input_vector[threadIdx.x + maxSegmentSize*blockIdx.x];
     // }
     // __syncthreads();
-
-    if(threadIdx.x < K[blockIdx.x]){
-        H2Opus_Real tmp_sum = 0;
-        for(unsigned int v_tile_index=0; v_tile_index<maxSegmentSize; ++v_tile_index){
-            tmp_sum += V_tiled[scan_k[blockIdx.x]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector[maxSegmentSize*blockIdx.x + v_tile_index];
-        }
-        buffer_vector[K[blockIdx.x] - threadIdx.x + maxSegmentSize*blockIdx.x] = tmp_sum;
+    if(threadIdx.x==0 && blockIdx.x==0){
+        printf("started GEMV\n");
     }
-    __syncthreads();
-
-    if(threadIdx.x < maxSegmentSize){
-        H2Opus_Real tmp_sum = 0;
-        for(unsigned int u_tile_index=0; u_tile_index<K[blockIdx.x]; ++u_tile_index){
-            tmp_sum += U_tiled[scan_k[blockIdx.x]*maxSegmentSize + u_tile_index*maxSegmentSize + threadIdx.x]*buffer_vector[maxSegmentSize*blockIdx.x + u_tile_index];
+    for(unsigned int tile = 0; tile < num_segments; ++tile){
+        if(threadIdx.x < K[tile*num_segments + blockIdx.x]){
+            H2Opus_Real tmp_sum = 0;
+            for(unsigned int v_tile_index=0; v_tile_index<maxSegmentSize; ++v_tile_index){
+                tmp_sum += V_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector[maxSegmentSize*blockIdx.x + v_tile_index];
+            }
+            assert(K[tile*num_segments + blockIdx.x] <= 32);
+            buffer_vector[K[tile*num_segments + blockIdx.x] - (threadIdx.x+1) + maxSegmentSize*blockIdx.x] = tmp_sum;
+            // buffer_vector[threadIdx.x + maxSegmentSize*blockIdx.x] = tmp_sum;
         }
-        output_vector[maxSegmentSize*blockIdx.x + threadIdx.x] += tmp_sum;
+        __syncthreads();
+
+        if(threadIdx.x < maxSegmentSize){
+            H2Opus_Real tmp_sum = 0;
+            for(unsigned int u_tile_index=0; u_tile_index<K[tile*num_segments + blockIdx.x]; ++u_tile_index){
+                tmp_sum += U_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + u_tile_index*maxSegmentSize + threadIdx.x]*buffer_vector[maxSegmentSize*blockIdx.x + u_tile_index];
+            }
+            output_vector[maxSegmentSize*blockIdx.x + threadIdx.x] += tmp_sum;
+        }
+        __syncthreads();
+        // if(threadIdx.x==0 && blockIdx.x==0){
+        //     printf("tile #: %d\n", tile);
+        // }
     }
+    if(threadIdx.x==0 && blockIdx.x==0){
+        printf("finished GEMV\n");
+    }
+}
+
+__global__ void GEMM(int num_segments, int maxSegmentSize, H2Opus_Real* U_tiled_1, H2Opus_Real* V_tiled_1, int* K_1, int* scan_k_1, H2Opus_Real* U_tiled_2, H2Opus_Real* V_tiled_2, int* K_2, int* scan_k_2, H2Opus_Real* d_gemm_matrix_segmented, unsigned int segment){
+    __shared__ H2Opus_Real first_matrix[BUCKET_SIZE][BUCKET_SIZE];
+    __shared__ H2Opus_Real second_matrix[BUCKET_SIZE][BUCKET_SIZE];
+    H2Opus_Real sum = 0;
+
+    for(unsigned int tile = 0; tile<num_segments; ++tile){
+        H2Opus_Real temp = 0;
+        unsigned int matrix1_rank = K_1[tile*num_segments + segment];
+        unsigned int matrix2_rank = K_2[segment*num_segments + tile];
+
+        // loads Av_s into shared memory
+        if(threadIdx.x < matrix1_rank){
+            first_matrix[threadIdx.y][threadIdx.x] = V_tiled_1[scan_k_1[tile*num_segments + segment] + threadIdx.x*maxSegmentSize + threadIdx.y];
+        }
+        // loads Bu_s into shared memory
+        if(threadIdx.x < matrix2_rank){
+            second_matrix[threadIdx.y][threadIdx.x] = U_tiled_2[scan_k_2[segment*num_segments + tile] + threadIdx.x*maxSegmentSize + threadIdx.y];
+        }
+        __syncthreads();
+
+        // multiplies Av_s*Bu_s
+        // stores result in place of Av_s
+        if(threadIdx.x < matrix2_rank && threadIdx.y < matrix1_rank){
+            for(unsigned int i = 0; i < maxSegmentSize; ++i){
+                temp += first_matrix[i][threadIdx.y] * second_matrix[i][threadIdx.x];
+            }
+        }
+        __syncthreads();
+
+        if(threadIdx.x < matrix2_rank && threadIdx.y < matrix1_rank){
+            first_matrix[threadIdx.y][threadIdx.x] = temp;
+        }
+        __syncthreads();
+
+        // loads Bv_s into shared memory. Replaces Bu_s
+        if(threadIdx.x < matrix2_rank){
+            second_matrix[threadIdx.y][threadIdx.x] = V_tiled_2[scan_k_2[segment*num_segments + tile] + threadIdx.x*maxSegmentSize + threadIdx.y];
+        }
+        __syncthreads();
+
+        temp = 0.0f;
+        // multiplies (Av_s*Bu_s)*Bv_s and stores result in Av_s space
+        if(threadIdx.y < matrix1_rank){
+            for(unsigned int i = 0; i < matrix2_rank; ++i){
+                temp += first_matrix[threadIdx.y][i]*second_matrix[threadIdx.x][i];
+            }
+        }
+        __syncthreads();
+        if(threadIdx.y < matrix1_rank){
+            first_matrix[threadIdx.y][threadIdx.x] = temp;
+        }
+        __syncthreads();
+        
+        // loads Au_s into shared memory
+        if(threadIdx.x < matrix1_rank){
+            second_matrix[threadIdx.y][threadIdx.x] = U_tiled_1[scan_k_1[tile*num_segments + segment] + threadIdx.x*maxSegmentSize + threadIdx.y];
+        }
+        __syncthreads();
+        // multiplies Au_s*(Av_s*Bu_s*Bv_s) and stores result in sum
+        for(unsigned int i = 0; i < matrix1_rank; ++i){
+            sum += second_matrix[threadIdx.y][i]*first_matrix[i][threadIdx.x];
+        }
+        __syncthreads();
+    }
+    d_gemm_matrix_segmented[blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
 }

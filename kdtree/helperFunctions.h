@@ -2,6 +2,7 @@
 #define HELPERFUNCTIONS_H
 
 #include <utility>
+#include <cstdint> 
 #define numTimers 11
 
 void printCountersInFile(float* times){
@@ -40,6 +41,22 @@ std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     p.first = n;
     p.second = it;
     return p;
+}
+
+void printSigmas(double* S, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_size, int n, int segment){
+    FILE *fp;
+    fp = fopen("results/sigma_values.csv", "a");// "w" means that we are going to write on this file
+    if(segment == 0){
+        fprintf(fp, "bucket size: %d, n: %d, num segments: %d,\n", bucket_size, n, num_segments);
+    }
+
+    for(unsigned int i=0; i<num_segments; ++i){
+        for(unsigned int j=0; j<maxSegmentSize; ++j){
+            fprintf(fp, "%lf, ", S[i*maxSegmentSize + j]);
+        }
+        fprintf(fp, "\n");
+    }
+    fclose(fp); //Don't forget to close the file when finished
 }
 
 #endif
