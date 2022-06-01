@@ -3,7 +3,7 @@
 
 #include <utility>
 #include <cstdint> 
-#define numTimers 11
+#define numTimers 9
 
 void printCountersInFile(float* times){
     char filename[100] = "results/times.csv";
