@@ -1,4 +1,0 @@
-*.o
-/kdtree/results/*
-/kdtree/cub-1.8.0/*
-output
