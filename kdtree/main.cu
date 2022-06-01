@@ -685,8 +685,8 @@ int main(int argc, char *argv[]){
     cudaDeviceSynchronize();
     printf("filled vector\n");
 
-    numThreadsPerBlock = upper_power_of_two(maxSegmentSize);
-    numBlocks = num_segments;
+    numThreadsPerBlock = 2*upper_power_of_two(maxSegmentSize);
+    numBlocks = (num_segments+1)/2;
 
     cudaEvent_t startGEMV, stopGEMV;
     cudaEventCreate(&startGEMV);
