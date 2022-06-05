@@ -17,5 +17,4 @@ struct TLR_Matrix{
     void del();
 };
 
-
 #endif

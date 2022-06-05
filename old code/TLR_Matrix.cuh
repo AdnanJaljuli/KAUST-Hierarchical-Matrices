@@ -1,7 +1,5 @@
 #include "TLR_Matrix.h"
 
-
-
 TLR_Matrix AllocateInputMatrix(TLR_Matrix CPU_matrix){
     TLR_Matrix GPU_matrix;
     GPU_matrix.n = CPU_matrix.n;
