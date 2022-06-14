@@ -3,7 +3,7 @@
 
 #include <utility>
 #include <cstdint> 
-#define numTimers 9
+#define numTimers 10
 
 void printCountersInFile(float* times){
     char filename[100] = "results/times.csv";
@@ -56,6 +56,20 @@ void printSigmas(double* S, uint64_t num_segments, uint64_t maxSegmentSize, int 
         }
         fprintf(fp, "\n");
     }
+    fclose(fp); //Don't forget to close the file when finished
+}
+
+void printKs(unsigned int* K, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_size, int n, int segment, float eps){
+    FILE *fp;
+    fp = fopen("results/K_values.csv", "a");// "w" means that we are going to write on this file
+    if(segment == 0){
+        fprintf(fp, "bucket size: %d, n: %d, num segments: %d, epsilon: %f\n", bucket_size, n, num_segments, eps);
+    }
+
+    for(unsigned int i=0; i<num_segments; ++i){
+            fprintf(fp, "%u, ", K[i]);
+    }
+    fprintf(fp, "\n");
     fclose(fp); //Don't forget to close the file when finished
 }
 

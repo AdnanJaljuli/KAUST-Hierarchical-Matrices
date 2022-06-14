@@ -6,5 +6,5 @@ void cudaFreeMatrix(TLR_Matrix matrix){
     cudaFree(matrix.blockOffsets);
     cudaFree(matrix.U);
     cudaFree(matrix.V);
-    // cudaFree(matrix.diagonal);
+    cudaFree(matrix.diagonal);
 }
