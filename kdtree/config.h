@@ -64,7 +64,7 @@ static Config parseArgs(int argc, char **argv)
     Config config;
     config.div_method = POWER_OF_TWO_ON_LEFT;
     config.dim = 2;
-    config.n = 1<<10;
+    config.n = 32;
     config.bucket_size = 32;
     config.epsilon = 1e-3;
 

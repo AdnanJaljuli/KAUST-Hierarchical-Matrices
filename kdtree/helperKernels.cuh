@@ -162,24 +162,24 @@ __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2O
         span_offsets[num_segments] = num_segments*dim;
     }
 
-    if(i==0){
-        printf("num segments %u\n", num_segments);
-        printf("spans\n");
-        for(unsigned int j=0;j<num_segments; ++j){
-            for(int k=0; k<dim;++k){
-                printf("%lf ", span[j*dim + k]);
-                printf("  %lf %lf      ", reduce_max_out[k*num_segments + j], reduce_min_out[k*num_segments + j]);
-            }
-            printf("\n");
-        }
-        printf("\n");
+    // if(i==0){
+    //     printf("num segments %u\n", num_segments);
+    //     printf("spans\n");
+    //     for(unsigned int j=0;j<num_segments; ++j){
+    //         for(int k=0; k<dim;++k){
+    //             printf("%lf ", span[j*dim + k]);
+    //             printf("  %lf %lf      ", reduce_max_out[k*num_segments + j], reduce_min_out[k*num_segments + j]);
+    //         }
+    //         printf("\n");
+    //     }
+    //     printf("\n");
 
         // printf("span offsets\n");
         // for(unsigned int j=0;j<num_segments + 1; ++j){
         //     printf("%d ", span_offsets[j]);
         // }
         // printf("\n");
-    }
+    // }
 }
 
 __global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
@@ -187,13 +187,13 @@ __global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray,
     if(i<num_segments){
         currDimArray[i] = spanReduced[i].key;
     }
-    if(threadIdx.x==0 && blockIdx.x==0){
-        printf("curr dim\n");
-        for(int j=0; j<num_segments; ++j){
-            printf("%d ", currDimArray[j]);
-        }
-        printf("\n");
-    }
+    // if(threadIdx.x==0 && blockIdx.x==0){
+    //     printf("curr dim\n");
+    //     for(int j=0; j<num_segments; ++j){
+    //         printf("%d ", currDimArray[j]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 // TODO: change the name of this kernel because it also changes the bit vector
@@ -207,13 +207,13 @@ __global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray,
     if(i<last_index){
         bit_vector[i] = 0ULL;
     }
-    if(threadIdx.x==0 && blockIdx.x==0){
-        printf("curr dim\n");
-        for(int j=0; j<num_segments; ++j){
-            printf("%d ", currDimArray[j]);
-        }
-        printf("\n");
-    }
+    // if(threadIdx.x==0 && blockIdx.x==0){
+    //     printf("curr dim\n");
+    //     for(int j=0; j<num_segments; ++j){
+    //         printf("%d ", currDimArray[j]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 __global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_in, int* currDimArray, int* values_in, H2Opus_Real* dataset){
@@ -520,36 +520,37 @@ __global__ void GEMV(int num_segments, int maxSegmentSize, unsigned int* K, unsi
     //     input_vector_s[threadIdx.x] = input_vector[threadIdx.x + maxSegmentSize*blockIdx.x];
     // }
     // __syncthreads();
-
+    unsigned int warpIdx = threadIdx.x/32;
+    unsigned int blockIndex = (blockIdx.x*2 + warpIdx);
     if(threadIdx.x==0 && blockIdx.x==0){
         printf("started GEMV\n");
     }
     for(unsigned int tile = 0; tile < num_segments; ++tile){
-        if(tile == blockIdx.x){
+        if(tile == blockIndex){
             H2Opus_Real tmp_sum = 0;
             for(unsigned int index=0; index<maxSegmentSize; ++index){
-                tmp_sum += diagonal[index*maxSegmentSize + threadIdx.x]*input_vector[maxSegmentSize*blockIdx.x + index];
+                tmp_sum += diagonal[index*maxSegmentSize + threadIdx.x]*input_vector[maxSegmentSize*blockIndex + index];
             }
-            output_vector[maxSegmentSize*blockIdx.x + threadIdx.x] += tmp_sum;
+            output_vector[maxSegmentSize*(blockIdx.x*2) + threadIdx.x] += tmp_sum;
         }
         else{
-            if(threadIdx.x < K[tile*num_segments + blockIdx.x]){
+            if(threadIdx.x < K[tile*num_segments + blockIndex]){
                 H2Opus_Real tmp_sum = 0;
                 for(unsigned int v_tile_index=0; v_tile_index<maxSegmentSize; ++v_tile_index){
-                    tmp_sum += V_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector[maxSegmentSize*blockIdx.x + v_tile_index];
+                    tmp_sum += V_tiled[scan_k[tile*num_segments + blockIndex]*maxSegmentSize + maxSegmentSize*threadIdx.x + v_tile_index]*input_vector[maxSegmentSize*blockIndex + v_tile_index];
                 }
-                assert(K[tile*num_segments + blockIdx.x] <= 32);
-                buffer_vector[K[tile*num_segments + blockIdx.x] - (threadIdx.x+1) + maxSegmentSize*blockIdx.x] = tmp_sum;
+                assert(K[tile*num_segments + blockIndex] <= 32);
+                buffer_vector[K[tile*num_segments + blockIndex] - (threadIdx.x+1) + maxSegmentSize*(blockIdx.x*2)] = tmp_sum;
                 // buffer_vector[threadIdx.x + maxSegmentSize*blockIdx.x] = tmp_sum;
             }
             __syncthreads();
 
             if(threadIdx.x < maxSegmentSize){
                 H2Opus_Real tmp_sum = 0;
-                for(unsigned int u_tile_index=0; u_tile_index<K[tile*num_segments + blockIdx.x]; ++u_tile_index){
-                    tmp_sum += U_tiled[scan_k[tile*num_segments + blockIdx.x]*maxSegmentSize + u_tile_index*maxSegmentSize + threadIdx.x]*buffer_vector[maxSegmentSize*blockIdx.x + u_tile_index];
+                for(unsigned int u_tile_index=0; u_tile_index<K[tile*num_segments + blockIndex]; ++u_tile_index){
+                    tmp_sum += U_tiled[scan_k[tile*num_segments + blockIndex]*maxSegmentSize + u_tile_index*maxSegmentSize + threadIdx.x]*buffer_vector[maxSegmentSize*blockIndex + u_tile_index];
                 }
-                output_vector[maxSegmentSize*blockIdx.x + threadIdx.x] += tmp_sum;
+                output_vector[maxSegmentSize*(blockIdx.x*2) + threadIdx.x] += tmp_sum;
             }
         }
         __syncthreads();
@@ -718,4 +719,36 @@ __global__ void GEMM(int num_segments, int maxSegmentSize, H2Opus_Real* U_tiled_
         }
     }
     d_gemm_matrix_segmented[blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
+}
+
+__global__ void fillDenseMatrix(int n, H2Opus_Real* matrix){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int seed = i;
+    if(i<n){
+        curandState s;
+        for(unsigned int j=0;j<n; ++j){
+            curand_init(seed, 0, 0, &s);
+            H2Opus_Real random_n = curand_uniform(&s);
+            matrix[j*n + i] = random_n;
+        }
+    }
+}
+
+__global__ void filltmpVector(int n, H2Opus_Real* vector){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int seed = i;
+    if(i<n){
+        curandState s;
+        curand_init(seed, 0, 0, &s);
+        H2Opus_Real random_n = curand_uniform(&s);
+        vector[i] = random_n;
+    }
+}
+
+__global__ void fillBatch(int num_segments, int* rows_batch, int* cols_batch, int maxSegmentSize){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<num_segments){
+        rows_batch[i] = maxSegmentSize;
+        cols_batch[i] = maxSegmentSize;
+    }
 }

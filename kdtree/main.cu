@@ -9,6 +9,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
+#include "cublas_v2.h"
 #include <iostream>
 #include <utility>
 #include <time.h>
@@ -16,6 +17,7 @@
 #include <math.h>
 #include <typeinfo>
 
+#define BLOCK_SIZE 32
 #define PRINT_OUTPUT 0
 using namespace std;
 
@@ -69,8 +71,10 @@ int main(int argc, char *argv[]){
     }
 
     H2Opus_Real *d_dataset;
-    cudaMalloc((void**) &d_dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real));
-    cudaMemcpy(d_dataset, dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real*), cudaMemcpyHostToDevice);
+    cudaError_t cudaErr = cudaMalloc((void**) &d_dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMemcpy(d_dataset, dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real*), cudaMemcpyHostToDevice);
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
     free(dataset);
 
     uint64_t num_segments = 1;
@@ -118,35 +122,58 @@ int main(int argc, char *argv[]){
     unsigned int largest_segment_size = config.n;
 
     // TODO: fix memory allocated
-    cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int));
-    cudaMalloc((void**) &d_offsets_reduce, (long long)((max_num_segments*config.dim + 1)*(long long)sizeof(int)));
-    cudaMalloc((void**) &d_keys_in, config.n*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_keys_out, config.n*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_values_in, config.n*sizeof(int));
-    cudaMalloc((void**) &d_values_out, config.n*sizeof(int));
-    cudaMalloc((void**) &d_curr_dim, (max_num_segments + 1)*sizeof(int));
-    cudaMalloc((void**) &d_reduce_in, (long long)config.n*(long long)config.dim*(long long)sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_reduce_min_out, (long long)((max_num_segments+1)*config.dim)*(long long)sizeof(int));
-    cudaMalloc((void**) &d_reduce_max_out, (long long)((max_num_segments+1)*config.dim)*(long long)sizeof(int));
-    cudaMalloc((void**) &d_span, (long long)((max_num_segments+1)*config.dim)*(long long)sizeof(int));
-    cudaMalloc((void**) &d_span_offsets, (max_num_segments + 1)*sizeof(int));
-    cudaMalloc((void**) &d_span_reduce_out, (max_num_segments+1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
+    cudaErr = cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_offsets_reduce, (long long)((max_num_segments*config.dim + 1)*(long long)sizeof(int)));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_keys_in, config.n*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_keys_out, config.n*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_values_in, config.n*sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_values_out, config.n*sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_curr_dim, (max_num_segments + 1)*sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_reduce_in, (long long)config.n*(long long)config.dim*(long long)sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_reduce_min_out, (long long)((max_num_segments+1)*config.dim)*(long long)sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_reduce_max_out, (long long)((max_num_segments+1)*config.dim)*(long long)sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_span, (long long)((max_num_segments+1)*config.dim)*(long long)sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_span_offsets, (max_num_segments + 1)*sizeof(int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaErr = cudaMalloc((void**) &d_span_reduce_out, (max_num_segments+1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
 
     if(config.div_method == DIVIDE_IN_HALF){
-        cudaMalloc((void**) &d_bit_vector, (((max_num_segments+1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) *sizeof(uint64_t));
-        cudaMalloc((void**) &d_popc_bit_vector, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));
-        cudaMalloc((void**) &d_popc_scan, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));
-        cudaMalloc((void**) &d_new_num_segments, sizeof(unsigned int));
-        cudaMalloc((void**) &d_workDone, sizeof(bool));
+        cudaErr = cudaMalloc((void**) &d_bit_vector, (((max_num_segments+1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) *sizeof(uint64_t));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &d_popc_bit_vector, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &d_popc_scan, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &d_new_num_segments, sizeof(unsigned int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &d_workDone, sizeof(bool));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
         new_num_segments = (unsigned int*)malloc(sizeof(unsigned int));
     }
 
     if(config.div_method != POWER_OF_TWO_ON_LEFT){
-        cudaMalloc((void**) &d_aux_offsets_sort, (max_num_segments + 1) * sizeof(int));
-        cudaMalloc((void**) &A, (max_num_segments + 1)*sizeof(int));
-        cudaMalloc((void**) &B, config.n*sizeof(int));
-        cudaMalloc((void**) &d_bin_search_output, config.n*sizeof(int));
-        cudaMalloc((void**) &d_input_search, config.n*sizeof(int));
+        cudaErr = cudaMalloc((void**) &d_aux_offsets_sort, (max_num_segments + 1) * sizeof(int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &A, (max_num_segments + 1)*sizeof(int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &B, config.n*sizeof(int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &d_bin_search_output, config.n*sizeof(int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaErr = cudaMalloc((void**) &d_input_search, config.n*sizeof(int));
+        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
     }
 
     unsigned int numThreadsPerBlock = 1024;
@@ -432,7 +459,7 @@ int main(int argc, char *argv[]){
     H2Opus_Real* d_input_matrix_segmented;
     H2Opus_Real* input_matrix_segmented = (H2Opus_Real*)malloc(maxSegmentSize*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real));
     printf("mem allocated to input matrix: %lu\n", maxSegmentSize*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real));
-    cudaError_t cudaErr = cudaMalloc((void**) &d_input_matrix_segmented, maxSegmentSize*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real));
+    cudaErr = cudaMalloc((void**) &d_input_matrix_segmented, maxSegmentSize*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real));
     if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
 
     H2Opus_Real *h_S = (H2Opus_Real *)malloc(maxSegmentSize * num_segments * sizeof(H2Opus_Real));
@@ -458,6 +485,7 @@ int main(int argc, char *argv[]){
 
     TLR_Matrix matrix;
     cudaErr = cudaMalloc((void**) &matrix.blockRanks, num_segments*num_segments*sizeof(unsigned int));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
     cudaErr = cudaMalloc((void**) &matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
     if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
 
@@ -498,6 +526,42 @@ int main(int argc, char *argv[]){
         cudaMemcpy(d_S, h_S, maxSegmentSize * num_segments * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
         cudaMemcpy(d_U, h_U, maxSegmentSize*maxSegmentSize*num_segments * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
         cudaMemcpy(d_V, h_V, maxSegmentSize*maxSegmentSize*num_segments * sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+
+        // ----------------------------ARA----------------------------
+        #if 0
+        kblasHandle_t kblas_handle;
+        kblasRandState_t rand_state;
+        kblasCreate(&kblas_handle);
+		kblasInitRandState(kblas_handle, &rand_state, 16384*2, 0);
+		kblasEnableMagma(kblas_handle);
+        kblas_ara_batch_wsquery<H2Opus_Real>(kblas_handle, BLOCK_SIZE, num_segments);
+        check_kblas_error( kblasAllocateWorkspace(kblas_handle) );
+
+        int* d_rows_batch, d_cols_batch;
+        cudaMalloc((void**) &d_rows_batch, num_segments*sizeof(int));
+        cudaMalloc((void**) &d_cols_batch, num_segments*sizeof(int));
+
+        numThreadsPerBlock = 1024;
+        numBlocks = (num_segments + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        fillBatch<<<numBlocks, numThreadsPerBlock>>>(num_segments, d_rows_batch, d_cols_batch);
+        cudaDeviceSynchronize();
+
+        cudaEvent_t startARA, stopARA;
+        cudaEventCreate(&startARA);
+        cudaEventCreate(&stopARA);
+        cudaEventRecord(startARA);
+        kblas_ara_batch( kblas_handles[g], d_rows_batch[g], d_cols_batch[g], d_M_ptrs[g], d_ldm_batch[g], 
+								d_A_ptrs[g], d_lda_batch[g], d_B_ptrs[g], d_ldb_batch[g], d_ranks[g], 
+								tol, max_rows, max_cols, max_rank, BLOCK_SIZE, ARA_R, rand_state[g], 0, batchCount_gpu);
+        cudaEventRecord(stopARA);
+        cudaEventSynchronize(stopARA);
+        cudaEventDestroy(startARA);
+        cudaEventDestroy(stopARA);
+        cudaDeviceSynchronize();
+
+        cudaFree(d_rows_batch);
+        cudaFree(d_cols_batch);
+        #endif
 
         #if 0
         printSigmas(h_S, num_segments, maxSegmentSize, config.bucket_size, config.n, segment);  
@@ -550,6 +614,7 @@ int main(int argc, char *argv[]){
         tileMatrix<<<d_numBlocks, d_numThreadsPerBlock>>> (config.n, num_segments, maxSegmentSize, d_S, d_U, d_V, d_U_tiled_segmented, d_V_tiled_segmented, matrix.blockRanks + segment*num_segments, d_scan_K_segmented, segment);
         cudaDeviceSynchronize();
 
+        #if 0
         H2Opus_Real* d_expMatrix;
         cudaErr = cudaMalloc((void**) &d_expMatrix, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
         if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
@@ -586,6 +651,8 @@ int main(int argc, char *argv[]){
         // printf("error: %lf\n", sqrt(*error)/sqrt(*tmp));
         free(tmp);
         free(error);
+        cudaFree(d_expMatrix);
+        #endif
 
         cudaErr = cudaMalloc((void**) &d_U_tiled_temp[segment], maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real));
         if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
@@ -599,7 +666,6 @@ int main(int argc, char *argv[]){
         free(totalMem);
         cudaFree(d_U_tiled_segmented);
         cudaFree(d_V_tiled_segmented);
-        cudaFree(d_expMatrix);
     }
     printf("total mem %d\n", k_sum);
     timer_arr[5] =k_sum;
@@ -700,6 +766,57 @@ int main(int argc, char *argv[]){
     cudaEventElapsedTime(&GEMV_time, startGEMV, stopGEMV);
     cudaEventDestroy(startGEMV);
     cudaEventDestroy(stopGEMV);
+
+    // dense matrix * vector
+    #if 1
+    // generate n*n dense matrix
+    H2Opus_Real* d_denseMatrix;
+    cudaErr = cudaMalloc((void**) &d_denseMatrix, config.n*config.n*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error d_output_vector_org: %s\n", cudaGetErrorString(cudaErr)); }
+    H2Opus_Real* d_vector;
+    cudaErr = cudaMalloc((void**) &d_vector, config.n*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error d_output_vector_org: %s\n", cudaGetErrorString(cudaErr)); }
+
+    numThreadsPerBlock = 1024; //TODO: make sure that bucket_size is less than 1024   
+    numBlocks = (config.n + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillDenseMatrix<<<numBlocks, numThreadsPerBlock>>>(config.n, d_denseMatrix);
+    filltmpVector<<<numBlocks, numThreadsPerBlock>>>(config.n, d_vector);
+    cudaDeviceSynchronize();
+
+    cublasHandle_t handle;
+    cublasStatus_t stat;
+    stat = cublasCreate(&handle);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        printf ("CUBLAS initialization failed\n");
+        return EXIT_FAILURE;
+    }
+    H2Opus_Real alfa=1, beta=0;
+    
+    cudaEvent_t startDenseGEMV, stopDenseGEMV;
+    cudaEventCreate(&startDenseGEMV);
+    cudaEventCreate(&stopDenseGEMV);
+    cudaEventRecord(startDenseGEMV);
+    cublasDgemv(handle, CUBLAS_OP_T,
+                           config.n, config.n,
+                           &alfa,
+                           d_denseMatrix, config.n,
+                           d_vector, 1,
+                           &beta,
+                           d_vector, 1);
+    cudaDeviceSynchronize();
+    cudaEventRecord(stopDenseGEMV);
+    cudaEventSynchronize(stopDenseGEMV);
+    float DenseGEMV_time = 0;
+    cudaEventElapsedTime(&DenseGEMV_time, startDenseGEMV, stopDenseGEMV);
+    printf("DenseGEMV time: %f\n", DenseGEMV_time);
+    timer_arr[8] = DenseGEMV_time;
+    cudaEventDestroy(startDenseGEMV);
+    cudaEventDestroy(stopDenseGEMV);
+
+    cublasDestroy(handle);
+    cudaFree(d_denseMatrix);
+    cudaFree(d_vector);
+    #endif
 
     printf("GEMV time: %f\n", GEMV_time);
     timer_arr[7] = GEMV_time;
@@ -852,23 +969,69 @@ int main(int argc, char *argv[]){
     cudaEventDestroy(startGEMM);
     cudaEventDestroy(stopGEMM);
     printf("GEMM time: %f\n", GEMM_time);
-    timer_arr[8] = GEMM_time;
+    timer_arr[9] = GEMM_time;
     // TODO: copy from double pointer array to a single pointer array
+
+    #if 1
+    // generate n*n dense matrix
+    H2Opus_Real* d_denseMatrix1;
+    cudaErr = cudaMalloc((void**) &d_denseMatrix1, config.n*config.n*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error d_output_vector_org: %s\n", cudaGetErrorString(cudaErr)); }
+    H2Opus_Real* d_denseMatrix2;
+    cudaErr = cudaMalloc((void**) &d_denseMatrix2, config.n*config.n*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error d_output_vector_org: %s\n", cudaGetErrorString(cudaErr)); }
+    H2Opus_Real* d_denseMatrix3;
+    cudaErr = cudaMalloc((void**) &d_denseMatrix3, config.n*config.n*sizeof(H2Opus_Real));
+    if ( cudaErr != cudaSuccess ){ printf("CUDA Error d_output_vector_org: %s\n", cudaGetErrorString(cudaErr)); }
+
+    numThreadsPerBlock = 1024; //TODO: make sure that bucket_size is less than 1024   
+    numBlocks = (config.n + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillDenseMatrix<<<numBlocks, numThreadsPerBlock>>>(config.n, d_denseMatrix1);
+    fillDenseMatrix<<<numBlocks, numThreadsPerBlock>>>(config.n, d_denseMatrix2);
+    cudaDeviceSynchronize();
+
+    
+    stat = cublasCreate(&handle);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        printf ("CUBLAS initialization failed\n");
+        return EXIT_FAILURE;
+    }
+    
+    cudaEvent_t startDenseGEMM, stopDenseGEMM;
+    cudaEventCreate(&startDenseGEMM);
+    cudaEventCreate(&stopDenseGEMM);
+    cudaEventRecord(startDenseGEMM);
+    cudaDeviceSynchronize();
+    cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_T,
+                           config.n, config.n, config.n,
+                           &alfa,
+                           d_denseMatrix1, config.n,
+                           d_denseMatrix2, config.n,
+                           &beta,
+                           d_denseMatrix3, config.n);
+    cudaDeviceSynchronize();
+    cudaEventRecord(stopDenseGEMM);
+    cudaEventSynchronize(stopDenseGEMM);
+    float DenseGEMM_time = 0;
+    cudaEventElapsedTime(&DenseGEMM_time, startDenseGEMM, stopDenseGEMM);
+    printf("DenseGEMM time: %f\n", DenseGEMM_time);
+    timer_arr[10] = DenseGEMM_time;
+    cudaEventDestroy(startDenseGEMM);
+    cudaEventDestroy(stopDenseGEMM);
+
+    cublasDestroy(handle);
+    cudaFree(d_denseMatrix1);
+    cudaFree(d_denseMatrix2);
+    cudaFree(d_denseMatrix3);
+    #endif
 
     free(gemm_matrix_segmented);
     cudaFree(d_scan_K_segmented);
     cudaFree(matrix_gemm_output.blockRanks);
     cudaFree(d_gemm_matrix_segmented);
-    // cudaFree(d_K);
-    // cudaFree(d_scan_K);
-    // cudaFree(d_U_tiled);
-    // cudaFree(d_V_tiled);
+    
     cudaFreeMatrix(matrix);
     cudaFreeMatrix(matrix2);
-    // cudaFree(d_K_2);
-    // cudaFree(d_scan_K_2);
-    // cudaFree(d_U_tiled_2);
-    // cudaFree(d_V_tiled_2);
 
     cudaDeviceSynchronize();
     cudaEventRecord(stopCode);
@@ -879,7 +1042,7 @@ int main(int argc, char *argv[]){
     cudaEventDestroy(startCode);
     cudaEventDestroy(stopCode);
     printf("total time: %f\n", Code_time);
-    timer_arr[9] = Code_time;
+    timer_arr[11] = Code_time;
     printCountersInFile(timer_arr);
     free(timer_arr);
     

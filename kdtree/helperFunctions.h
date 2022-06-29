@@ -3,7 +3,7 @@
 
 #include <utility>
 #include <cstdint> 
-#define numTimers 10
+#define numTimers 12
 
 void printCountersInFile(float* times){
     char filename[100] = "results/times.csv";
@@ -43,7 +43,7 @@ std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     return p;
 }
 
-void printSigmas(double* S, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_size, int n, int segment){
+void printSigmas(H2Opus_Real* S, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_size, int n, int segment){
     FILE *fp;
     fp = fopen("results/sigma_values.csv", "a");// "w" means that we are going to write on this file
     if(segment == 0){
