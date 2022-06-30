@@ -133,7 +133,7 @@ int main(int argc, char** argv)
     H2Opus_Real *d_dataset;
     cudaError_t cudaErr = cudaMalloc((void**) &d_dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real));
     if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMemcpy(d_dataset, dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real*), cudaMemcpyHostToDevice);
+    cudaErr = cudaMemcpy(d_dataset, dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
     if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
     free(dataset);
 
@@ -555,6 +555,7 @@ int main(int argc, char** argv)
     cudaEventCreate(&startGenerateInputMatrix);
     cudaEventCreate(&stopGenerateInputMatrix);
     cudaEventRecord(startGenerateInputMatrix);
+    cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error -3: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
     for(unsigned int segment = 0; segment < num_segments; ++segment){
 
@@ -564,6 +565,7 @@ int main(int argc, char** argv)
 
         generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(config.n, num_segments, maxSegmentSize, config.dim, d_values_in, d_input_matrix_segmented, d_dataset, d_offsets_sort, segment, matrix.diagonal);
         cudaDeviceSynchronize();
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error -2: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
         float tol = 1e-5;
         const int ARA_R = 10;
@@ -586,46 +588,55 @@ int main(int argc, char** argv)
         cudaMalloc((void**) &d_M_ptrs, batchCount*sizeof(H2Opus_Real*));
         cudaMalloc((void**) &d_A_ptrs, batchCount*sizeof(H2Opus_Real*));
         cudaMalloc((void**) &d_B_ptrs, batchCount*sizeof(H2Opus_Real*));
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error -1: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
-        numThreadsPerBlock = 1024;
-        numBlocks = (batchCount + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        int numThreadsPerBlock = 1024;
+        int numBlocks = (batchCount + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillArrays2<<<numBlocks, numThreadsPerBlock>>>(batchCount, max_rows, max_cols, d_rows_batch, d_cols_batch, d_M_ptrs, d_input_matrix_segmented, d_ldm_batch, d_lda_batch, d_ldb_batch);
         cudaDeviceSynchronize();
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 0: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
         magma_init();
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 1: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
         cudaSetDevice(0);
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 2: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
         cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 3: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
         kblasHandle_t kblas_handle;
         kblasRandState_t rand_state;
         kblasCreate(&kblas_handle);
         cudaDeviceSynchronize();
-
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+    
 		int errormsg = kblasInitRandState(kblas_handle, &rand_state, 16384*2, 0);
-        printf("error: %s", kblasGetErrorString(errormsg));
+        printf("error: %d: %s\n", errormsg, kblasGetErrorString(errormsg));
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
 		kblasEnableMagma(kblas_handle);
-        
+
         kblas_gemm_batch_strided_wsquery(kblas_handle, batchCount);
         kblas_gesvj_batch_wsquery<H2Opus_Real>(kblas_handle, max_rows, max_cols, batchCount);
         kblas_ara_batch_wsquery<H2Opus_Real>(kblas_handle, BLOCK_SIZE, batchCount);
         kblas_rsvd_batch_wsquery<H2Opus_Real>(kblas_handle, max_rows, max_cols, 64, batchCount);
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
-        // int errormsg = kblasAllocateWorkspace(kblas_handle);
-        // printf("error: %s", kblasGetErrorString(errormsg));
+        errormsg = kblasAllocateWorkspace(kblas_handle);
+        printf("error: %d: %s\n", errormsg, kblasGetErrorString(errormsg));
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
-        // cudaDeviceSynchronize();
-        // errormsg = kblas_ara_batch(
-        //                     kblas_handle, d_rows_batch, d_cols_batch, d_M_ptrs, d_ldm_batch, 
-        //                     d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks, 
-        //                     tol, max_rows, max_cols, max_rank, BLOCK_SIZE, ARA_R, rand_state, 0, batchCount
-        //                 );
-        // printf("error: %s", kblasGetErrorString(errormsg));
+        cudaDeviceSynchronize();
+        errormsg = kblas_ara_batch(
+                            kblas_handle, d_rows_batch, d_cols_batch, d_M_ptrs, d_ldm_batch, 
+                            d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks, 
+                            tol, max_rows, max_cols, max_rank, BLOCK_SIZE, ARA_R, rand_state, 0, batchCount
+                        );
+        printf("error: %s", kblasGetErrorString(errormsg));
         
-        // cudaDeviceSynchronize();
-        // printf("ended for loop\n");
-        // printOutput<<<1, 1>>>(d_A_ptrs, d_B_ptrs, d_ranks, batchCount);
-        // cudaDeviceSynchronize();
+        cudaDeviceSynchronize();
+        printf("ended for loop\n");
+        printOutput<<<1, 1>>>(d_A_ptrs, d_B_ptrs, d_ranks, batchCount);
+        cudaDeviceSynchronize();
     }
 
     return 0;
