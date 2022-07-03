@@ -2,7 +2,7 @@
 #include "kdtree/TLR_Matrix.cuh"
 #include "kdtree/helperFunctions.h"
 #include "kdtree/helperKernels.cuh"
-// #include "kdtree/SVD.cuh"
+#include "kdtree/SVD.cuh"
 #include "kdtree/config.h"
 
 #include <thrust/binary_search.h>
@@ -15,10 +15,6 @@
 #include <time.h>
 #include <assert.h>
 #include <typeinfo>
-
-#define BLOCK_SIZE 32
-#define PRINT_OUTPUT 0
-using namespace std;
 
 #include <stdio.h>
 #include <math.h>
@@ -34,6 +30,9 @@ using namespace std;
 #include "helperKernels.cuh"
 #include "magma_auxiliary.h"
 
+#define BLOCK_SIZE 32
+#define PRINT_OUTPUT 0
+using namespace std;
 // typedef float Real;
 #define ARA_TOLERANCE 1e-5
 
@@ -51,42 +50,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-// const char* kblasGetErrorString( int error )
-// {
-//   switch( error ) {
-//     case KBLAS_UnknownError:
-//       return "KBLAS: unknown error";
-//     case KBLAS_NotSupported:
-//       return "Operation not supported";
-//     case KBLAS_NotImplemented:
-//       return "Operation not implemented yet";
-//     case KBLAS_cuBLAS_Error:
-//       return "cuBLAS error";
-//     case KBLAS_WrongConfig:
-//       return "Wrong compilation flags configuration";
-//     case KBLAS_CUDA_Error:
-//       return "CUDA error";
-//     case KBLAS_InsufficientWorkspace:
-//       return "Insufficient workspace supplied to function";
-//     case KBLAS_Error_Allocation:
-//       return "Error allocating memory";
-//     case KBLAS_Error_Deallocation:
-//       return "Error de-allocating memory";
-//     case KBLAS_Error_NotInitialized:
-//       return "KBLAS handle not initialized";
-//     case KBLAS_Error_WrongInput:
-//       return "One of input parameter's value is wrong";
-//     case KBLAS_MAGMA_Error:
-//       return "MAGMA error";
-//     case KBLAS_SVD_NoConvergence:
-//       return "SVD-gram operation did not converge.";
-//     default:
-//       return "unknown KBLAS error code";
-//   }
-// }
-
 int main(int argc, char** argv)
 {
+    float SVDTotalTime = 0, ARATotalTime = 0;
     cudaEvent_t startCode, stopCode;
     cudaEventCreate(&startCode);
     cudaEventCreate(&stopCode);
@@ -549,17 +515,73 @@ int main(int argc, char** argv)
     cudaErr = cudaMalloc((void**) &matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
     if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
 
-    int k_sum = 0;
-
     cudaEvent_t startGenerateInputMatrix, stopGenerateInputMatrix;
     cudaEventCreate(&startGenerateInputMatrix);
     cudaEventCreate(&stopGenerateInputMatrix);
     cudaEventRecord(startGenerateInputMatrix);
     cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error -3: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+    
+    magma_init();
+
+    float tol = 1e-5;
+    const int ARA_R = 10;
+    const int batchCount = num_segments;
+    const int max_rows = 32;
+    const int max_cols = 32;
+    int max_rank = max_cols;
+
+    int *d_rows_batch, *d_cols_batch, *d_ranks;
+    int *d_ldm_batch, *d_lda_batch, *d_ldb_batch;
+    H2Opus_Real *d_A, *d_B;
+    H2Opus_Real** d_M_ptrs, **d_A_ptrs, **d_B_ptrs;
+
+    cudaMalloc((void**) &d_rows_batch, batchCount*sizeof(int));
+    cudaMalloc((void**) &d_cols_batch, batchCount*sizeof(int));
+    cudaMalloc((void**) &d_ranks, batchCount*sizeof(int));
+    cudaMalloc((void**) &d_ldm_batch, batchCount*sizeof(int));
+    cudaMalloc((void**) &d_lda_batch, batchCount*sizeof(int));
+    cudaMalloc((void**) &d_ldb_batch, batchCount*sizeof(int));
+    cudaMalloc((void**) &d_A, batchCount*max_rows*max_rank*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_B, batchCount*max_rows*max_rank*sizeof(H2Opus_Real));
+
+    cudaMalloc((void**) &d_M_ptrs, batchCount*sizeof(H2Opus_Real*));
+    cudaMalloc((void**) &d_A_ptrs, batchCount*sizeof(H2Opus_Real*));
+    cudaMalloc((void**) &d_B_ptrs, batchCount*sizeof(H2Opus_Real*));
+    cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error -1: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+
+    numThreadsPerBlock = 1024;
+    numBlocks = (batchCount + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillARAArrays<<<numBlocks, numThreadsPerBlock>>>(batchCount, max_rows, max_cols, d_rows_batch, d_cols_batch, d_M_ptrs, d_input_matrix_segmented, d_ldm_batch, d_lda_batch, d_ldb_batch);
+    cudaDeviceSynchronize();
+    cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 0: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+
+    
+    kblasHandle_t kblas_handle;
+    kblasRandState_t rand_state;
+    kblasCreate(&kblas_handle);
+    cudaDeviceSynchronize();
+    cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+
+    int errormsg = kblasInitRandState(kblas_handle, &rand_state, 1<<15, 0);
+    // printf("error: %d: %s\n", errormsg, kblasGetErrorString(errormsg));
+    cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+
+    kblasEnableMagma(kblas_handle);
+
+    kblas_gemm_batch_strided_wsquery(kblas_handle, batchCount);
+    kblas_gesvj_batch_wsquery<H2Opus_Real>(kblas_handle, max_rows, max_cols, batchCount);
+    kblas_ara_batch_wsquery<H2Opus_Real>(kblas_handle, BLOCK_SIZE, batchCount);
+    kblas_rsvd_batch_wsquery<H2Opus_Real>(kblas_handle, max_rows, max_cols, 64, batchCount);
+    cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+
+    errormsg = kblasAllocateWorkspace(kblas_handle);
+    // printf("error: %d: %s\n", errormsg, kblasGetErrorString(errormsg));
+    cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+
 
     for(unsigned int segment = 0; segment < num_segments; ++segment){
 
-        printf("for loop\n");
+        // printf("for loop\n");
         dim3 m_numThreadsPerBlock(upper_power_of_two(maxSegmentSize), upper_power_of_two(maxSegmentSize));
         dim3 m_numBlocks(1, num_segments);
 
@@ -567,77 +589,72 @@ int main(int argc, char** argv)
         cudaDeviceSynchronize();
         cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error -2: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
-        float tol = 1e-5;
-        const int ARA_R = 10;
-        const int batchCount = 1;
-        const int max_rows = 32;
-        const int max_cols = 32;
-        int max_rank = max_cols;
-
-        int *d_rows_batch, *d_cols_batch, *d_ranks;
-	    int *d_ldm_batch, *d_lda_batch, *d_ldb_batch;
-        H2Opus_Real** d_M_ptrs, **d_A_ptrs, **d_B_ptrs;
-
-        cudaMalloc((void**) &d_rows_batch, batchCount*sizeof(int));
-        cudaMalloc((void**) &d_cols_batch, batchCount*sizeof(int));
-        cudaMalloc((void**) &d_ranks, batchCount*sizeof(int));
-        cudaMalloc((void**) &d_ldm_batch, batchCount*sizeof(int));
-        cudaMalloc((void**) &d_lda_batch, batchCount*sizeof(int));
-        cudaMalloc((void**) &d_ldb_batch, batchCount*sizeof(int));
-
-        cudaMalloc((void**) &d_M_ptrs, batchCount*sizeof(H2Opus_Real*));
-        cudaMalloc((void**) &d_A_ptrs, batchCount*sizeof(H2Opus_Real*));
-        cudaMalloc((void**) &d_B_ptrs, batchCount*sizeof(H2Opus_Real*));
-        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error -1: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
-
-        int numThreadsPerBlock = 1024;
-        int numBlocks = (batchCount + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillArrays2<<<numBlocks, numThreadsPerBlock>>>(batchCount, max_rows, max_cols, d_rows_batch, d_cols_batch, d_M_ptrs, d_input_matrix_segmented, d_ldm_batch, d_lda_batch, d_ldb_batch);
+        cudaEvent_t startSVD, stopSVD;
+        cudaEventCreate(&startSVD);
+        cudaEventCreate(&stopSVD);
+        cudaEventRecord(startSVD);
+        SVD(config.n, num_segments, input_matrix_segmented, maxSegmentSize, h_S, h_U, h_V);
+        cudaEventRecord(stopSVD);
+        cudaEventSynchronize(stopSVD);
+        float SVD_time = 0;
+        cudaEventElapsedTime(&SVD_time, startSVD, stopSVD);
+        // printf("SVD time: %f\n", SVD_time);
+        SVDTotalTime += SVD_time;
+        cudaEventDestroy(startSVD);
+        cudaEventDestroy(stopSVD);
         cudaDeviceSynchronize();
-        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 0: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
-        magma_init();
+        generateArrayOfPointersT<H2Opus_Real>(d_input_matrix_segmented, d_M_ptrs, max_rows*max_cols, batchCount, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_A, d_A_ptrs, max_rows*max_cols, batchCount, 0);
         cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 1: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+        generateArrayOfPointersT<H2Opus_Real>(d_B, d_B_ptrs, max_rows*max_cols, batchCount, 0);
+        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 1: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
+
         cudaSetDevice(0);
         cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 2: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
         cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
         cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error 3: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
 
-        kblasHandle_t kblas_handle;
-        kblasRandState_t rand_state;
-        kblasCreate(&kblas_handle);
         cudaDeviceSynchronize();
-        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
-    
-		int errormsg = kblasInitRandState(kblas_handle, &rand_state, 16384*2, 0);
-        printf("error: %d: %s\n", errormsg, kblasGetErrorString(errormsg));
-        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
-
-		kblasEnableMagma(kblas_handle);
-
-        kblas_gemm_batch_strided_wsquery(kblas_handle, batchCount);
-        kblas_gesvj_batch_wsquery<H2Opus_Real>(kblas_handle, max_rows, max_cols, batchCount);
-        kblas_ara_batch_wsquery<H2Opus_Real>(kblas_handle, BLOCK_SIZE, batchCount);
-        kblas_rsvd_batch_wsquery<H2Opus_Real>(kblas_handle, max_rows, max_cols, 64, batchCount);
-        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
-
-        errormsg = kblasAllocateWorkspace(kblas_handle);
-        printf("error: %d: %s\n", errormsg, kblasGetErrorString(errormsg));
-        cudaErr = cudaGetLastError(); if(cudaErr != cudaSuccess) { printf("CUDA error here: %s\n", cudaGetErrorString(cudaErr)); exit(-1); }
-
-        cudaDeviceSynchronize();
+        cudaEvent_t startARA, stopARA;
+        cudaEventCreate(&startARA);
+        cudaEventCreate(&stopARA);
+        cudaEventRecord(startARA);
         errormsg = kblas_ara_batch(
                             kblas_handle, d_rows_batch, d_cols_batch, d_M_ptrs, d_ldm_batch, 
                             d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks, 
                             tol, max_rows, max_cols, max_rank, BLOCK_SIZE, ARA_R, rand_state, 0, batchCount
                         );
-        printf("error: %s", kblasGetErrorString(errormsg));
-        
+        cudaEventRecord(stopARA);
+        cudaEventSynchronize(stopARA);
+        float ARA_time = 0;
+        cudaEventElapsedTime(&ARA_time, startARA, stopARA);
+        // printf("ARA time: %f\n", ARA_time);
+        ARATotalTime += ARA_time;
+        cudaEventDestroy(startARA);
+        cudaEventDestroy(stopARA);
         cudaDeviceSynchronize();
-        printf("ended for loop\n");
-        printOutput<<<1, 1>>>(d_A_ptrs, d_B_ptrs, d_ranks, batchCount);
-        cudaDeviceSynchronize();
+
+        // printf("error: %d: %s\n", errormsg, kblasGetErrorString(errormsg));
+
+        // printf("ended for loop\n");
+        // printOutput<<<1, 1>>>(d_A, d_B, d_ranks, batchCount);
+        // cudaDeviceSynchronize();
+
     }
+    cudaFree(d_rows_batch);
+    cudaFree(d_cols_batch);
+    cudaFree(d_ranks);
+    cudaFree(d_ldm_batch);
+    cudaFree(d_lda_batch);
+    cudaFree(d_ldb_batch);
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_M_ptrs);
+    cudaFree(d_A_ptrs);
+    cudaFree(d_B_ptrs);
+    magma_finalize();
+    printf("\nARA time %f\n SVD time %f\n", ARATotalTime, SVDTotalTime);
 
     return 0;
 }

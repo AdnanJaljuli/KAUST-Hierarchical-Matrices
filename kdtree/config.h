@@ -64,9 +64,9 @@ static Config parseArgs(int argc, char **argv)
     Config config;
     config.div_method = POWER_OF_TWO_ON_LEFT;
     config.dim = 2;
-    config.n = 32;
+    config.n = 64;
     config.bucket_size = 32;
-    config.epsilon = 1e-3;
+    config.epsilon = 1e-5;
 
     int opt;
     while ((opt = getopt(argc, argv, "m:d:n:b:e")) >= 0)

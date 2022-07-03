@@ -1,6 +1,6 @@
 #ifndef TLR_Matrix_H
 #define TLR_Matrix_H
-typedef float H2Opus_Real;
+typedef double H2Opus_Real;
 
 struct TLR_Matrix{
     unsigned int n;
