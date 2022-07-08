@@ -7,6 +7,22 @@
 #include <cub/cub.cuh>
 #include <assert.h>
 #include <curand_kernel.h>
+#include <thrust/binary_search.h>
+#include <thrust/device_vector.h>
+#include <thrust/functional.h>
+#include <thrust/execution_policy.h>
+
+__global__ void generateDataset(int n, int dim, H2Opus_Real* dataset){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i<n){
+        unsigned int seed = i;
+        curandState s;
+        curand_init(seed, 0, 0, &s);
+        for(unsigned int j=0; j<dim; ++j){
+            dataset[j*n + i] = curand_uniform(&s);
+        }
+    }
+}
 
 __global__ void initializeArrays(int n, int* values_in, int* currDimArray, int max_num_segments){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -255,6 +271,9 @@ __device__ H2Opus_Real getCorrelationLength(int dim){
 }
 
 __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real* dataset){
+    assert(col<n);
+    assert(row<n);
+
     H2Opus_Real diff = 0;
     H2Opus_Real x, y;
     for (int d = 0; d < dim; ++d){
@@ -411,16 +430,6 @@ __global__ void printK(int num_segments, unsigned int* K){
     }
     printf("\n");
 }
-
-// __global__ void printK(int num_segments, unsigned int* K){
-//     printf("ks\n");
-//     for(int i=0; i<num_segments; ++i){
-//         for(int j=0; j<num_segments; ++j){
-//             printf("%d ", K[j*num_segments + i]);
-//         }
-//         printf("\n");
-//     }
-// }
 
 __global__ void printOffsetsSort(int num_segments, int* offsets_sort){
     printf("print offsets sort\n");
@@ -752,49 +761,3 @@ __global__ void fillBatch(int num_segments, int* rows_batch, int* cols_batch, in
         cols_batch[i] = maxSegmentSize;
     }
 }
-
-
-// __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, H2Opus_Real** d_M_ptrs, H2Opus_Real* d_M, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
-//     for(unsigned int i=0; i<batchCount; ++i){
-//         d_rows_batch[i] = max_rows;
-//         d_cols_batch[i] = max_cols;
-//         d_ldm_batch[i] = max_rows;
-//         d_lda_batch[i] = max_rows;
-//         d_ldb_batch[i] = max_rows;
-//     }
-// }
-
-// template<class T>
-// struct UnaryAoAAssign : public thrust::unary_function<int, T*>
-// {
-//   T* original_array;
-//   int stride;
-//   UnaryAoAAssign(T* original_array, int stride) { this->original_array = original_array; this->stride = stride; }
-//   __host__ __device__
-//   T* operator()(const unsigned int& thread_id) const { return original_array + thread_id * stride; }
-// };
-
-// template<class T>
-// void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int stride, int num_arrays, cudaStream_t stream)
-// {
-//     printf("generate array of pointers\n");
-//   thrust::device_ptr<T*> dev_data(array_of_arrays);
-
-//   thrust::transform(
-//     thrust::cuda::par.on(stream),
-//     thrust::counting_iterator<int>(0),
-//     thrust::counting_iterator<int>(num_arrays),
-//     dev_data,
-//     UnaryAoAAssign<T>(original_array, stride)
-//     );
-//     printf("ended generate array of pointers\n");
-//   cudaGetLastError();
-// }
-
-
-// __global__ void printOutput(H2Opus_Real* d_A, H2Opus_Real* d_B, int* k, int batchCount){
-//     printf("ks\n");
-//     for(unsigned int i=0;i<batchCount; ++i){
-//         printf("%d ", k[i]);
-//     }
-// }
