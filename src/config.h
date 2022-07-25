@@ -56,7 +56,7 @@ struct Config
     unsigned int n;
     unsigned int dim;
     unsigned int bucket_size;
-    float epsilon;
+    float tol;
 };
 
 static Config parseArgs(int argc, char **argv)
@@ -66,10 +66,10 @@ static Config parseArgs(int argc, char **argv)
     config.dim = 2;
     config.n = 64;
     config.bucket_size = 32;
-    config.epsilon = 1e-5;
+    config.tol = 1e-5;
 
     int opt;
-    while ((opt = getopt(argc, argv, "m:d:n:b:e")) >= 0)
+    while ((opt = getopt(argc, argv, "m:d:n:b:t")) >= 0)
     {
         switch (opt)
         {
@@ -80,7 +80,7 @@ static Config parseArgs(int argc, char **argv)
             config.bucket_size = atoi(optarg);
             break;
         case 'e':
-            config.epsilon = atof(optarg);
+            config.tol = atof(optarg);
             break;
         case 'm':
             config.div_method = parseDivMethod(optarg);

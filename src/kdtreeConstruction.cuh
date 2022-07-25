@@ -1,4 +1,3 @@
-// #include "kdtreeConstruction.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,12 +11,10 @@ void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVIS
     uint64_t num_segments_reduce = num_segments*dim;
     uint64_t segment_size = upper_power_of_two(n);
 
-    // int *d_offsets_sort;         // e.g., [0, 3, 3, 7]
     int *d_offsets_reduce;
-    H2Opus_Real *d_keys_in;         // e.g., [8, 6, 7, 5, 3, 0, 9]
-    H2Opus_Real *d_keys_out;        // e.g., [-, -, -, -, -, -, -]
-    // int  *d_values_in;       // e.g., [0, 1, 2, 3, 4, 5, 6]
-    int  *d_values_out;      // e.g., [-, -, -, -, -, -, -]
+    H2Opus_Real *d_keys_in;
+    H2Opus_Real *d_keys_out;
+    int  *d_values_out;
     int *d_curr_dim;
     H2Opus_Real *d_reduce_in;
     H2Opus_Real *d_reduce_min_out;
@@ -112,7 +109,6 @@ void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVIS
 
     unsigned int iteration = 0;
 
-    // TODO: fix the while loop if statement
     #if 0
     if(div_method == DIVIDE_IN_HALF){
         while(!workDone)
@@ -299,19 +295,9 @@ void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVIS
 
     cudaDeviceSynchronize();
 
-    #if 1
+    #if 0
     int *index_map = (int*)malloc(n*sizeof(int));
     cudaMemcpy(index_map, d_values_in, n*sizeof(int), cudaMemcpyDeviceToHost);
-    // FILE *fp;
-    // fp = fopen("results/pointcloud.csv", "a");// "w" means that we are going to write on this file
-    // fprintf(fp, "bucket size: %d, n: %d, num segments: %d,\n", bucket_size, n, num_segments);
-    // for(int i=0; i<n; ++i){
-    //     for(int j=0; j<dim; ++j){
-    //         fprintf(fp, "%lf, ", pt_cloud.pts[j][index_map[i]]);
-    //     }
-    //     fprintf(fp, "\n");
-    // }
-    // fclose(fp); //Don't forget to close the file when finished    
     printf("index max\n");
     for(int i=0; i<n; ++i){
         printf("%d ", index_map[i]);

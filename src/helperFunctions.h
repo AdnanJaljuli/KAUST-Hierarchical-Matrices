@@ -3,11 +3,10 @@
 
 #include <utility>
 #include <cstdint> 
-#define numTimers 12
+#define numTimers 13
 
 void printCountersInFile(float* times){
     char filename[100] = "results/times.csv";
-
     FILE *output_file = fopen(filename, "a");
     for(unsigned int i = 0; i<numTimers; ++i){
         fprintf(output_file,"%f, ",times[i]);

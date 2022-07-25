@@ -9,6 +9,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
+
 #include "cublas_v2.h"
 #include <iostream>
 #include <utility>
@@ -22,7 +23,6 @@
 #include <algorithm>
 #include "kblas.h"
 
-#include "kblas.h"
 #include "batch_rand.h"
 #include "batch_pstrf.h"
 #include "batch_block_copy.h"
@@ -644,15 +644,15 @@ int main(int argc, char** argv)
     }
     cudaFree(d_rows_batch);
     cudaFree(d_cols_batch);
-    cudaFree(d_ranks);
     cudaFree(d_ldm_batch);
     cudaFree(d_lda_batch);
     cudaFree(d_ldb_batch);
-    cudaFree(d_A);
-    cudaFree(d_B);
     cudaFree(d_M_ptrs);
     cudaFree(d_A_ptrs);
     cudaFree(d_B_ptrs);
+    cudaFree(d_ranks);
+    cudaFree(d_A);
+    cudaFree(d_B);
     magma_finalize();
     printf("\nARA time %f\n SVD time %f\n", ARATotalTime, SVDTotalTime);
 

@@ -5,9 +5,9 @@ typedef double H2Opus_Real;
 struct TLR_Matrix{
     unsigned int n;
     unsigned int blockSize;
-    unsigned int nBlocks;
-    unsigned int *blockRanks;
-    unsigned int *blockOffsets;
+    unsigned int numBlocks;
+    int *blockRanks;
+    int *blockOffsets;
     H2Opus_Real *U;
     H2Opus_Real *V;
     H2Opus_Real *diagonal;
