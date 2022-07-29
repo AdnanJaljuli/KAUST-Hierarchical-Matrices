@@ -4,6 +4,8 @@
 #include "helperKernels.cuh"
 #include "config.h"
 #include "kdtreeConstruction.cuh"
+#include "sampleBatch.cuh"
+#include "kblas_ara.cuh"
 
 #include <thrust/binary_search.h>
 #include <thrust/device_vector.h>
@@ -19,14 +21,6 @@
 #include <algorithm>
 #include <string.h>
 #include <stdio.h>
-#include "cublas_v2.h"
-
-#include "kblas.h"
-#include "batch_rand.h"
-#include "batch_pstrf.h"
-#include "batch_block_copy.h"
-#include "batch_ara.h"
-#include "magma_auxiliary.h"
 
 #define EXPAND_MATRIX 1
 #define DENSE_CALC 1
@@ -46,13 +40,8 @@ true) {
     }
 }
 
-// TODO: make sure that non powers of two work
-// TODO: create a struct for the tiled matrix that has u_tiled, v_tiled, k, k_scan
-// TODO: generate pointcloud and copy values of the pointcloud to ptr on GPU
-// TODO: fix makefile so main.cu depends on helperKerlens.cuh
-// TODO: make sure that everything that is malloced is freed
-// TODO: move generate input matrix to its own file
-// TODO: move the expand matrix function to outside the for loop
+// TODO: write a GEMM functionce to replace with the kblas_ara_batch one
+// TODO: change the ordering of the LR tiles into a morton or z ordering
 
 int main(int argc, char *argv[]){
 
@@ -250,11 +239,13 @@ int main(int argc, char *argv[]){
         cudaEventCreate(&startARA);
         cudaEventCreate(&stopARA);
         cudaEventRecord(startARA);
+
         kblas_ara_batch(
                             kblas_handle, d_rows_batch, d_cols_batch, d_M_ptrs, d_ldm_batch, 
                             d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks + segment*num_segments, 
                             config.tol, max_rows, max_cols, max_rank, 32, ARA_R, rand_state, 0, num_segments
                         );
+                        
         cudaEventRecord(stopARA);
         cudaEventSynchronize(stopARA);
         float ARA_time = 0;
@@ -376,274 +367,6 @@ int main(int argc, char *argv[]){
     free(d_U_tiled_temp);
     free(d_V_tiled_temp);
 
-    H2Opus_Real* d_buffer_vector;
-    H2Opus_Real* d_input_vector;
-    H2Opus_Real* d_output_vector;
-    H2Opus_Real* d_output_vector_org;
-    gpuErrchk(cudaMalloc((void**) &d_buffer_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_input_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_output_vector, maxSegmentSize*num_segments*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_output_vector_org, maxSegmentSize*num_segments*sizeof(H2Opus_Real)));
-
-    numThreadsPerBlock = 1024;
-    numBlocks = (num_segments*maxSegmentSize + numThreadsPerBlock-1)/numThreadsPerBlock;
-    fillVector<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, d_input_vector, d_output_vector, d_output_vector_org);
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaPeekAtLastError());
-
-    cudaEvent_t startGEMV, stopGEMV;
-    cudaEventCreate(&startGEMV);
-    cudaEventCreate(&stopGEMV);
-    cudaEventRecord(startGEMV);
-    numThreadsPerBlock = maxSegmentSize;
-    numBlocks = num_segments;
-    GEMV<<<numBlocks, numThreadsPerBlock>>> (num_segments, maxSegmentSize, matrix.blockRanks, matrix.blockOffsets, matrix.U, matrix.V, matrix.diagonal, d_input_vector, d_output_vector, d_buffer_vector);
-    cudaEventRecord(stopGEMV);
-    cudaEventSynchronize(stopGEMV);
-    gpuErrchk(cudaPeekAtLastError());
-    cudaEventElapsedTime(&timer_arr[7], startGEMV, stopGEMV);
-    cudaEventDestroy(startGEMV);
-    cudaEventDestroy(stopGEMV);
-
-    cudaFree(d_buffer_vector);
-    cudaFree(d_input_vector);
-    cudaFree(d_output_vector);
-    cudaFree(d_output_vector_org);
-
-    #if DENSE_CALC
-    H2Opus_Real* d_denseMatrix;
-    H2Opus_Real* d_vector;
-    gpuErrchk(cudaMalloc((void**) &d_denseMatrix, config.n*config.n*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_vector, config.n*sizeof(H2Opus_Real)));
-
-    numThreadsPerBlock = 1024;
-    numBlocks = (config.n + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillDenseMatrix<<<numBlocks, numThreadsPerBlock>>>(config.n, d_denseMatrix);
-    filltmpVector<<<numBlocks, numThreadsPerBlock>>>(config.n, d_vector);
-    cudaDeviceSynchronize();
-
-    cublasHandle_t handle;
-    cublasStatus_t stat;
-    stat = cublasCreate(&handle);
-    if (stat != CUBLAS_STATUS_SUCCESS) {
-        printf ("CUBLAS initialization failed\n");
-        return EXIT_FAILURE;
-    }
-    H2Opus_Real alfa=1, beta=0;
-    
-    cudaEvent_t startDenseGEMV, stopDenseGEMV;
-    cudaEventCreate(&startDenseGEMV);
-    cudaEventCreate(&stopDenseGEMV);
-    cudaEventRecord(startDenseGEMV);
-    cublasDgemv(handle, CUBLAS_OP_T,
-                           config.n, config.n,
-                           &alfa,
-                           d_denseMatrix, config.n,
-                           d_vector, 1,
-                           &beta,
-                           d_vector, 1);
-    cudaDeviceSynchronize();
-    cudaEventRecord(stopDenseGEMV);
-    cudaEventSynchronize(stopDenseGEMV);
-    cudaEventElapsedTime(&timer_arr[8], startDenseGEMV, stopDenseGEMV);
-    cudaEventDestroy(startDenseGEMV);
-    cudaEventDestroy(stopDenseGEMV);
-
-    cublasDestroy(handle);
-    cudaFree(d_denseMatrix);
-    cudaFree(d_vector);
-    #endif
-
-    #if 1
-    TLR_Matrix matrix2;
-    gpuErrchk(cudaMalloc((void**) &matrix2.blockRanks, num_segments*num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &matrix2.U, k_sum*maxSegmentSize*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &matrix2.V, k_sum*maxSegmentSize*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &matrix2.diagonal, maxSegmentSize*maxSegmentSize*num_segments*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &matrix2.blockOffsets, num_segments*num_segments*sizeof(int)));
-
-    cudaMemcpy(matrix2.blockRanks, matrix.blockRanks, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(matrix2.blockOffsets, matrix.blockOffsets, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(matrix2.U, matrix.U, k_sum*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(matrix2.V, matrix.V, k_sum*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(matrix2.diagonal, matrix.diagonal, maxSegmentSize*maxSegmentSize*num_segments*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-
-    int* d_scan_K_output;
-
-    gpuErrchk(cudaMalloc((void**) &d_scan_K_output, num_segments*num_segments*sizeof(unsigned int)));
-
-    H2Opus_Real* d_gemm_matrix_segmented;
-    gpuErrchk(cudaMalloc((void**) &d_gemm_matrix_segmented, maxSegmentSize*maxSegmentSize*num_segments*(uint64_t)sizeof(H2Opus_Real)));
-
-    d_U_tiled_temp = (H2Opus_Real**)malloc(num_segments*sizeof(H2Opus_Real*));
-    d_V_tiled_temp = (H2Opus_Real**)malloc(num_segments*sizeof(H2Opus_Real*));
-
-    gpuErrchk(cudaMalloc((void**) &d_scan_K_segmented, num_segments*sizeof(int)));
-    k_sum = 0;
-    ARATotalTime = 0;
-
-    gpuErrchk(cudaMalloc((void**) &d_rows_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_cols_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_ranks, num_segments*num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_ldm_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_lda_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_ldb_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_A, num_segments*max_rows*max_rank*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_B, num_segments*max_rows*max_rank*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_M_ptrs, num_segments*sizeof(H2Opus_Real*)));
-    gpuErrchk(cudaMalloc((void**) &d_A_ptrs, num_segments*sizeof(H2Opus_Real*)));
-    gpuErrchk(cudaMalloc((void**) &d_B_ptrs, num_segments*sizeof(H2Opus_Real*)));
-
-    numThreadsPerBlock = maxSegmentSize;
-    numBlocks = num_segments;
-    fillARAArrays<<<1, 1>>>(num_segments, max_rows, max_cols, d_rows_batch, d_cols_batch, d_ldm_batch, d_lda_batch, d_ldb_batch);
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaPeekAtLastError());
-
-    cudaEvent_t startGEMM, stopGEMM;
-    cudaEventCreate(&startGEMM);
-    cudaEventCreate(&stopGEMM);
-    cudaEventRecord(startGEMM);
-
-    for(unsigned int segment = 0; segment < num_segments; ++segment){
-        GEMM<<<m_numBlocks, m_numThreadsPerBlock, 2*config.bucket_size*config.bucket_size*sizeof(H2Opus_Real)>>>(num_segments, maxSegmentSize, matrix.U, matrix.V, matrix.diagonal, matrix.blockRanks, matrix.blockOffsets, matrix2.U, matrix2.V, matrix2.diagonal, matrix2.blockRanks, matrix2.blockOffsets, d_gemm_matrix_segmented, segment, config.bucket_size);
-        cudaDeviceSynchronize();
-
-        int* totalMem = (int*)malloc(sizeof(int));
-        generateArrayOfPointersT<H2Opus_Real>(d_gemm_matrix_segmented, d_M_ptrs, max_rows*max_cols, num_segments, 0);
-        generateArrayOfPointersT<H2Opus_Real>(d_A, d_A_ptrs, max_rows*max_cols, num_segments, 0);
-        generateArrayOfPointersT<H2Opus_Real>(d_B, d_B_ptrs, max_rows*max_cols, num_segments, 0);
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
-        cudaDeviceSynchronize();
-
-        cudaEvent_t startARA, stopARA;
-        cudaEventCreate(&startARA);
-        cudaEventCreate(&stopARA);
-        cudaEventRecord(startARA);
-        kblas_ara_batch(
-                            kblas_handle, d_rows_batch, d_cols_batch, d_M_ptrs, d_ldm_batch, 
-                            d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks + segment*num_segments, 
-                            config.tol, max_rows, max_cols, max_rank, 32, ARA_R, rand_state, 0, num_segments
-                        );
-        cudaEventRecord(stopARA);
-        cudaEventSynchronize(stopARA);
-        float ARA_time = 0;
-        cudaEventElapsedTime(&ARA_time, startARA, stopARA);
-        ARATotalTime += ARA_time;
-        cudaEventDestroy(startARA);
-        cudaEventDestroy(stopARA);
-        cudaDeviceSynchronize();
-
-        void* d_temp_storage = NULL;
-        size_t temp_storage_bytes = 0;
-        cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_ranks + segment*num_segments, d_scan_K_segmented, num_segments);
-        cudaMalloc(&d_temp_storage, temp_storage_bytes);
-        cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_ranks + segment*num_segments, d_scan_K_segmented, num_segments);
-        cudaDeviceSynchronize();
-        cudaFree(d_temp_storage);
-
-        int* d_totalMem;
-        cudaMalloc((void**) &d_totalMem, sizeof(int));
-        getTotalMem<<<1, 1>>> (d_totalMem, d_ranks + segment*num_segments, d_scan_K_segmented, num_segments);
-        cudaDeviceSynchronize();
-        gpuErrchk(cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost));
-        cudaFree(d_totalMem);
-
-        #if 1
-        printARAOutput<<<1, 1>>>(d_A, d_B, d_ranks + segment*num_segments, num_segments, max_rows, max_rank);
-        #endif
-
-        gpuErrchk(cudaMalloc((void**) &d_U_tiled_temp[segment], maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real)));
-        gpuErrchk(cudaMalloc((void**) &d_V_tiled_temp[segment], maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real)));
-
-        // copy d_A and d_B to d_U_tiled_segmented
-        numThreadsPerBlock = maxSegmentSize;
-        numBlocks = num_segments;
-        copyTiles<<<numBlocks, numThreadsPerBlock>>>(num_segments, maxSegmentSize, d_ranks+ segment*num_segments, d_scan_K_segmented, d_U_tiled_temp[segment], d_A, d_V_tiled_temp[segment], d_B);
-        cudaDeviceSynchronize();
-
-        k_sum += (*totalMem);
-        free(totalMem);
-    }
-
-    cudaDeviceSynchronize();
-    cudaEventRecord(stopGEMM);
-    cudaEventSynchronize(stopGEMM);
-    float GEMM_time = 0;
-    cudaEventElapsedTime(&GEMM_time, startGEMM, stopGEMM);
-    cudaEventDestroy(startGEMM);
-    cudaEventDestroy(stopGEMM);
-    printf("GEMM time: %f\n", GEMM_time);
-    timer_arr[9] = GEMM_time;
-    magma_finalize();
-    // TODO: copy from double pointer array to a single pointer 
-
-    for(unsigned int segment = 0; segment < num_segments; ++segment){
-        cudaFree(d_U_tiled_temp[segment]);
-        cudaFree(d_V_tiled_temp[segment]);
-    }
-    free(d_U_tiled_temp);
-    free(d_V_tiled_temp);
-
-    #if DENSE_CALC
-    H2Opus_Real* d_denseMatrix1;
-    cudaErr = cudaMalloc((void**) &d_denseMatrix1, config.n*config.n*sizeof(H2Opus_Real));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error dense matrix 1: %s\n", cudaGetErrorString(cudaErr)); }
-    H2Opus_Real* d_denseMatrix2;
-    cudaErr = cudaMalloc((void**) &d_denseMatrix2, config.n*config.n*sizeof(H2Opus_Real));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error dense matrix 2: %s\n", cudaGetErrorString(cudaErr)); }
-    H2Opus_Real* d_denseMatrix3;
-    cudaErr = cudaMalloc((void**) &d_denseMatrix3, config.n*config.n*sizeof(H2Opus_Real));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error dense matrix3: %s\n", cudaGetErrorString(cudaErr)); }
-
-    numThreadsPerBlock = 1024;
-    numBlocks = (config.n + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillDenseMatrix<<<numBlocks, numThreadsPerBlock>>>(config.n, d_denseMatrix1);
-    fillDenseMatrix<<<numBlocks, numThreadsPerBlock>>>(config.n, d_denseMatrix2);
-    cudaDeviceSynchronize();
-    
-    stat = cublasCreate(&handle);
-    if (stat != CUBLAS_STATUS_SUCCESS) {
-        printf ("CUBLAS initialization failed\n");
-        return EXIT_FAILURE;
-    }
-
-    cudaEvent_t startDenseGEMM, stopDenseGEMM;
-    cudaEventCreate(&startDenseGEMM);
-    cudaEventCreate(&stopDenseGEMM);
-    cudaEventRecord(startDenseGEMM);
-    cudaDeviceSynchronize();
-    cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_T,
-                           config.n, config.n, config.n,
-                           &alfa,
-                           d_denseMatrix1, config.n,
-                           d_denseMatrix2, config.n,
-                           &beta,
-                           d_denseMatrix3, config.n);
-    cudaDeviceSynchronize();
-    cudaEventRecord(stopDenseGEMM);
-    cudaEventSynchronize(stopDenseGEMM);
-    float DenseGEMM_time = 0;
-    cudaEventElapsedTime(&DenseGEMM_time, startDenseGEMM, stopDenseGEMM);
-    printf("DenseGEMM time: %f\n", DenseGEMM_time);
-    timer_arr[10] = DenseGEMM_time;
-    cudaEventDestroy(startDenseGEMM);
-    cudaEventDestroy(stopDenseGEMM);
-
-    cublasDestroy(handle);
-    cudaFree(d_denseMatrix1);
-    cudaFree(d_denseMatrix2);
-    cudaFree(d_denseMatrix3);
-    #endif
-
-    cudaFree(d_scan_K_segmented);
-    cudaFree(d_gemm_matrix_segmented);
-    
-    cudaFreeMatrix(matrix);
-    cudaFreeMatrix(matrix2);
-
-    #endif
     cudaDeviceSynchronize();
     cudaEventRecord(stopCode);
     cudaEventSynchronize(stopCode);
