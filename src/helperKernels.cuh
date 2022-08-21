@@ -1,3 +1,6 @@
+#ifndef HELPERKERNELS_CUH
+#define HELPERKERNELS_CUH
+
 #include "helperFunctions.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,6 +8,7 @@
 #include <ctype.h>
 #include <stddef.h>
 #include <cub/cub.cuh>
+
 #include <assert.h>
 #include <curand_kernel.h>
 #include <thrust/binary_search.h>
@@ -291,27 +295,31 @@ __global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t 
         for(unsigned int j=0; j<(maxSegmentSize/blockDim.x); ++j){
             unsigned int row = blockIdx.y*maxSegmentSize + i*blockDim.x + threadIdx.y;
             unsigned int col = segment*maxSegmentSize + j*blockDim.x + threadIdx.x;
-            // uint64_t num_elements = num_segments*maxSegmentSize;
 
             int xDim = offsets_sort[segment + 1] - offsets_sort[segment];
             int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
+
+            int diff = (blockIdx.y>segment) ? 1 : 0;
 
             if(((uint64_t)col*num_segments*maxSegmentSize + (uint64_t)row) >= (maxSegmentSize*maxSegmentSize*num_segments*num_segments)){
                 assert(0);
             }
             if(blockIdx.y == segment){
-                diagonal[segment*maxSegmentSize*maxSegmentSize + threadIdx.x*j*maxSegmentSize + i*blockDim.x + threadIdx.y] = matrix[blockIdx.y*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y];
+                // diagonal[segment*maxSegmentSize*maxSegmentSize + threadIdx.x*j*maxSegmentSize + i*blockDim.x + threadIdx.y] = matrix[blockIdx.y*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y];
+                diagonal[segment*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = matrix[blockIdx.y*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y];
             }
-            if(threadIdx.x*j >= xDim || threadIdx.y*i >= yDim) {
-                if(col == row){
-                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 1;
+            else{
+                if(threadIdx.x + j*blockDim.x >= xDim || threadIdx.y + i*blockDim.x >= yDim) {
+                    if(col == row){
+                        matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 1;
+                    }
+                    else{
+                        matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 0;
+                    }
                 }
-                else{
-                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 0;
+                else {
+                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);
                 }
-            }
-            else {
-                matrix[blockIdx.y*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);
             }
         }
     }
@@ -421,7 +429,7 @@ __global__ void printSort(int n, H2Opus_Real* keys_out, int* values_out){
     printf("\n");
 }
 
-__global__ void printK(int num_segments, int* K){
+__global__ void printK(int* K, int num_segments){
     printf("ks\n");
     for(int i=0; i<num_segments; ++i){
         printf("%d ", K[i]);
@@ -767,6 +775,15 @@ __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d
     }
 }
 
+__global__ void fillARAArrays_mod(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_lda_batch, int* d_ldb_batch, int* ranks){
+    for(unsigned int i=0; i<batchCount; ++i){
+        d_rows_batch[i] = max_rows*2;
+        d_cols_batch[i] = max_rows*2;
+        d_lda_batch[i] = max_rows*2;
+        d_ldb_batch[i] = max_rows*2;
+    }
+}
+
 template<class T>
 struct UnaryAoAAssign : public thrust::unary_function<int, T*>
 {
@@ -834,3 +851,98 @@ __global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int*
         }
     }
 }
+
+__global__ void copyRanks(int num_segments, int maxSegmentSize, int* from_ranks, int* to_ranks){
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < num_segments*(num_segments-1)){
+        int row = i%(num_segments-1);
+        int col = i/(num_segments-1);
+        int diff = (row>=col) ? 1 : 0;
+        to_ranks[i + col + diff] = from_ranks[i];
+    }
+    if(i < num_segments){
+        to_ranks[i*num_segments + i] = 0;
+    }
+}
+
+__host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
+    static const unsigned int B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF};
+    static const unsigned int S[] = {1, 2, 4, 8};
+
+    x = (x | (x << S[3])) & B[3];
+    x = (x | (x << S[2])) & B[2];
+    x = (x | (x << S[1])) & B[1];
+    x = (x | (x << S[0])) & B[0];
+
+    y = (y | (y << S[3])) & B[3];
+    y = (y | (y << S[2])) & B[2];
+    y = (y | (y << S[1])) & B[1];
+    y = (y | (y << S[0])) & B[0];
+
+    int z = x | (y << 1);
+    return z;
+}
+
+__host__ __device__ int IndextoMOIndex_h(int num_segments, int n){
+    unsigned int i = n%num_segments;
+    unsigned int j = n/num_segments;
+    return getMOfromXY_h(j, i);
+}
+
+__global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<num_segments*num_segments){
+        int MOIndex = IndextoMOIndex_h(num_segments, i);
+        mortonMatrixRanks[MOIndex] = matrixRanks[i];
+    }
+}
+
+__global__ void copyTiles(int n, H2Opus_Real* toArray, H2Opus_Real* fromArray, int offset_1, int offset_2){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<n){
+        toArray[offset_1 + i] = fromArray[offset_2 + i];
+    }
+}
+
+__device__ uint32_t morton1(uint32_t x)
+{
+    x = x & 0x55555555;
+    x = (x | (x >> 1)) & 0x33333333;
+    x = (x | (x >> 2)) & 0x0F0F0F0F;
+    x = (x | (x >> 4)) & 0x00FF00FF;
+    x = (x | (x >> 8)) & 0x0000FFFF;
+    return x;
+}
+
+// morton2 - extract odd and even bits
+__global__ void fillActiveArrays(int num_segments, int* activeArrays, int* tmpArray){
+    int tmp=0;
+    for(int i=0; i<num_segments*num_segments; ++i){
+        int x = morton1(i);
+        int y = morton1(i >> 1);
+        if(x != y){
+            tmpArray[tmp++] = i;
+        }
+    }
+
+    int tmp2 = 0;
+    for(int i=0; i<tmp;){
+        if(tmpArray[i]%4==0){
+            for(int j=0; j<4; ++j){
+                activeArrays[tmp2++] = tmpArray[i+j];
+            }
+            i += 4;
+        }
+        else{
+            i += 2;
+        }
+    }
+    printf("active arrays\n");
+    for(unsigned int i=0; i<tmp2; ++i){
+        printf("%d ", activeArrays[i]);
+    }
+    printf("\n");
+}
+
+#endif
+
