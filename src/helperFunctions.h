@@ -112,12 +112,12 @@ void ColumnMajorToMorton(int num_segments, int maxSegmentSize, int k_sum, TLR_Ma
         printf("ranks[i]: %d\n", h_matrix_ranks[i]);
         assert(h_matrix_ranks[i] >= 0);
         if(h_matrix_ranks[i] > 0){
-            copyTiles<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i], mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
-            copyTiles<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i], mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            copyTiles<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            copyTiles<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
         }
     }
 
-    cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize,cudaMemcpyDeviceToDevice);
+    cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
 }
 
 // void MortonToColumnMajor(int num_segments, int maxSegmentSize, int k_sum, TLR_Matrix matrix, TLR_Matrix mortonMatrix){

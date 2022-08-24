@@ -117,20 +117,6 @@ __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segmen
         aux_offsets_sort[index] = offsets_sort[i];
         aux_offsets_sort[index + 1] = (offsets_sort[i+1] - offsets_sort[i] + 1)/2 + offsets_sort[i];
     }
-
-    // if(threadIdx.x==0 && blockIdx.x==0){
-    //     printf("new num segment: %d\n", num_segments*2);
-    //     printf("offsets sort\n");
-    //     for(unsigned int j=0; j<num_segments+1; ++j){
-    //         printf("%d ", offsets_sort[j]);
-    //     }
-    //     printf("\n");
-    //     printf(" newoffsets sort\n");
-    //     for(unsigned int j=0; j<num_segments*2+1; ++j){
-    //         printf("%d ", aux_offsets_sort[j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 
@@ -144,14 +130,6 @@ __global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int
             offsets_reduce[j*num_segments + i + 1] = offsets_sort[i + 1] + (n*j);
         }
     }
-
-    // if(threadIdx.x==0 && blockIdx.x==0){
-    //     printf(" newoffsets reduce\n");
-    //     for(unsigned int j=0; j<num_segments*dim+1; ++j){
-    //         printf("%d ", offsets_reduce[j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 __global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* dataset, int* values_in, H2Opus_Real* reduce_in){
@@ -159,14 +137,6 @@ __global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* dataset
     if(i<(long long)n*(long long)dim){
         reduce_in[i] = dataset[(long long)values_in[i - (i/n)*n] + (long long)(i/n)*n];
     }
-
-    // if(i==0){
-    //     printf("reduction array\n");
-    //     for(unsigned int j=0; j<n*dim; ++j){
-    //         printf("%lf ", reduce_in[j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2Opus_Real* reduce_min_out, H2Opus_Real* reduce_max_out, H2Opus_Real* span, int* span_offsets){
@@ -181,25 +151,6 @@ __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2O
     if(threadIdx.x==0 && blockIdx.x==0){
         span_offsets[num_segments] = num_segments*dim;
     }
-
-    // if(i==0){
-    //     printf("num segments %u\n", num_segments);
-    //     printf("spans\n");
-    //     for(unsigned int j=0;j<num_segments; ++j){
-    //         for(int k=0; k<dim;++k){
-    //             printf("%lf ", span[j*dim + k]);
-    //             printf("  %lf %lf      ", reduce_max_out[k*num_segments + j], reduce_min_out[k*num_segments + j]);
-    //         }
-    //         printf("\n");
-    //     }
-    //     printf("\n");
-
-        // printf("span offsets\n");
-        // for(unsigned int j=0;j<num_segments + 1; ++j){
-        //     printf("%d ", span_offsets[j]);
-        // }
-        // printf("\n");
-    // }
 }
 
 __global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
@@ -227,13 +178,6 @@ __global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray,
     if(i<last_index){
         bit_vector[i] = 0ULL;
     }
-    // if(threadIdx.x==0 && blockIdx.x==0){
-    //     printf("curr dim\n");
-    //     for(int j=0; j<num_segments; ++j){
-    //         printf("%d ", currDimArray[j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 __global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_in, int* currDimArray, int* values_in, H2Opus_Real* dataset){
@@ -249,25 +193,6 @@ __global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currDimArray, int* 
         int segment_index = output[i] - 1;
         keys_in[i] = dataset[(long long)currDimArray[segment_index]*n + (long long)values_in[i]];
     }
-    // if(i==0){
-    //     printf("fill keys in\n");
-    //     for(unsigned int j=0; j<n; ++j){
-    //         printf("%lf ", keys_in[j]);
-    //     }
-    //     printf("\n");
-    // }
-    // if(threadIdx.x==0 && blockIdx.x==0){
-    //     printf("output\n");
-    //     for(unsigned int j=0; j<n; ++j){
-    //         printf("%d ", output[j]);
-    //     }
-    // }
-    // if(threadIdx.x==0 && blockIdx.x==0){
-    //     printf("keys in\n");
-    //     for(unsigned int j=0; j<n; ++j){
-    //         printf("%lf ", keys_in[j]);
-    //     }
-    // }
 }
 
 __device__ H2Opus_Real getCorrelationLength(int dim){
@@ -357,26 +282,6 @@ __global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_R
         V_tiled[K_scan[blockIdx.y]*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] 
       = V[blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     }
-
-    // __syncthreads();
-    // if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
-    //     printf("U\n");
-    //     for(int i=0; i<maxSegmentSize; ++i){
-    //         for(int j=0; j<K[blockIdx.x*num_segments + blockIdx.y]; ++j){
-    //             printf("%lf ", U_tiled[j*maxSegmentSize + i]);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
-    // if(threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0){
-    //     printf("V\n");
-    //     for(int i=0; i<K[blockIdx.x*num_segments + blockIdx.y]; ++i){
-    //         for(int j=0; j<maxSegmentSize; ++j){
-    //             printf("%lf ", V_tiled[i*maxSegmentSize + j]);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
 }
 
 __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offsets_sort, int bucket_size){
@@ -775,7 +680,7 @@ __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d
     }
 }
 
-__global__ void fillARAArrays_mod(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_lda_batch, int* d_ldb_batch, int* ranks){
+__global__ void fillARAArrays_mod(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_lda_batch, int* d_ldb_batch){
     for(unsigned int i=0; i<batchCount; ++i){
         d_rows_batch[i] = max_rows*2;
         d_cols_batch[i] = max_rows*2;
@@ -817,30 +722,6 @@ __global__ void printARAOutput(H2Opus_Real* d_A, H2Opus_Real* d_B, int* k, int b
         printf("%d ", k[i]);
     }
     printf("\n");
-
-    // printf("d_A\n");
-    // for(unsigned int i=0; i<batchCount; ++i){
-    //     for(unsigned int j=0; j<max_rows; ++j){
-    //         for(unsigned int k=0; k<max_rank; ++k){
-    //             printf("%lf ", d_A[i*max_rows*max_rank + j*max_rank + k]);
-    //         }
-    //         printf("\n");
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\n");
-
-    // printf("d_B\n");
-    // for(unsigned int i=0; i<batchCount; ++i){
-    //     for(unsigned int j=0; j<max_rows; ++j){
-    //         for(unsigned int k=0; k<max_rank; ++k){
-    //             printf("%lf ", d_B[i*max_rows*max_rank + j*max_rank + k]);
-    //         }
-    //         printf("\n");
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\n");
 }
 
 __global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
@@ -915,7 +796,7 @@ __device__ uint32_t morton1(uint32_t x)
 }
 
 // morton2 - extract odd and even bits
-__global__ void fillActiveArrays(int num_segments, int* activeArrays, int* tmpArray){
+__global__ void fillActiveArrays(int num_segments, int* activeArrays, int* tmpArray, int* new_ranks, int* old_ranks){
     int tmp=0;
     for(int i=0; i<num_segments*num_segments; ++i){
         int x = morton1(i);
@@ -929,6 +810,7 @@ __global__ void fillActiveArrays(int num_segments, int* activeArrays, int* tmpAr
     for(int i=0; i<tmp;){
         if(tmpArray[i]%4==0){
             for(int j=0; j<4; ++j){
+                new_ranks[tmp2] = old_ranks[tmpArray[i+j]];
                 activeArrays[tmp2++] = tmpArray[i+j];
             }
             i += 4;
@@ -942,6 +824,78 @@ __global__ void fillActiveArrays(int num_segments, int* activeArrays, int* tmpAr
         printf("%d ", activeArrays[i]);
     }
     printf("\n");
+}
+
+__global__ void fillBitVector(int num_ops, int tile_size, int* new_ranks, int* old_ranks, int* bit_vector){
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < num_ops){
+        if(2*tile_size*(old_ranks[i*4] + old_ranks[i*4 + 1] + old_ranks[i*4 + 2] + old_ranks[i*4 + 3]) > 4*tile_size*new_ranks[i]){
+            bit_vector[i] = 1;
+        }
+        else{
+            bit_vector[i] = 0;
+        }
+    }
+}
+
+__global__ void fillNewLevel(int num_ops, int* bit_vector, int* bit_vector_scan, int* ranks_output, int* new_ranks, int* new_active_tiles){
+    int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i < num_ops){
+        if(bit_vector[i] == 1){
+            new_ranks[(i>0)?bit_vector_scan[i-1]:0] = ranks_output[i];
+            new_active_tiles[(i>0)?bit_vector_scan[i-1]:0] = 0;
+        }
+    }
+}
+
+__global__ void expandMortonMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix mortonMatrix){
+    if(blockIdx.x == blockIdx.y){
+        expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = mortonMatrix.diagonal[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
+    }
+    else{
+        int MOIndex = IndextoMOIndex_h(num_segments, blockIdx.x*num_segments + blockIdx.y);
+        H2Opus_Real sum = 0;
+        for(unsigned int i=0; i<mortonMatrix.blockRanks[MOIndex]; ++i){
+            sum += mortonMatrix.U[mortonMatrix.blockOffsets[MOIndex]*maxSegmentSize + i*maxSegmentSize + threadIdx.y]*mortonMatrix.V[mortonMatrix.blockOffsets[MOIndex]*maxSegmentSize + i*maxSegmentSize + threadIdx.x];
+        }
+        expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
+    }
+    // printf("%lf\n", expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]);
+}
+
+__global__ void expMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expMatrix, TLR_Matrix matrix){
+    if(blockIdx.x == blockIdx.y){
+        expMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = matrix.diagonal[blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
+    }
+    else{
+        H2Opus_Real sum = 0;
+        for(unsigned int i=0; i<matrix.blockRanks[blockIdx.x*num_segments + blockIdx.y]; ++i){
+            sum += matrix.U[matrix.blockOffsets[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + i*maxSegmentSize + threadIdx.y]*matrix.V[matrix.blockOffsets[blockIdx.x*num_segments + blockIdx.y]*maxSegmentSize + i*maxSegmentSize + threadIdx.x];
+        }
+        expMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
+    }
+    // printf("%lf\n", expMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]);
+}
+
+
+__global__ void errorInMortonMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* originalMatrix, H2Opus_Real* mortonMatrix, TLR_Matrix matrix){
+    if(blockIdx.x==blockIdx.y){
+        // printf("%lf %lf\n", matrix.diagonal[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y], mortonMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]);
+    }
+    else{
+        int diff = (blockIdx.y>blockIdx.x)?1:0;
+        printf("%lf  %lf\n", originalMatrix[blockIdx.x*(num_segments-1)*maxSegmentSize*maxSegmentSize + (blockIdx.y-diff)*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y], mortonMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]);
+    }
+}
+
+__global__ void errorInMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* originalMatrix, H2Opus_Real* expMatrix, TLR_Matrix matrix){
+    if(blockIdx.x==blockIdx.y){
+        // printf("%lf %lf\n", matrix.diagonal[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y], expMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]);
+    }
+    else{
+        int diff = (blockIdx.y>blockIdx.x)?1:0;
+        printf("%lf  %lf\n", originalMatrix[blockIdx.x*(num_segments-1)*maxSegmentSize*maxSegmentSize + (blockIdx.y-diff)*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y], expMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]);
+    }
 }
 
 #endif

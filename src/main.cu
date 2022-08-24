@@ -25,10 +25,7 @@
 #include <stdio.h>
 
 #define EXPAND_MATRIX 0
-#define DENSE_CALC 1
 #define BLOCK_SIZE 32
-#define PRINT_OUTPUT 0
-#define KBLAS_ARA 1
 using namespace std;
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -122,7 +119,6 @@ int main(int argc, char *argv[]){
     gpuErrchk(cudaMalloc((void**) &matrix.blockRanks, num_segments*num_segments*sizeof(int)));
     gpuErrchk(cudaMalloc((void**) &matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real)));
 
-    printf("ARA begins\n");
     magma_init();
 
     const int ARA_R = 10;
@@ -199,7 +195,7 @@ int main(int argc, char *argv[]){
 
     dim3 m_numThreadsPerBlock(min(32, (int)maxSegmentSize), min(32, (int)maxSegmentSize));
     dim3 m_numBlocks(1, num_segments);
-    
+
     for(unsigned int segment = 0; segment < num_segments; ++segment){
         generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(config.n, num_segments, maxSegmentSize, config.dim, d_values_in, d_input_matrix_segmented, d_dataset, d_offsets_sort, segment, matrix.diagonal);
         cudaDeviceSynchronize();
@@ -336,8 +332,6 @@ int main(int argc, char *argv[]){
     gpuErrchk(cudaMalloc((void**) &matrix.V, k_sum*maxSegmentSize*sizeof(H2Opus_Real)));
     gpuErrchk(cudaMalloc((void**) &matrix.blockOffsets, num_segments*num_segments*sizeof(int)));
 
-    // TODO: replace with a kernel to account for missing diagonal blocks
-    // gpuErrchk(cudaMemcpy(matrix.blockRanks, d_ranks, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToDevice));
     numThreadsPerBlock = 1024;
     numBlocks = ((num_segments-1)*num_segments + numThreadsPerBlock - 1)/numThreadsPerBlock;
     copyRanks<<<numBlocks, numThreadsPerBlock>>>(num_segments, maxSegmentSize, d_ranks, matrix.blockRanks);
@@ -384,6 +378,8 @@ int main(int argc, char *argv[]){
     cudaMalloc((void**) &mortonMatrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
     ColumnMajorToMorton(num_segments, maxSegmentSize, k_sum, matrix, mortonMatrix);
     gpuErrchk(cudaPeekAtLastError());
+    printf("k_sum %d\n", k_sum);
+
 
     const int num_ops = (num_segments/2)*(num_segments/2) - (num_segments/2);
 
@@ -399,7 +395,7 @@ int main(int argc, char *argv[]){
     gpuErrchk(cudaMalloc((void**) &d_B, num_ops*2*max_rows*2*max_rank*sizeof(H2Opus_Real)));
 
     gpuErrchk(cudaPeekAtLastError());
-    fillARAArrays_mod<<<1, 1>>>(num_ops, max_rows, max_cols, d_rows_batch, d_cols_batch, d_lda_batch, d_ldb_batch, mortonMatrix.blockRanks);
+    fillARAArrays_mod<<<1, 1>>>(num_ops, max_rows, max_cols, d_rows_batch, d_cols_batch, d_lda_batch, d_ldb_batch);
     gpuErrchk(cudaPeekAtLastError());
     printf("fillARAArrays_mod\n");
     generateArrayOfPointersT<H2Opus_Real>(d_A, d_A_ptrs, max_rows*max_cols*4, num_ops, 0);
@@ -418,7 +414,6 @@ int main(int argc, char *argv[]){
     int kblasrandstate_value = kblasInitRandState(kblas_handle_2, &rand_state_2, 1<<15, 0);
     printf("kblasinitrandstate: %d\n", kblasrandstate_value);
     gpuErrchk(cudaPeekAtLastError());
-    printf("num segments: %d\n", ((num_segments*num_segments)/4));
 
     kblasEnableMagma(kblas_handle_2);
     kblas_gesvj_batch_wsquery<H2Opus_Real>(kblas_handle_2, 2*max_rows, 2*max_cols, num_ops);
@@ -430,28 +425,59 @@ int main(int argc, char *argv[]){
 
     int* d_activeArrays;
     int* d_tmpArray;
-    gpuErrchk(cudaMalloc((void**) &d_activeArrays, (num_segments*num_segments)*(int)sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_tmpArray, (num_segments*num_segments)*(int)sizeof(int)));
-    fillActiveArrays<<<1, 1>>>(num_segments, d_activeArrays, d_tmpArray);
+    int* d_ranks_1;
+    gpuErrchk(cudaMalloc((void**) &d_ranks_1, num_ops*4*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_activeArrays, (num_segments*num_segments)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_tmpArray, (num_segments*num_segments)*sizeof(int)));
+    fillActiveArrays<<<1, 1>>>(num_segments, d_activeArrays, d_tmpArray, d_ranks_1, mortonMatrix.blockRanks);
     cudaFree(d_tmpArray);
 
     printf("num ops: %d\n", num_ops);
+    gpuErrchk(cudaPeekAtLastError());
 
-    #if 1
     int kblas_mod_ans = kblas_ara_batch_mod(kblas_handle_2, d_rows_batch, d_cols_batch, mortonMatrix.U, mortonMatrix.V, mortonMatrix.blockRanks, mortonMatrix.blockOffsets, d_activeArrays,
         d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks_output,
         config.tol, 2*max_rows, 2*max_cols, 2*max_rank, 32, ARA_R, rand_state_2, 0, ((num_segments/2)*(num_segments/2) - (num_segments/2))
     );
     printf("kblas mod ans : %d\n", kblas_mod_ans);
-    printf("finished kblas ara on MO matrix\n");
-
+    
     printK<<<1, 1>>>(d_ranks_output, num_ops);
-    #endif
-
     cudaDeviceSynchronize();
+    printK<<<1, 1>>>(mortonMatrix.blockRanks, num_segments*num_segments);
+    cudaDeviceSynchronize();
+    gpuErrchk(cudaPeekAtLastError());
+
+    #if 0
+    int* d_bit_vector;
+    int* d_bit_vector_scan;
+    gpuErrchk(cudaMalloc((void**) &d_bit_vector, num_ops*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_bit_vector_scan, num_ops*sizeof(int)));
+
+    numThreadsPerBlock = 1024;
+    numBlocks = (num_ops + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillBitVector<<<numBlocks, numThreadsPerBlock>>>(num_ops, 32, d_ranks_output, d_ranks_1, d_bit_vector);
+    cudaDeviceSynchronize();
+
+    d_temp_storage = NULL;
+    temp_storage_bytes = 0;
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_bit_vector, d_bit_vector_scan, num_ops);
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_bit_vector, d_bit_vector_scan, num_ops);
+    cudaDeviceSynchronize();
+    cudaFree(d_temp_storage);
+
+    int* d_new_ranks;
+    int* d_new_active_tiles;
+    cudaMalloc((void**) &d_new_ranks, num_ops*sizeof(int));
+    cudaMalloc((void**) &d_new_active_tiles, num_ops*sizeof(int));
+
+    numThreadsPerBlock = 1024;
+    numBlocks = (num_ops + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillNewLevel<<<numBlocks, numThreadsPerBlock>>>(num_ops, d_bit_vector, d_bit_vector_scan, d_ranks_output, d_new_ranks, d_new_active_tiles);
+    #endif 
+
     cudaEventRecord(stopCode);
     cudaEventSynchronize(stopCode);
-    float code_time = 0;
     float Code_time=0;
     cudaEventElapsedTime(&Code_time, startCode, stopCode);
     cudaEventDestroy(startCode);
