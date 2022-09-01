@@ -42,56 +42,32 @@ void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVIS
     unsigned int largest_segment_size = n;
 
     // TODO: fix memory allocated
-    
-    cudaError_t cudaErr = cudaMalloc((void**) &d_offsets_reduce, (long long)((max_num_segments*dim + 1)*(long long)sizeof(int)));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_keys_in, n*sizeof(H2Opus_Real));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_keys_out, n*sizeof(H2Opus_Real));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    
-    cudaErr = cudaMalloc((void**) &d_values_out, n*sizeof(int));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_curr_dim, (max_num_segments + 1)*sizeof(int));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_reduce_in, (long long)n*(long long)dim*(long long)sizeof(H2Opus_Real));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_reduce_min_out, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_reduce_max_out, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_span, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_span_offsets, (max_num_segments + 1)*sizeof(int));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-    cudaErr = cudaMalloc((void**) &d_span_reduce_out, (max_num_segments+1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
-    if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+    cudaMalloc((void**) &d_offsets_reduce, (long long)((max_num_segments*dim + 1)*(long long)sizeof(int)));
+    cudaMalloc((void**) &d_keys_in, n*sizeof(H2Opus_Real));    
+    cudaMalloc((void**) &d_keys_out, n*sizeof(H2Opus_Real));    
+    cudaMalloc((void**) &d_values_out, n*sizeof(int));    
+    cudaMalloc((void**) &d_curr_dim, (max_num_segments + 1)*sizeof(int));    
+    cudaMalloc((void**) &d_reduce_in, (long long)n*(long long)dim*(long long)sizeof(H2Opus_Real));    
+    cudaMalloc((void**) &d_reduce_min_out, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));    
+    cudaMalloc((void**) &d_reduce_max_out, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));    
+    cudaMalloc((void**) &d_span, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));    
+    cudaMalloc((void**) &d_span_offsets, (max_num_segments + 1)*sizeof(int));    
+    cudaMalloc((void**) &d_span_reduce_out, (max_num_segments+1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));    
 
     if(div_method == DIVIDE_IN_HALF){
-        cudaErr = cudaMalloc((void**) &d_bit_vector, (((max_num_segments+1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) *sizeof(uint64_t));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &d_popc_bit_vector, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &d_popc_scan, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &d_new_num_segments, sizeof(unsigned int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &d_workDone, sizeof(bool));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        new_num_segments = (unsigned int*)malloc(sizeof(unsigned int));
-    }
+        cudaMalloc((void**) &d_bit_vector, (((max_num_segments+1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8)) *sizeof(uint64_t));
+        cudaMalloc((void**) &d_popc_bit_vector, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));
+        cudaMalloc((void**) &d_popc_scan, (((max_num_segments + 1) + sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8))*sizeof(short int));        
+        cudaMalloc((void**) &d_new_num_segments, sizeof(unsigned int));        
+        cudaMalloc((void**) &d_workDone, sizeof(bool));        
+        new_num_segments = (unsigned int*)malloc(sizeof(unsigned int));    }
 
     if(div_method != POWER_OF_TWO_ON_LEFT){
-        cudaErr = cudaMalloc((void**) &d_aux_offsets_sort, (max_num_segments + 1) * sizeof(int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &A, (max_num_segments + 1)*sizeof(int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &B, n*sizeof(int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &d_bin_search_output, n*sizeof(int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
-        cudaErr = cudaMalloc((void**) &d_input_search, n*sizeof(int));
-        if ( cudaErr != cudaSuccess ){ printf("CUDA Error: %s\n", cudaGetErrorString(cudaErr)); }
+        cudaMalloc((void**) &d_aux_offsets_sort, (max_num_segments + 1) * sizeof(int));        
+        cudaMalloc((void**) &A, (max_num_segments + 1)*sizeof(int));        
+        cudaMalloc((void**) &B, n*sizeof(int));        
+        cudaMalloc((void**) &d_bin_search_output, n*sizeof(int));        
+        cudaMalloc((void**) &d_input_search, n*sizeof(int));        
     }
 
     unsigned int numThreadsPerBlock = 1024;
@@ -224,7 +200,6 @@ void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVIS
         d_values_out = d_temp;
         ++iteration;
 
-        // TODO: fix cuda-memcheck bug in divide_in_half
         if(div_method == DIVIDE_IN_HALF){
             numThreadsPerBlock = 1024;
             numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
@@ -295,20 +270,7 @@ void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVIS
 
     cudaDeviceSynchronize();
 
-    #if 0
-    int *index_map = (int*)malloc(n*sizeof(int));
-    cudaMemcpy(index_map, d_values_in, n*sizeof(int), cudaMemcpyDeviceToHost);
-    printf("index max\n");
-    for(int i=0; i<n; ++i){
-        printf("%d ", index_map[i]);
-    }
-    printf("\n");
-    free(index_map);
-    #endif
-
     if(div_method == POWER_OF_TWO_ON_LEFT){
-        printf("num segments :%d\n", num_segments);
-        printf("segment size :%d\n", segment_size);
         fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
         cudaDeviceSynchronize();
     }

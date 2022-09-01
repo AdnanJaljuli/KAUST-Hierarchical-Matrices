@@ -109,7 +109,6 @@ void ColumnMajorToMorton(int num_segments, int maxSegmentSize, int k_sum, TLR_Ma
 
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (h_matrix_ranks[i] + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        printf("ranks[i]: %d\n", h_matrix_ranks[i]);
         assert(h_matrix_ranks[i] >= 0);
         if(h_matrix_ranks[i] > 0){
             copyTiles<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
