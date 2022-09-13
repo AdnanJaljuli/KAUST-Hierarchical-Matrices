@@ -147,7 +147,8 @@ int main(int argc, char *argv[]){
     gpuErrchk(cudaMalloc((void**) &d_M_ptrs, num_segments*sizeof(H2Opus_Real*)));
     gpuErrchk(cudaMalloc((void**) &d_A_ptrs, num_segments*sizeof(H2Opus_Real*)));
     gpuErrchk(cudaMalloc((void**) &d_B_ptrs, num_segments*sizeof(H2Opus_Real*)));
-
+    gpuErrchk(cudaPeekAtLastError());
+    
     numThreadsPerBlock = 1024;
     numBlocks = ((num_segments-1) + numThreadsPerBlock - 1)/numThreadsPerBlock;
     // TODO: parallelize
@@ -237,16 +238,20 @@ int main(int argc, char *argv[]){
         cudaDeviceSynchronize();
         cudaFree(d_temp_storage);
 
+        printK<<<1, 1>>>(d_ranks + segment*(num_segments-1), num_segments - 1);
+
         int* d_totalMem;
         cudaMalloc((void**) &d_totalMem, sizeof(int));
         getTotalMem<<<1, 1>>> (d_totalMem, d_ranks + segment*(num_segments-1), d_scan_K_segmented, num_segments-1);
         cudaDeviceSynchronize();
         cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost);
         cudaFree(d_totalMem);
+        printf("total mem: %d\n", *totalMem);
 
         gpuErrchk(cudaMalloc((void**) &d_U_tiled_temp[segment], max_segment_size*(*totalMem)*sizeof(H2Opus_Real)));
         gpuErrchk(cudaMalloc((void**) &d_V_tiled_temp[segment], max_segment_size*(*totalMem)*sizeof(H2Opus_Real)));
 
+        // TODO: optimize thread allocation here
         numThreadsPerBlock = max_segment_size;
         numBlocks = num_segments-1;
         copyTiles<<<numBlocks, numThreadsPerBlock>>>(num_segments-1, max_segment_size, d_ranks + segment*(num_segments-1), d_scan_K_segmented, d_U_tiled_temp[segment], d_A, d_V_tiled_temp[segment], d_B);
@@ -299,6 +304,9 @@ int main(int argc, char *argv[]){
     cudaFree(d_temp_storage);
     gpuErrchk(cudaPeekAtLastError());
 
+    printK<<<1, 1>>>(matrix.blockRanks, num_segments*num_segments);
+    printK<<<1, 1>>>(matrix.blockOffsets, num_segments*num_segments);
+
     int* h_scan_K = (int*)malloc(num_segments*num_segments*sizeof(int));
     gpuErrchk(cudaMemcpy(h_scan_K, matrix.blockOffsets, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaPeekAtLastError());
@@ -323,12 +331,12 @@ int main(int argc, char *argv[]){
     gpuErrchk(cudaPeekAtLastError());
 
     // TODO: check error in matrix against epxanded matrix
-    #if 0
-    H2Opus_Real* d_expandedMatrix;
-    cudaMalloc((void**) &d_expandedMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
+    #if 1
+    H2Opus_Real* d_expandedCMMatrix;
+    cudaMalloc((void**) &d_expandedCMMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
     dim3 mm_numBlocks(num_segments, num_segments);
     dim3 mm_numThreadsPerBlock(32, 32);
-    expMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMatrix, matrix);
+    expandCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, matrix);
     H2Opus_Real* d_error;
     cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
     H2Opus_Real* h_error = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
@@ -341,13 +349,13 @@ int main(int argc, char *argv[]){
     H2Opus_Real* h_tmp = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
     *h_tmp = 0;
     cudaMemcpy(d_tmp, h_tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    errorInMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
+    errorInCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedCMMatrix, d_error, d_tmp);
     cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     printf("error: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
     #endif
     gpuErrchk(cudaPeekAtLastError());
-    // TODO: make all of the above its own function
+    // TODO: make createLRMatrix a function
 
     TLR_Matrix mortonMatrix;
     cudaMalloc((void**) &mortonMatrix.U, k_sum*max_segment_size*sizeof(H2Opus_Real));
@@ -357,6 +365,10 @@ int main(int argc, char *argv[]){
     cudaMalloc((void**) &mortonMatrix.diagonal, num_segments*max_segment_size*max_segment_size*sizeof(H2Opus_Real));
     ColumnMajorToMorton(num_segments, max_segment_size, k_sum, matrix, mortonMatrix);
     gpuErrchk(cudaPeekAtLastError());
+
+    #if EXPAND_MATRIX
+    
+    #endif
 
     const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size);
     printf("num_levels: %d\n", num_levels);
@@ -385,7 +397,10 @@ int main(int argc, char *argv[]){
         calcNumOps<<<numBlocks, numThreadsPerBlock>>> (num_available_tiles, d_num_ops, HMatrixAvailableTiles[level]);        
         cudaMemcpy(h_num_ops, d_num_ops, sizeof(int), cudaMemcpyDeviceToHost);
         int num_ops = *h_num_ops;
-        printf("num ops: %d\n", num_ops);
+        printf("level: %d   num ops: %d\n", level, num_ops);
+
+        free(h_num_ops);
+        cudaFree(d_num_ops);
 
         int* d_activeTiles;
         int* d_activeRanks;
@@ -401,7 +416,7 @@ int main(int argc, char *argv[]){
         max_rows <<= 1;
         max_cols <<= 1;
         max_rank <<= 1;
-        tolerance *= 2;
+        // tolerance *= 2;
         printf("max rows: %d\n", max_rows);
         printf("tolerance: %f\n", tolerance);
 
@@ -435,12 +450,12 @@ int main(int argc, char *argv[]){
         kblasAllocateWorkspace(kblas_handle_2);
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
-
         // TODO: optimize max_cols. max_cols shouldn't be equal to max_rows, instead, its values should depend on the ranks of the tiles
-        int lr_ARA_return = lr_kblas_ara_batch(kblas_handle_2, d_rows_batch, d_cols_batch, mortonMatrix.U, mortonMatrix.V, mortonMatrix.blockRanks, mortonMatrix.blockOffsets, d_activeTiles,
+        int lr_ARA_return = lr_kblas_ara_batch(kblas_handle_2, d_rows_batch, d_cols_batch, mortonMatrix.U, mortonMatrix.V, d_activeRanks, mortonMatrix.blockOffsets, d_activeTiles,
             d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks,
             tolerance, max_rows, max_cols, max_rank, 32, ARA_R, rand_state_2, 0, num_ops
         );
+        cudaDeviceSynchronize();
         assert(lr_ARA_return == 1);
         gpuErrchk(cudaPeekAtLastError());
 
@@ -450,7 +465,9 @@ int main(int argc, char *argv[]){
         cudaMalloc((void**) &expandedMatrix, num_ops*max_rows*max_cols*sizeof(H2Opus_Real));
         dim3 hm_numBlocks(2, 2*num_ops);
         dim3 hm_numThreadsPerBlock(32, 32);
+        // expandHMatrixLevel<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_ops, 64, 64, d_A_ptrs, d_B_ptrs, d_ranks, expandedMatrix);
         expandHMatrixLevel<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_ops, 64, 64, d_A, d_B, d_ranks, expandedMatrix);
+
         H2Opus_Real* d_error;
         cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
         H2Opus_Real* h_error = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
@@ -465,10 +482,11 @@ int main(int argc, char *argv[]){
         cudaDeviceSynchronize();
         cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-        printf("h matrix error: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
-        #endif
+        // printf("h matrix error: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
 
         printK<<<1, 1>>>(d_ranks, num_ops);
+        #endif
+        break;
 
         // TODO: optimize the bit vector: use an array of longs instead.
         int* d_old_bit_vector;

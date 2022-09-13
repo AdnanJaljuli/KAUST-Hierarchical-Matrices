@@ -72,15 +72,15 @@ void printKs(int* K, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_
     fclose(fp); //Don't forget to close the file when finished
 }
 
-void ColumnMajorToMorton(int num_segments, int maxSegmentSize, int k_sum, TLR_Matrix matrix, TLR_Matrix mortonMatrix){
+void ColumnMajorToMorton(int num_segments, int maxSegmentSize, int k_sum, TLR_Matrix &matrix, TLR_Matrix &mortonMatrix){
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (num_segments*num_segments + 1024 - 1)/1024;
     copyCMRanksToMORanks<<<numBlocks, numThreadsPerBlock>>>(num_segments, maxSegmentSize, matrix.blockRanks, mortonMatrix.blockRanks);
     cudaDeviceSynchronize();
 
-    // printK<<<1, 1>>>(matrix.blockRanks, num_segments*num_segments);
-    // printK<<<1, 1>>>(mortonMatrix.blockRanks, num_segments*num_segments);
+    printK<<<1, 1>>>(matrix.blockRanks, num_segments*num_segments);
+    printK<<<1, 1>>>(mortonMatrix.blockRanks, num_segments*num_segments);
 
     // scan mortonMatrix ranks
     void* d_temp_storage = NULL;
@@ -108,11 +108,12 @@ void ColumnMajorToMorton(int num_segments, int maxSegmentSize, int k_sum, TLR_Ma
         unsigned int y = i/num_segments;
 
         unsigned int numThreadsPerBlock = 1024;
-        unsigned int numBlocks = (h_matrix_ranks[i] + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        // unsigned int numBlocks = (h_matrix_ranks[i] + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
         if(h_matrix_ranks[i] > 0){
-            copyTiles<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
-            copyTiles<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            copyTilestoMO<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            copyTilestoMO<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
         }
     }
 
