@@ -353,8 +353,8 @@ __global__ void printOffsetsSort(int num_segments, int* offsets_sort){
     printf("\n");
 }
 
-__global__ void getTotalMem(int* totalMem, int* K, int* scan_K, int num_segments){
-    *totalMem = scan_K[num_segments - 1] + K[num_segments - 1];
+__global__ void getTotalMem(uint64_t* totalMem, int* K, int* scan_K, int num_segments){
+    *totalMem = (uint64_t)scan_K[num_segments - 1] + (uint64_t)K[num_segments - 1];
 }
 
 __global__ void expandMatrix(int num_segments, int max_segment_size, int* K, int* scan_K, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* expMatrix){
@@ -847,7 +847,7 @@ __global__ void fillNewLevel(int num_ops, int* bit_vector, int* bit_vector_scan,
     }
 }
 
-__global__ void expandMortonMatrix(int num_segments, int max_segment_size, H2Opus_Real* expandedMatrix, TLR_Matrix mortonMatrix){
+__global__ void expandMOMatrix(int num_segments, int max_segment_size, H2Opus_Real* expandedMatrix, TLR_Matrix mortonMatrix){
     if(blockIdx.x == blockIdx.y){
         expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y] = mortonMatrix.diagonal[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
     }
@@ -874,14 +874,17 @@ __global__ void expandCMMatrix(int num_segments, int max_segment_size, H2Opus_Re
     }
 }
 
-__global__ void errorInMortonMatrix(int num_segments, int max_segment_size, H2Opus_Real* originalMatrix, H2Opus_Real* mortonMatrix, TLR_Matrix matrix){
-    if(blockIdx.x==blockIdx.y){
-        // printf("%lf %lf\n", matrix.diagonal[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y], mortonMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y]);
-    }
-    else{
-        int diff = (blockIdx.y>blockIdx.x)?1:0;
-        printf("%lf  %lf\n", originalMatrix[blockIdx.x*(num_segments-1)*max_segment_size*max_segment_size + (blockIdx.y-diff)*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y], mortonMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y]);
-    }
+__global__ void errorInMOMatrix(int num_segments, int max_segment_size, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
+    H2Opus_Real x = denseMatrix[(blockIdx.x*max_segment_size + threadIdx.x)*max_segment_size*num_segments + blockIdx.y*max_segment_size + threadIdx.y];
+    H2Opus_Real y = expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+    atomicAdd(tmp, x*x);
+    atomicAdd(error, (x-y)*(x-y));
+}
+
+__global__ void compareMOwithCM(int num_segments, int max_segment_size, H2Opus_Real* expandedCMMatrix, H2Opus_Real* expandedMOMatrix){
+    H2Opus_Real x = expandedMOMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+    H2Opus_Real y = expandedCMMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+    assert(x == y);
 }
 
 __global__ void errorInCMMatrix(int num_segments, int max_segment_size, H2Opus_Real* originalMatrix, H2Opus_Real* expMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
@@ -955,7 +958,7 @@ __global__ void errorInHMatrix(int num_segments, int max_segment_size, int num_o
 
     H2Opus_Real x = d_denseMatrix[(col + i*max_cols)*num_segments*max_segment_size + j*max_rows + row];
     H2Opus_Real y = expandedMatrix[block*max_rows*max_cols + col*max_rows + row];
-    printf("%d: %lf %lf        %d: %d %d\n", blockIdx.y/2, x, y, MOIndex, i, j);
+    // printf("%d: %lf %lf        %d: %d %d\n", blockIdx.y/2, x, y, MOIndex, i, j);
     atomicAdd(d_tmp, x*x);
     atomicAdd(d_error, (x-y)*(x-y));
 }

@@ -72,7 +72,7 @@ void printKs(int* K, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_
     fclose(fp); //Don't forget to close the file when finished
 }
 
-void ColumnMajorToMorton(int num_segments, int maxSegmentSize, int k_sum, TLR_Matrix &matrix, TLR_Matrix &mortonMatrix){
+void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix &matrix, TLR_Matrix &mortonMatrix){
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (num_segments*num_segments + 1024 - 1)/1024;
