@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <string.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #define EXPAND_MATRIX 1
 #define BLOCK_SIZE 32
@@ -183,7 +184,7 @@ int main(int argc, char *argv[]){
 
     H2Opus_Real* d_denseMatrix;
     #if EXPAND_MATRIX
-    cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
     #endif
 
     dim3 m_numThreadsPerBlock(min(32, (int)max_segment_size), min(32, (int)max_segment_size));
@@ -199,7 +200,7 @@ int main(int argc, char *argv[]){
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
 
-        uint64_t* totalMem = (uint64_t*)malloc(sizeof(uint64_t));
+        
         generateArrayOfPointersT<H2Opus_Real>(d_input_matrix_segmented, d_M_ptrs, max_rows*max_cols, num_segments-1, 0);
         gpuErrchk(cudaPeekAtLastError());
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_A_ptrs, max_rows*max_cols, num_segments-1, 0);
@@ -240,14 +241,14 @@ int main(int argc, char *argv[]){
 
         printK<<<1, 1>>>(d_ranks + segment*(num_segments-1), num_segments - 1);
 
+        uint64_t* totalMem = (uint64_t*)malloc(sizeof(uint64_t));
         uint64_t* d_totalMem;
         cudaMalloc((void**) &d_totalMem, sizeof(uint64_t));
         getTotalMem<<<1, 1>>> (d_totalMem, d_ranks + segment*(num_segments-1), d_scan_K_segmented, num_segments-1);
         cudaDeviceSynchronize();
-        cudaMemcpy(totalMem, d_totalMem, sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(totalMem, d_totalMem, sizeof(uint64_t), cudaMemcpyDeviceToHost);
         cudaFree(d_totalMem);
-        printf("total mem: %d\n", *totalMem);
-
+        printf("total mem: %"PRIu64"\n", *totalMem);
         gpuErrchk(cudaMalloc((void**) &d_U_tiled_temp[segment], max_segment_size*(*totalMem)*(uint64_t)sizeof(H2Opus_Real)));
         gpuErrchk(cudaMalloc((void**) &d_V_tiled_temp[segment], max_segment_size*(*totalMem)*(uint64_t)sizeof(H2Opus_Real)));
 
@@ -330,10 +331,47 @@ int main(int argc, char *argv[]){
     free(d_V_tiled_temp);
     gpuErrchk(cudaPeekAtLastError());
 
+    #if 1
+    H2Opus_Real *h_Us, *h_Vs, *h_diagonal, *h_ranks, *h_offsets;
+    H2Opus_Real *h_denseMatrix;
+    h_Us = (H2Opus_Real*)malloc(k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    h_Vs = (H2Opus_Real*)malloc(k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    h_diagonal = (H2Opus_Real*)malloc(num_segments*max_segment_size*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    h_ranks = (H2Opus_Real*)malloc(num_segments*num_segments*(uint64_t)sizeof(int));
+    h_offsets = (H2Opus_Real*)malloc(num_segments*num_segments*(uint64_t)sizeof(int));
+    h_denseMatrix = (H2Opus_Real*)malloc(num_segments*max_segment_size*num_segments*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+
+    cudaMemcpy(h_Us, matrix.U, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_Vs, matrix.V, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_diagonal, matrix.diagonal, num_segments*max_segment_size*max_segment_size*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_ranks, matrix.blockRanks, num_segments*num_segments*(uint64_t)sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_offsets, matrix.blockOffsets, num_segments*num_segments*(uint64_t)sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_denseMatrix, d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    cudaDeviceReset();
+    gpuErrchk(cudaPeekAtLastError());
+
+    cudaMalloc((void**) &matrix.U, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &matrix.V, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &matrix.blockOffsets, num_segments*num_segments*(uint64_t)sizeof(int));
+    cudaMalloc((void**) &matrix.blockRanks, num_segments*num_segments*(uint64_t)sizeof(int));
+    cudaMalloc((void**) &matrix.diagonal, num_segments*max_segment_size*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
+    gpuErrchk(cudaPeekAtLastError());
+
+    cudaMemcpy(matrix.U, h_Us, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    cudaMemcpy(matrix.V, h_Vs, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    cudaMemcpy(matrix.diagonal, h_diagonal, num_segments*max_segment_size*max_segment_size*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    cudaMemcpy(matrix.blockRanks, h_ranks, num_segments*num_segments*(uint64_t)sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(matrix.blockOffsets, h_offsets, num_segments*num_segments*(uint64_t)sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_denseMatrix, h_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    gpuErrchk(cudaPeekAtLastError());
+    #endif
+
     // TODO: check error in matrix against epxanded matrix
     #if EXPAND_MATRIX
     H2Opus_Real* d_expandedCMMatrix;
-    cudaMalloc((void**) &d_expandedCMMatrix, num_segments*max_segment_size*num_segments*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_expandedCMMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
     dim3 mm_numBlocks(num_segments, num_segments);
     dim3 mm_numThreadsPerBlock(32, 32);
     expandCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, matrix);
@@ -377,7 +415,7 @@ int main(int argc, char *argv[]){
 
     #if EXPAND_MATRIX
     H2Opus_Real* d_expandedMOMatrix;
-    cudaMalloc((void**) &d_expandedMOMatrix, num_segments*max_segment_size*num_segments*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_expandedMOMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
     expandMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMOMatrix, mortonMatrix);
     gpuErrchk(cudaPeekAtLastError());
 
@@ -389,6 +427,7 @@ int main(int argc, char *argv[]){
     h_tmp = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
     *h_tmp = 0;
     cudaMemcpy(d_tmp, h_tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+    gpuErrchk(cudaPeekAtLastError());
 
     errorInMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMOMatrix, d_error, d_tmp);
     cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
@@ -400,9 +439,9 @@ int main(int argc, char *argv[]){
     cudaFree(d_error);
 
     compareMOwithCM<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, d_expandedMOMatrix);
-    cudaDeviceSynchronize();
     cudaFree(d_expandedCMMatrix);
     cudaFree(d_expandedMOMatrix);
+    gpuErrchk(cudaPeekAtLastError());
     #endif
 
     const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size);
@@ -428,7 +467,7 @@ int main(int argc, char *argv[]){
         cudaMemcpy(d_num_ops, h_num_ops, sizeof(int), cudaMemcpyHostToDevice);
         numThreadsPerBlock = 1024;
         numBlocks = (num_available_tiles + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        
+
         // TODO: instead of using atmoicAdds, let each thread write to a bit vector and then do a reduce
         calcNumOps<<<numBlocks, numThreadsPerBlock>>> (num_available_tiles, d_num_ops, HMatrixAvailableTiles[level]);        
         cudaMemcpy(h_num_ops, d_num_ops, sizeof(int), cudaMemcpyDeviceToHost);
@@ -520,7 +559,7 @@ int main(int argc, char *argv[]){
         cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
         printf("h matrix error: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
 
-        printK<<<1, 1>>>(d_ranks, num_ops);
+        // printK<<<1, 1>>>(d_ranks, num_ops);
         #endif
         break;
 
@@ -600,14 +639,14 @@ int main(int argc, char *argv[]){
         break;
     }
     #endif
-    cudaEventRecord(stopCode);
-    cudaEventSynchronize(stopCode);
-    float Code_time=0;
-    cudaEventElapsedTime(&Code_time, startCode, stopCode);
-    cudaEventDestroy(startCode);
-    cudaEventDestroy(stopCode);
-    printf("total time: %f\n", Code_time);
-    timer_arr[11] = Code_time;
-    printCountersInFile(timer_arr);
-    free(timer_arr);
+    // cudaEventRecord(stopCode);
+    // cudaEventSynchronize(stopCode);
+    // float Code_time=0;
+    // cudaEventElapsedTime(&Code_time, startCode, stopCode);
+    // cudaEventDestroy(startCode);
+    // cudaEventDestroy(stopCode);
+    // printf("total time: %f\n", Code_time);
+    // timer_arr[11] = Code_time;
+    // printCountersInFile(timer_arr);
+    // free(timer_arr);
 }
