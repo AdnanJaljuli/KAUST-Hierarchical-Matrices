@@ -439,8 +439,8 @@ int main(int argc, char *argv[]){
     cudaFree(d_error);
 
     compareMOwithCM<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, d_expandedMOMatrix);
-    cudaFree(d_expandedCMMatrix);
-    cudaFree(d_expandedMOMatrix);
+    // cudaFree(d_expandedCMMatrix);
+    // cudaFree(d_expandedMOMatrix);
     gpuErrchk(cudaPeekAtLastError());
     #endif
 
@@ -460,8 +460,11 @@ int main(int argc, char *argv[]){
 
     #if 1
     for(unsigned int level = 0; level < (num_levels - 1); ++level){
+        // TODO: set cudaMalloc and cudaFrees to outside the loop
+        // TODO: use cudaMemSet to initialize num_ops to 0
         int* d_num_ops;
         cudaMalloc((void**) &d_num_ops, sizeof(int));
+        // TODO: no need to dynamically allocate h_num_ops. just pass the reference.
         int* h_num_ops = (int*)malloc(sizeof(int));
         *h_num_ops = 0;
         cudaMemcpy(d_num_ops, h_num_ops, sizeof(int), cudaMemcpyHostToDevice);
@@ -477,6 +480,7 @@ int main(int argc, char *argv[]){
         free(h_num_ops);
         cudaFree(d_num_ops);
 
+        // TODO: rename available tiles to existing tiles
         int* d_activeTiles;
         int* d_activeRanks;
         cudaMalloc((void**) &d_activeTiles, 4*num_ops*sizeof(int));
@@ -495,6 +499,7 @@ int main(int argc, char *argv[]){
         printf("max rows: %d\n", max_rows);
         printf("tolerance: %f\n", tolerance);
 
+        // TODO: find a tight upper limit and malloc and free before and after the loop
         gpuErrchk(cudaMalloc((void**) &d_ranks, num_ops*sizeof(int)));
         gpuErrchk(cudaMalloc((void**) &d_rows_batch, num_ops*sizeof(int)));
         gpuErrchk(cudaMalloc((void**) &d_cols_batch, num_ops*sizeof(int)));
