@@ -67,7 +67,7 @@ int main(int argc, char *argv[]){
     H2Opus_Real *d_dataset;
     gpuErrchk(cudaMalloc((void**) &d_dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real)));
     unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = (config.n+numThreadsPerBlock-1)/numThreadsPerBlock;
+    unsigned int numBlocks = (config.n + numThreadsPerBlock - 1)/numThreadsPerBlock;
     generateDataset<<<numBlocks, numThreadsPerBlock>>> (config.n, config.dim, d_dataset);
     cudaDeviceSynchronize();
 
@@ -100,16 +100,11 @@ int main(int argc, char *argv[]){
     cudaEventDestroy(stopKDtree);
 
     uint64_t max_segment_size = config.bucket_size;
-    #if 0
-    if(config.div_method != POWER_OF_TWO_ON_LEFT){
-        max_segment_size = getMaxSegmentSize(config.n, config.bucket_size).first;
-    } else {
-        max_segment_size = config.bucket_size;
-    }
-    #endif
     printf("max segment size: %lu\n", max_segment_size);
     printf("num segments: %lu\n", num_segments);
-
+    TLR_Matrix matrix;
+    // _______________________________________________________________________________________________________
+    // _________________________________________________begin_________________________________________________
     H2Opus_Real* d_input_matrix_segmented;
 
     gpuErrchk(cudaMalloc((void**) &d_input_matrix_segmented, max_segment_size*max_segment_size*num_segments*(uint64_t)sizeof(H2Opus_Real)));
@@ -120,7 +115,6 @@ int main(int argc, char *argv[]){
     H2Opus_Real** d_U_tiled_temp = (H2Opus_Real**)malloc(num_segments*sizeof(H2Opus_Real*));
     H2Opus_Real** d_V_tiled_temp = (H2Opus_Real**)malloc(num_segments*sizeof(H2Opus_Real*));
 
-    TLR_Matrix matrix;
     gpuErrchk(cudaMalloc((void**) &matrix.blockRanks, num_segments*num_segments*sizeof(int)));
     gpuErrchk(cudaMalloc((void**) &matrix.diagonal, num_segments*max_segment_size*max_segment_size*sizeof(H2Opus_Real)));
 
@@ -137,17 +131,17 @@ int main(int argc, char *argv[]){
     H2Opus_Real** d_M_ptrs, **d_A_ptrs, **d_B_ptrs;
 
     // TODO: fix memory allocation. Change num_segments to num_segments-1
-    gpuErrchk(cudaMalloc((void**) &d_rows_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_cols_batch, num_segments*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_rows_batch, (num_segments-1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_cols_batch, (num_segments-1)*sizeof(int)));
     gpuErrchk(cudaMalloc((void**) &d_ranks, (num_segments-1)*num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_ldm_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_lda_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_ldb_batch, num_segments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_A, num_segments*max_rows*max_rank*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_B, num_segments*max_rows*max_rank*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_M_ptrs, num_segments*sizeof(H2Opus_Real*)));
-    gpuErrchk(cudaMalloc((void**) &d_A_ptrs, num_segments*sizeof(H2Opus_Real*)));
-    gpuErrchk(cudaMalloc((void**) &d_B_ptrs, num_segments*sizeof(H2Opus_Real*)));
+    gpuErrchk(cudaMalloc((void**) &d_ldm_batch, (num_segments-1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_lda_batch, (num_segments-1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_ldb_batch, (num_segments-1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_A, (num_segments-1)*max_rows*max_rank*sizeof(H2Opus_Real)));
+    gpuErrchk(cudaMalloc((void**) &d_B, (num_segments-1)*max_rows*max_rank*sizeof(H2Opus_Real)));
+    gpuErrchk(cudaMalloc((void**) &d_M_ptrs, (num_segments-1)*sizeof(H2Opus_Real*)));
+    gpuErrchk(cudaMalloc((void**) &d_A_ptrs, (num_segments-1)*sizeof(H2Opus_Real*)));
+    gpuErrchk(cudaMalloc((void**) &d_B_ptrs, (num_segments-1)*sizeof(H2Opus_Real*)));
     gpuErrchk(cudaPeekAtLastError());
     
     numThreadsPerBlock = 1024;
@@ -330,8 +324,10 @@ int main(int argc, char *argv[]){
     free(d_U_tiled_temp);
     free(d_V_tiled_temp);
     gpuErrchk(cudaPeekAtLastError());
+    // _________________________________________________end_________________________________________________
+    // _____________________________________________________________________________________________________    
 
-    #if 1
+    #if 0
     H2Opus_Real *h_Us, *h_Vs, *h_diagonal, *h_ranks, *h_offsets;
     H2Opus_Real *h_denseMatrix;
     h_Us = (H2Opus_Real*)malloc(k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
