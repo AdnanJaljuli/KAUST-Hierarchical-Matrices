@@ -897,7 +897,6 @@ __global__ void errorInCMMatrix(int num_segments, int max_segment_size, H2Opus_R
         int diff = (blockIdx.y > blockIdx.x) ? 1 : 0;
         H2Opus_Real x = originalMatrix[(blockIdx.x*max_segment_size + threadIdx.x)*max_segment_size*num_segments + blockIdx.y*max_segment_size + threadIdx.y];
         H2Opus_Real y = expMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-        printf("%lf   %lf\n", x, y);
         atomicAdd(tmp, x*x);
         atomicAdd(error, (x-y)*(x-y));
     }
@@ -961,7 +960,6 @@ __global__ void errorInHMatrix(int num_segments, int max_segment_size, int num_o
 
     H2Opus_Real x = d_denseMatrix[(col + i*max_cols)*num_segments*max_segment_size + j*max_rows + row];
     H2Opus_Real y = expandedMatrix[block*max_rows*max_cols + col*max_rows + row];
-    printf("%d: %lf %lf        %d: %d %d\n", blockIdx.y/2, x, y, MOIndex, i, j);
     atomicAdd(d_tmp, x*x);
     atomicAdd(d_error, (x-y)*(x-y));
 }

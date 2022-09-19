@@ -118,13 +118,20 @@ int main(int argc, char *argv[]){
     H2Opus_Real *d_A, *d_B;
     H2Opus_Real **d_A_ptrs, **d_B_ptrs;
 
-    cudaMalloc((void**) &HMatrixRanks[num_levels - 1], num_existing_tiles*sizeof(int));
-    cudaMalloc((void**) &HMatrixExistingTiles[num_levels - 1], num_existing_tiles*sizeof(int));
+    cudaMalloc((void**) &HMatrixRanks[num_levels - 2], num_existing_tiles*sizeof(int));
+    cudaMalloc((void**) &HMatrixExistingTiles[num_levels - 2], num_existing_tiles*sizeof(int));
 
     // TODO: parallelize
-    fillFirstLevelExistingArrays<<<1, 1>>>(num_segments, HMatrixExistingTiles[0], HMatrixRanks[0], mortonMatrix.blockRanks);
+    fillFirstLevelExistingArrays<<<1, 1>>>(num_segments, HMatrixExistingTiles[num_levels - 2], HMatrixRanks[num_levels - 2], mortonMatrix.blockRanks);
     unsigned int tile_size = config.bucket_size;
     bool stop = false;
+
+    H2Opus_Real h_error;
+    H2Opus_Real h_tmp;
+    H2Opus_Real* d_error;
+    H2Opus_Real* d_tmp;
+    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
 
     #if 1
     for(unsigned int level = num_levels - 1; level > 0; --level){
@@ -138,7 +145,7 @@ int main(int argc, char *argv[]){
         numThreadsPerBlock = 1024;
         numBlocks = (num_existing_tiles + numThreadsPerBlock - 1)/numThreadsPerBlock;
         // TODO: instead of using atmoicAdds, let each thread write to a bit vector and then do a reduce
-        calcNumOps<<<numBlocks, numThreadsPerBlock>>> (num_existing_tiles, d_num_ops, HMatrixExistingTiles[level]);        
+        calcNumOps<<<numBlocks, numThreadsPerBlock>>> (num_existing_tiles, d_num_ops, HMatrixExistingTiles[level - 1]);        
         cudaMemcpy(&num_ops, d_num_ops, sizeof(int), cudaMemcpyDeviceToHost);
         printf("level: %d   num ops: %d\n", level, num_ops);
         cudaFree(d_num_ops);
@@ -150,7 +157,7 @@ int main(int argc, char *argv[]){
         cudaMalloc((void**) &d_activeRanks, 4*num_ops*sizeof(int));
 
         // TODO: parallelize
-        fillActiveTiles<<<1, 1>>>(num_existing_tiles, d_activeTiles, HMatrixExistingTiles[level], d_activeRanks, HMatrixRanks[0]);
+        fillActiveTiles<<<1, 1>>>(num_existing_tiles, d_activeTiles, HMatrixExistingTiles[level - 1], d_activeRanks, HMatrixRanks[level - 1]);
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
         printK<<<1, 1>>>(d_activeTiles, num_ops*4);
@@ -205,25 +212,20 @@ int main(int argc, char *argv[]){
 
         #if EXPAND_MATRIX
         cudaDeviceSynchronize();
-        H2Opus_Real* expandedMatrix;
-        cudaMalloc((void**) &expandedMatrix, num_ops*max_rows*max_cols*sizeof(H2Opus_Real));
+        H2Opus_Real* expandedHMatrix;
+        cudaMalloc((void**) &expandedHMatrix, num_ops*max_rows*max_cols*sizeof(H2Opus_Real));
         dim3 hm_numBlocks(2, 2*num_ops);
         dim3 hm_numThreadsPerBlock(32, 32);
-        expandHMatrixLevel<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_ops, 64, 64, d_A, d_B, d_ranks, expandedMatrix);
+        expandHMatrixLevel<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_ops, 64, 64, d_A, d_B, d_ranks, expandedHMatrix);
 
-        H2Opus_Real* d_error;
-        cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-        int h_error;
         cudaMemset(d_error, 0, sizeof(H2Opus_Real));
-        H2Opus_Real* d_tmp;
-        cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-        int h_tmp;
         cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
-        errorInHMatrix<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_segments, max_segment_size, num_ops, max_rows, max_cols, expandedMatrix, d_denseMatrix, d_activeTiles, d_error, d_tmp);
+        errorInHMatrix<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_segments, max_segment_size, num_ops, max_rows, max_cols, expandedHMatrix, d_denseMatrix, d_activeTiles, d_error, d_tmp);
         cudaDeviceSynchronize();
         cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
         cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
         printf("h matrix error: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+        cudaFree(expandedHMatrix);
         #endif
         break;
 
