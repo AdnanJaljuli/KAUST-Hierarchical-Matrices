@@ -100,10 +100,10 @@ int main(int argc, char *argv[]){
     checkErrorInMatrices(config.n, num_segments, max_segment_size, config.bucket_size, matrix, mortonMatrix, d_denseMatrix);
     #endif
 
-    const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size);
+    const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size) + 1;
     printf("num_levels: %d\n", num_levels);
-    int** HMatrixRanks = (int**)malloc(num_levels*sizeof(int*));
-    int** HMatrixAvailableTiles = (int**)malloc(num_levels*sizeof(int*));
+    int** HMatrixRanks = (int**)malloc((num_levels - 1)*sizeof(int*));
+    int** HMatrixAvailableTiles = (int**)malloc((num_levels - 1)*sizeof(int*));
     int num_available_tiles = num_segments*(num_segments-1);
 
     int *d_rows_batch, *d_cols_batch, *d_ranks;
@@ -111,8 +111,8 @@ int main(int argc, char *argv[]){
     H2Opus_Real *d_A, *d_B;
     H2Opus_Real **d_A_ptrs, **d_B_ptrs;
 
-    cudaMalloc((void**) &HMatrixRanks[0], num_available_tiles*sizeof(int));
-    cudaMalloc((void**) &HMatrixAvailableTiles[0], num_available_tiles*sizeof(int));
+    cudaMalloc((void**) &HMatrixRanks[num_levels - 1], num_available_tiles*sizeof(int));
+    cudaMalloc((void**) &HMatrixAvailableTiles[num_levels - 1], num_available_tiles*sizeof(int));
 
     // TODO: parallelize
     fillFirstLevelAvailableArrays<<<1, 1>>>(num_segments, HMatrixAvailableTiles[0], HMatrixRanks[0], mortonMatrix.blockRanks);
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]){
     bool stop = false;
 
     #if 1
-    for(unsigned int level = 0; level < (num_levels - 1); ++level){
+    for(unsigned int level = num_levels - 1; level > 0; --level){
         // TODO: set cudaMalloc and cudaFrees to outside the loop
         // TODO: use cudaMemSet to initialize num_ops to 0
         int* d_num_ops;
@@ -273,12 +273,12 @@ int main(int argc, char *argv[]){
             stop = true;
         }
         else {
-            gpuErrchk(cudaMalloc((void**) &HMatrixRanks[level + 1], *newLevelCount*sizeof(int)));
-            gpuErrchk(cudaMalloc((void**) &HMatrixAvailableTiles[level + 1], *newLevelCount*sizeof(int)));
+            gpuErrchk(cudaMalloc((void**) &HMatrixRanks[level - 1], *newLevelCount*sizeof(int)));
+            gpuErrchk(cudaMalloc((void**) &HMatrixAvailableTiles[level - 1], *newLevelCount*sizeof(int)));
 
             numThreadsPerBlock = 1024;
             numBlocks = (num_ops + numThreadsPerBlock - 1)/numThreadsPerBlock;
-            fillNewLevel<<<numBlocks, numThreadsPerBlock>>>(num_ops, d_new_bit_vector, d_new_bit_vector_scan, d_ranks, HMatrixRanks[level + 1], d_activeTiles, HMatrixAvailableTiles[level + 1]);
+            fillNewLevel<<<numBlocks, numThreadsPerBlock>>>(num_ops, d_new_bit_vector, d_new_bit_vector_scan, d_ranks, HMatrixRanks[level - 1], d_activeTiles, HMatrixAvailableTiles[level - 1]);
             copyTilesToNewLevel<<<numBlocks, numThreadsPerBlock>>>(num_ops, d_new_bit_vector, mortonMatrix, d_A, d_B, d_ranks, d_activeTiles, max_rows, max_cols);
             cudaDeviceSynchronize();
             gpuErrchk(cudaPeekAtLastError());
