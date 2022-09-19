@@ -120,7 +120,7 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
     cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
 }
 
-void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_size, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix mortonMatrix, H2Opus_Real* d_denseMatrix){
+void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_size, uint64_t k_sum, TLR_Matrix &matrix, TLR_Matrix &mortonMatrix, H2Opus_Real* &d_denseMatrix){
     H2Opus_Real* d_expandedCMMatrix;
     cudaMalloc((void**) &d_expandedCMMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
     dim3 mm_numBlocks(num_segments, num_segments);

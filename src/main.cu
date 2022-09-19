@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+// TODO: make EXPAND_MATRIX a config argument
 #define EXPAND_MATRIX 1
 #define BLOCK_SIZE 32
 using namespace std;
@@ -79,6 +80,9 @@ int main(int argc, char *argv[]){
     printf("num segments: %lu\n", num_segments);
     TLR_Matrix matrix;
     H2Opus_Real* d_denseMatrix;
+    #if EXPAND_MATRIX
+    cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
+    #endif
 
     const int ARA_R = 10;
     int max_rows = max_segment_size;
@@ -86,6 +90,9 @@ int main(int argc, char *argv[]){
     int max_rank = max_cols;
 
     uint64_t k_sum = createLRMatrix(config.n, num_segments, max_segment_size, config.bucket_size, config.dim, matrix, d_denseMatrix, d_values_in, d_offsets_sort, d_dataset, tolerance, ARA_R, max_rows, max_cols, max_rank);
+    printf("k sum %d\n", k_sum);
+
+    printK<<<1, 1>>> (matrix.blockRanks, num_segments*num_segments);
 
     TLR_Matrix mortonMatrix;
     cudaMalloc((void**) &mortonMatrix.U, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
@@ -103,42 +110,37 @@ int main(int argc, char *argv[]){
     const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size) + 1;
     printf("num_levels: %d\n", num_levels);
     int** HMatrixRanks = (int**)malloc((num_levels - 1)*sizeof(int*));
-    int** HMatrixAvailableTiles = (int**)malloc((num_levels - 1)*sizeof(int*));
-    int num_available_tiles = num_segments*(num_segments-1);
+    int** HMatrixExistingTiles = (int**)malloc((num_levels - 1)*sizeof(int*));
+    int num_existing_tiles = num_segments*(num_segments-1);
 
     int *d_rows_batch, *d_cols_batch, *d_ranks;
     int *d_lda_batch, *d_ldb_batch;
     H2Opus_Real *d_A, *d_B;
     H2Opus_Real **d_A_ptrs, **d_B_ptrs;
 
-    cudaMalloc((void**) &HMatrixRanks[num_levels - 1], num_available_tiles*sizeof(int));
-    cudaMalloc((void**) &HMatrixAvailableTiles[num_levels - 1], num_available_tiles*sizeof(int));
+    cudaMalloc((void**) &HMatrixRanks[num_levels - 1], num_existing_tiles*sizeof(int));
+    cudaMalloc((void**) &HMatrixExistingTiles[num_levels - 1], num_existing_tiles*sizeof(int));
 
     // TODO: parallelize
-    fillFirstLevelAvailableArrays<<<1, 1>>>(num_segments, HMatrixAvailableTiles[0], HMatrixRanks[0], mortonMatrix.blockRanks);
+    fillFirstLevelExistingArrays<<<1, 1>>>(num_segments, HMatrixExistingTiles[0], HMatrixRanks[0], mortonMatrix.blockRanks);
     unsigned int tile_size = config.bucket_size;
     bool stop = false;
 
     #if 1
     for(unsigned int level = num_levels - 1; level > 0; --level){
         // TODO: set cudaMalloc and cudaFrees to outside the loop
-        // TODO: use cudaMemSet to initialize num_ops to 0
         int* d_num_ops;
         cudaMalloc((void**) &d_num_ops, sizeof(int));
         // TODO: no need to dynamically allocate h_num_ops. just pass the reference.
-        int* h_num_ops = (int*)malloc(sizeof(int));
-        *h_num_ops = 0;
-        cudaMemcpy(d_num_ops, h_num_ops, sizeof(int), cudaMemcpyHostToDevice);
+        // int* h_num_ops = (int*)malloc(sizeof(int));
+        int num_ops;
+        cudaMemset(d_num_ops, 0, sizeof(int));
         numThreadsPerBlock = 1024;
-        numBlocks = (num_available_tiles + numThreadsPerBlock - 1)/numThreadsPerBlock;
-
+        numBlocks = (num_existing_tiles + numThreadsPerBlock - 1)/numThreadsPerBlock;
         // TODO: instead of using atmoicAdds, let each thread write to a bit vector and then do a reduce
-        calcNumOps<<<numBlocks, numThreadsPerBlock>>> (num_available_tiles, d_num_ops, HMatrixAvailableTiles[level]);        
-        cudaMemcpy(h_num_ops, d_num_ops, sizeof(int), cudaMemcpyDeviceToHost);
-        int num_ops = *h_num_ops;
+        calcNumOps<<<numBlocks, numThreadsPerBlock>>> (num_existing_tiles, d_num_ops, HMatrixExistingTiles[level]);        
+        cudaMemcpy(&num_ops, d_num_ops, sizeof(int), cudaMemcpyDeviceToHost);
         printf("level: %d   num ops: %d\n", level, num_ops);
-
-        free(h_num_ops);
         cudaFree(d_num_ops);
 
         // TODO: rename available tiles to existing tiles
@@ -148,7 +150,7 @@ int main(int argc, char *argv[]){
         cudaMalloc((void**) &d_activeRanks, 4*num_ops*sizeof(int));
 
         // TODO: parallelize
-        fillActiveTiles<<<1, 1>>>(num_available_tiles, d_activeTiles, HMatrixAvailableTiles[level], d_activeRanks, HMatrixRanks[0]);
+        fillActiveTiles<<<1, 1>>>(num_existing_tiles, d_activeTiles, HMatrixExistingTiles[level], d_activeRanks, HMatrixRanks[0]);
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
         printK<<<1, 1>>>(d_activeTiles, num_ops*4);
@@ -171,7 +173,6 @@ int main(int argc, char *argv[]){
         gpuErrchk(cudaMalloc((void**) &d_A, num_ops*max_rows*max_rank*sizeof(H2Opus_Real)));
         gpuErrchk(cudaMalloc((void**) &d_B, num_ops*max_rows*max_rank*sizeof(H2Opus_Real)));
 
-        // TODO: parallelize
         numThreadsPerBlock = 1024;
         numBlocks = (num_ops + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillLRARAArrays<<<numBlocks, numThreadsPerBlock>>>(num_ops, max_rows, max_cols, d_rows_batch, d_cols_batch, d_lda_batch, d_ldb_batch);
@@ -212,20 +213,17 @@ int main(int argc, char *argv[]){
 
         H2Opus_Real* d_error;
         cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-        H2Opus_Real* h_error = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-        *h_error = 0;
-        cudaMemcpy(d_error, h_error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+        int h_error;
+        cudaMemset(d_error, 0, sizeof(H2Opus_Real));
         H2Opus_Real* d_tmp;
         cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-        H2Opus_Real* h_tmp = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-        *h_tmp = 0;
-        cudaMemcpy(d_tmp, h_tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
+        int h_tmp;
+        cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
         errorInHMatrix<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_segments, max_segment_size, num_ops, max_rows, max_cols, expandedMatrix, d_denseMatrix, d_activeTiles, d_error, d_tmp);
         cudaDeviceSynchronize();
-        cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-        printf("h matrix error: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
-
+        cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+        printf("h matrix error: %lf\n", sqrt(h_error)/sqrt(h_tmp));
         #endif
         break;
 
@@ -266,19 +264,19 @@ int main(int argc, char *argv[]){
         cudaMalloc((void**) &d_newLevelCount, sizeof(int));
         getNewLevelCount<<<1, 1>>>(num_ops, d_new_bit_vector, d_new_bit_vector_scan, d_newLevelCount);
         cudaMemcpy(newLevelCount, d_newLevelCount, sizeof(int), cudaMemcpyDeviceToHost);
-        num_available_tiles = *newLevelCount;
-        printf("new level count %d\n", num_available_tiles);
+        num_existing_tiles = *newLevelCount;
+        printf("new level count %d\n", num_existing_tiles);
 
         if(*newLevelCount == 0) {
             stop = true;
         }
         else {
             gpuErrchk(cudaMalloc((void**) &HMatrixRanks[level - 1], *newLevelCount*sizeof(int)));
-            gpuErrchk(cudaMalloc((void**) &HMatrixAvailableTiles[level - 1], *newLevelCount*sizeof(int)));
+            gpuErrchk(cudaMalloc((void**) &HMatrixExistingTiles[level - 1], *newLevelCount*sizeof(int)));
 
             numThreadsPerBlock = 1024;
             numBlocks = (num_ops + numThreadsPerBlock - 1)/numThreadsPerBlock;
-            fillNewLevel<<<numBlocks, numThreadsPerBlock>>>(num_ops, d_new_bit_vector, d_new_bit_vector_scan, d_ranks, HMatrixRanks[level - 1], d_activeTiles, HMatrixAvailableTiles[level - 1]);
+            fillNewLevel<<<numBlocks, numThreadsPerBlock>>>(num_ops, d_new_bit_vector, d_new_bit_vector_scan, d_ranks, HMatrixRanks[level - 1], d_activeTiles, HMatrixExistingTiles[level - 1]);
             copyTilesToNewLevel<<<numBlocks, numThreadsPerBlock>>>(num_ops, d_new_bit_vector, mortonMatrix, d_A, d_B, d_ranks, d_activeTiles, max_rows, max_cols);
             cudaDeviceSynchronize();
             gpuErrchk(cudaPeekAtLastError());

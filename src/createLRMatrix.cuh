@@ -27,7 +27,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     }
 }
 
-uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucket_size, int dim, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix, int* d_values_in, int* d_offsets_sort, H2Opus_Real* d_dataset, float tolerance, int ARA_R, int max_rows, int max_cols, int max_rank){
+uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucket_size, int dim, TLR_Matrix &matrix, H2Opus_Real* &d_denseMatrix, int* d_values_in, int* d_offsets_sort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int max_rows, int max_cols, int max_rank){
     H2Opus_Real* d_input_matrix_segmented;
 
     gpuErrchk(cudaMalloc((void**) &d_input_matrix_segmented, max_segment_size*max_segment_size*num_segments*(uint64_t)sizeof(H2Opus_Real)));
@@ -88,17 +88,13 @@ uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucke
 
     float ARATotalTime = 0;
     uint64_t k_sum = 0;
-    
-    #if EXPAND_MATRIX
-    cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
-    #endif
 
     dim3 m_numThreadsPerBlock(min(32, (int)max_segment_size), min(32, (int)max_segment_size));
     dim3 m_numBlocks(1, num_segments);
 
     for(unsigned int segment = 0; segment < num_segments; ++segment){
         // TODO: launch a 1D grid instead of a 2D grid
-        #if EXPAND_MATRIX
+        #if 1
         generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, num_segments, max_segment_size, dim, d_values_in, d_input_matrix_segmented, d_dataset, d_offsets_sort, segment, matrix.diagonal, d_denseMatrix, 1);
         #else
         generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, num_segments, max_segment_size, dim, d_values_in, d_input_matrix_segmented, d_dataset, d_offsets_sort, segment, matrix.diagonal, d_denseMatrix, 0);

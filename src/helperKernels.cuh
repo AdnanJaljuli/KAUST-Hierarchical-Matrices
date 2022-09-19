@@ -791,33 +791,33 @@ __device__ uint32_t morton1(uint32_t x)
     return x;
 }
 
-__global__ void fillFirstLevelAvailableArrays(int num_segments, int* availableArrays, int* availableRanks, int* matrixRanks){
+__global__ void fillFirstLevelExistingArrays(int num_segments, int* existingArrays, int* existingRanks, int* matrixRanks){
     int tmp = 0;
     for(unsigned int i=0; i<num_segments*num_segments; ++i){
         int x = morton1(i);
         int y = morton1(i >> 1);
         if(x != y){
-            availableRanks[tmp] = matrixRanks[i];
-            availableArrays[tmp++] = i;
+            existingRanks[tmp] = matrixRanks[i];
+            existingArrays[tmp++] = i;
         }
     }
 }
 
-__global__ void fillActiveTiles(int numAvailableArrays, int* activeArrays, int* availableArrays, int* activeRanks, int* availableRanks){
+__global__ void fillActiveTiles(int numExistingArrays, int* activeArrays, int* existingArrays, int* activeRanks, int* existingRanks){
     int tmp = 0;
-    for(int i=0; i<numAvailableArrays; ++i){
-        if(availableArrays[i]%4 == 0 && i<=(numAvailableArrays-4)){
+    for(int i=0; i<numExistingArrays; ++i){
+        if(existingArrays[i]%4 == 0 && i<=(numExistingArrays-4)){
             bool flag = true;
             for(int j=1; j<4; ++j){
-                if(availableArrays[i + j] != availableArrays[i] + j){
+                if(existingArrays[i + j] != existingArrays[i] + j){
                     flag = false;
                     break;
                 }
             }
             if(flag){
                 for(int j=0; j<4; ++j){
-                    activeArrays[tmp] = availableArrays[i + j];
-                    activeRanks[tmp++] = availableRanks[i + j];
+                    activeArrays[tmp] = existingArrays[i + j];
+                    activeRanks[tmp++] = existingRanks[i + j];
                 }
                 i += 3;
             }
@@ -897,6 +897,7 @@ __global__ void errorInCMMatrix(int num_segments, int max_segment_size, H2Opus_R
         int diff = (blockIdx.y > blockIdx.x) ? 1 : 0;
         H2Opus_Real x = originalMatrix[(blockIdx.x*max_segment_size + threadIdx.x)*max_segment_size*num_segments + blockIdx.y*max_segment_size + threadIdx.y];
         H2Opus_Real y = expMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+        printf("%lf   %lf\n", x, y);
         atomicAdd(tmp, x*x);
         atomicAdd(error, (x-y)*(x-y));
     }
@@ -918,9 +919,9 @@ __global__ void copyTilesToNewLevel(int num_ops, int* bit_vector, TLR_Matrix mor
     }
 }
 
-__global__ void calcNumOps(int num_available_tiles, int* num_ops, int* availableTiles){
+__global__ void calcNumOps(int num_existing_tiles, int* num_ops, int* availableTiles){
     unsigned int i = threadIdx.x + blockIdx.x*blockDim.x;
-    if(i < num_available_tiles){
+    if(i < num_existing_tiles){
         if(availableTiles[i]%4 == 0){
             bool flag = true;
             for(int j=1; j<4; ++j){
