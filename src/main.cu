@@ -172,7 +172,9 @@ int main(int argc, char *argv[]){
         gpuErrchk(cudaMalloc((void**) &d_B, num_ops*max_rows*max_rank*sizeof(H2Opus_Real)));
 
         // TODO: parallelize
-        fillLRARAArrays<<<1, 1>>>(num_ops, max_rows, max_cols, d_rows_batch, d_cols_batch, d_lda_batch, d_ldb_batch);
+        numThreadsPerBlock = 1024;
+        numBlocks = (num_ops + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        fillLRARAArrays<<<numBlocks, numThreadsPerBlock>>>(num_ops, max_rows, max_cols, d_rows_batch, d_cols_batch, d_lda_batch, d_ldb_batch);
 
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_A_ptrs, max_rows*max_cols, num_ops, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_B, d_B_ptrs, max_rows*max_cols, num_ops, 0);
@@ -206,7 +208,6 @@ int main(int argc, char *argv[]){
         cudaMalloc((void**) &expandedMatrix, num_ops*max_rows*max_cols*sizeof(H2Opus_Real));
         dim3 hm_numBlocks(2, 2*num_ops);
         dim3 hm_numThreadsPerBlock(32, 32);
-        // expandHMatrixLevel<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_ops, 64, 64, d_A_ptrs, d_B_ptrs, d_ranks, expandedMatrix);
         expandHMatrixLevel<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_ops, 64, 64, d_A, d_B, d_ranks, expandedMatrix);
 
         H2Opus_Real* d_error;
@@ -225,7 +226,6 @@ int main(int argc, char *argv[]){
         cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
         printf("h matrix error: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
 
-        // printK<<<1, 1>>>(d_ranks, num_ops);
         #endif
         break;
 

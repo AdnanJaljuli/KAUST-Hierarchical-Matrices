@@ -61,11 +61,11 @@ uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucke
     gpuErrchk(cudaMalloc((void**) &d_A_ptrs, (num_segments-1)*sizeof(H2Opus_Real*)));
     gpuErrchk(cudaMalloc((void**) &d_B_ptrs, (num_segments-1)*sizeof(H2Opus_Real*)));
     gpuErrchk(cudaPeekAtLastError());
-    
+
+    // TODO: parallelize
     int numThreadsPerBlock = 1024;
     int numBlocks = ((num_segments-1) + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    // TODO: parallelize
-    fillARAArrays<<<1, 1>>>(num_segments-1, max_rows, max_cols, d_rows_batch, d_cols_batch, d_ldm_batch, d_lda_batch, d_ldb_batch);
+    fillARAArrays<<<numBlocks, numThreadsPerBlock>>>(num_segments-1, max_rows, max_cols, d_rows_batch, d_cols_batch, d_ldm_batch, d_lda_batch, d_ldb_batch);
     cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
 

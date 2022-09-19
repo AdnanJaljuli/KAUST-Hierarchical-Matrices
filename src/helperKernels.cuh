@@ -662,7 +662,8 @@ __global__ void fillBatch(int num_segments, int* rows_batch, int* cols_batch, in
 }
 
 __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
-    for(unsigned int i=0; i<batchCount; ++i){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < batchCount){
         d_rows_batch[i] = max_rows;
         d_cols_batch[i] = max_cols;
         d_ldm_batch[i] = max_rows;
@@ -672,7 +673,8 @@ __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d
 }
 
 __global__ void fillLRARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_lda_batch, int* d_ldb_batch){
-    for(unsigned int i=0; i<batchCount; ++i){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < batchCount){
         d_rows_batch[i] = max_rows;
         d_cols_batch[i] = max_rows;
         d_lda_batch[i] = max_rows;
