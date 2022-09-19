@@ -87,41 +87,6 @@ int main(int argc, char *argv[]){
 
     uint64_t k_sum = createLRMatrix(config.n, num_segments, max_segment_size, config.bucket_size, config.dim, matrix, d_denseMatrix, d_values_in, d_offsets_sort, d_dataset, tolerance, ARA_R, max_rows, max_cols, max_rank);
 
-    // TODO: check error in matrix against epxanded matrix
-    #if EXPAND_MATRIX
-    H2Opus_Real* d_expandedCMMatrix;
-    cudaMalloc((void**) &d_expandedCMMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
-    dim3 mm_numBlocks(num_segments, num_segments);
-    dim3 mm_numThreadsPerBlock(32, 32);
-    expandCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, matrix);
-    cudaDeviceSynchronize();
-    gpuErrchk(cudaPeekAtLastError());
-
-    H2Opus_Real* d_error;
-    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-    H2Opus_Real* h_error = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_error = 0;
-    cudaMemcpy(d_error, h_error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    H2Opus_Real* d_tmp;
-    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-    H2Opus_Real* h_tmp = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_tmp = 0;
-    cudaMemcpy(d_tmp, h_tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-
-    gpuErrchk(cudaPeekAtLastError());
-    errorInCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedCMMatrix, d_error, d_tmp);
-    gpuErrchk(cudaPeekAtLastError());
-    cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error in column major ordered matrix: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
-    free(h_tmp);
-    free(h_error);
-    cudaFree(d_tmp);
-    cudaFree(d_error);
-    #endif
-    gpuErrchk(cudaPeekAtLastError());
-    // TODO: make createLRMatrix a function
-
     TLR_Matrix mortonMatrix;
     cudaMalloc((void**) &mortonMatrix.U, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
     cudaMalloc((void**) &mortonMatrix.V, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
@@ -131,39 +96,8 @@ int main(int argc, char *argv[]){
     ColumnMajorToMorton(num_segments, max_segment_size, k_sum, matrix, mortonMatrix);
     gpuErrchk(cudaPeekAtLastError());
 
-    printK<<<1, 1>>>(mortonMatrix.blockRanks, num_segments*num_segments);
-    printK<<<1, 1>>>(mortonMatrix.blockOffsets, num_segments*num_segments);
-    cudaDeviceSynchronize();
-
     #if EXPAND_MATRIX
-    H2Opus_Real* d_expandedMOMatrix;
-    cudaMalloc((void**) &d_expandedMOMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
-    expandMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMOMatrix, mortonMatrix);
-    gpuErrchk(cudaPeekAtLastError());
-
-    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-    h_error = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_error = 0;
-    cudaMemcpy(d_error, h_error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-    h_tmp = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_tmp = 0;
-    cudaMemcpy(d_tmp, h_tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    gpuErrchk(cudaPeekAtLastError());
-
-    errorInMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMOMatrix, d_error, d_tmp);
-    cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error in morton ordered matrix: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
-    free(h_tmp);
-    free(h_error);
-    cudaFree(d_tmp);
-    cudaFree(d_error);
-
-    compareMOwithCM<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, d_expandedMOMatrix);
-    // cudaFree(d_expandedCMMatrix);
-    // cudaFree(d_expandedMOMatrix);
-    gpuErrchk(cudaPeekAtLastError());
+    checkErrorInMatrices(config.n, num_segments, max_segment_size, config.bucket_size, matrix, mortonMatrix, d_denseMatrix);
     #endif
 
     const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size);
