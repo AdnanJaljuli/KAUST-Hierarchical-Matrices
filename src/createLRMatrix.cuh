@@ -40,7 +40,6 @@ uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucke
     H2Opus_Real *d_A, *d_B;
     H2Opus_Real** d_M_ptrs, **d_A_ptrs, **d_B_ptrs;
 
-    // TODO: fix memory allocation. Change num_segments to num_segments-1
     gpuErrchk(cudaMalloc((void**) &d_rows_batch, (num_segments-1)*sizeof(int)));
     gpuErrchk(cudaMalloc((void**) &d_cols_batch, (num_segments-1)*sizeof(int)));
     gpuErrchk(cudaMalloc((void**) &d_ranks, (num_segments-1)*num_segments*sizeof(int)));
@@ -54,7 +53,6 @@ uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucke
     gpuErrchk(cudaMalloc((void**) &d_B_ptrs, (num_segments-1)*sizeof(H2Opus_Real*)));
     gpuErrchk(cudaPeekAtLastError());
 
-    // TODO: parallelize
     int numThreadsPerBlock = 1024;
     int numBlocks = ((num_segments-1) + numThreadsPerBlock - 1)/numThreadsPerBlock;
     fillARAArrays<<<numBlocks, numThreadsPerBlock>>>(num_segments-1, max_rows, max_cols, d_rows_batch, d_cols_batch, d_ldm_batch, d_lda_batch, d_ldb_batch);
@@ -190,9 +188,6 @@ uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucke
     cudaDeviceSynchronize();
     cudaFree(d_temp_storage);
     gpuErrchk(cudaPeekAtLastError());
-
-    // printK<<<1, 1>>>(matrix.blockRanks, num_segments*num_segments);
-    // printK<<<1, 1>>>(matrix.blockOffsets, num_segments*num_segments);
 
     int* h_scan_K = (int*)malloc(num_segments*num_segments*sizeof(int));
     gpuErrchk(cudaMemcpy(h_scan_K, matrix.blockOffsets, num_segments*num_segments*(uint64_t)sizeof(int), cudaMemcpyDeviceToHost));
