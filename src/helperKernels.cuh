@@ -886,6 +886,10 @@ __global__ void errorInMOMatrix(int num_segments, int max_segment_size, H2Opus_R
 __global__ void compareMOwithCM(int num_segments, int max_segment_size, H2Opus_Real* expandedCMMatrix, H2Opus_Real* expandedMOMatrix){
     H2Opus_Real x = expandedMOMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
     H2Opus_Real y = expandedCMMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+    // printf("%lf   %lf\n", x, y);
+    if(x != y){
+        printf("%lf   %lf\n", x, y);
+    }
     assert(x == y);
 }
 

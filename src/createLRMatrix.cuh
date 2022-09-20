@@ -93,7 +93,6 @@ uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucke
         #endif
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
-
         
         generateArrayOfPointersT<H2Opus_Real>(d_input_matrix_segmented, d_M_ptrs, max_rows*max_cols, num_segments-1, 0);
         gpuErrchk(cudaPeekAtLastError());

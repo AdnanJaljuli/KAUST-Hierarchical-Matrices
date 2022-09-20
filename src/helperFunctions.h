@@ -108,7 +108,13 @@ void printKs(int* K, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_
     fclose(fp); //Don't forget to close the file when finished
 }
 
-void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix mortonMatrix){
+void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix){
+
+    cudaMalloc((void**) &mortonMatrix.U, k_sum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &mortonMatrix.V, k_sum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &mortonMatrix.blockOffsets, num_segments*num_segments*(uint64_t)sizeof(int));
+    cudaMalloc((void**) &mortonMatrix.blockRanks, num_segments*num_segments*(uint64_t)sizeof(int));
+    cudaMalloc((void**) &mortonMatrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (num_segments*num_segments + 1024 - 1)/1024;
@@ -127,9 +133,6 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
     cudaDeviceSynchronize();
     cudaFree(d_temp_storage);
 
-    // copyCMTilesToMOTiles<<<numBlocks, numThreadsPerBlock>>>(num_segments, maxSegmentSize, matrix, mortonMatrix);
-    // cudaDeviceSynchronize();
-
     int* h_matrix_offsets = (int*)malloc(num_segments*num_segments*sizeof(int));
     int* h_mortonMatrix_offsets = (int*)malloc(num_segments*num_segments*sizeof(int));
     cudaMemcpy(h_matrix_offsets, matrix.blockOffsets, num_segments*num_segments*sizeof(int), cudaMemcpyDeviceToHost);
@@ -144,7 +147,6 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
         unsigned int y = i/num_segments;
 
         unsigned int numThreadsPerBlock = 1024;
-        // unsigned int numBlocks = (h_matrix_ranks[i] + numThreadsPerBlock - 1)/numThreadsPerBlock;
         unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
         if(h_matrix_ranks[i] > 0){
@@ -152,8 +154,8 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
             copyTilestoMO<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
         }
     }
-
     cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+    gpuErrchk(cudaPeekAtLastError());
 }
 
 // TODO: add type of matrix (column major or morton) to the TLR_Matrix struct as an attribute, and then make only one checkErrorInMatrix function that works for both types
@@ -186,8 +188,6 @@ void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_siz
     cudaFree(d_tmp);
     cudaFree(d_error);
 
-    // TODO: create a macro for each matrix to check whether it should expand and calc error or not
-
     H2Opus_Real* d_expandedMOMatrix;
     cudaMalloc((void**) &d_expandedMOMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
     expandMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMOMatrix, mortonMatrix);
@@ -211,8 +211,8 @@ void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_siz
     cudaFree(d_error);
 
     compareMOwithCM<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, d_expandedMOMatrix);
-    // cudaFree(d_expandedCMMatrix);
-    // cudaFree(d_expandedMOMatrix);
+    cudaFree(d_expandedCMMatrix);
+    cudaFree(d_expandedMOMatrix);
 }
 
 #endif

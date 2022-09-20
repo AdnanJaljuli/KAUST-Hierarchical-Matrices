@@ -62,35 +62,28 @@ int main(int argc, char *argv[]){
     printf("max segment size: %lu\n", max_segment_size);
     printf("num segments: %lu\n", num_segments);
 
-    TLR_Matrix matrix;
-    H2Opus_Real* d_denseMatrix;
-    // #if EXPAND_MATRIX
-    // cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
-    // #endif
-
     const int ARA_R = 10;
     int max_rows = max_segment_size;
     int max_cols = max_segment_size;
     int max_rank = max_cols;
 
+    TLR_Matrix matrix;
+    H2Opus_Real* d_denseMatrix;
+
     uint64_t k_sum = createLRMatrix(config.n, num_segments, max_segment_size, config.bucket_size, config.dim, matrix, d_denseMatrix, d_values_in, d_offsets_sort, d_dataset, tolerance, ARA_R, max_rows, max_cols, max_rank);
     printf("k sum %d\n", k_sum);
 
-    printK<<<1, 1>>> (matrix.blockRanks, num_segments*num_segments);
-
     TLR_Matrix mortonMatrix;
-    cudaMalloc((void**) &mortonMatrix.U, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
-    cudaMalloc((void**) &mortonMatrix.V, k_sum*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
-    cudaMalloc((void**) &mortonMatrix.blockOffsets, num_segments*num_segments*(uint64_t)sizeof(int));
-    cudaMalloc((void**) &mortonMatrix.blockRanks, num_segments*num_segments*(uint64_t)sizeof(int));
-    cudaMalloc((void**) &mortonMatrix.diagonal, num_segments*max_segment_size*max_segment_size*(uint64_t)sizeof(H2Opus_Real));
     ColumnMajorToMorton(num_segments, max_segment_size, k_sum, matrix, mortonMatrix);
-    gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
     checkErrorInMatrices(config.n, num_segments, max_segment_size, config.bucket_size, matrix, mortonMatrix, d_denseMatrix);
     #endif
 
+
+
+
+    return 0;
     const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size) + 1;
     printf("num_levels: %d\n", num_levels);
     int** HMatrixRanks = (int**)malloc((num_levels - 1)*sizeof(int*));
