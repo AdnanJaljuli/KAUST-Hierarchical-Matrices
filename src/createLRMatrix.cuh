@@ -17,10 +17,12 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucket_size, int dim, TLR_Matrix &matrix, H2Opus_Real* &d_denseMatrix, int* d_values_in, int* d_offsets_sort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int max_rows, int max_cols, int max_rank){
+// TODO: clean this file
+uint64_t createLRMatrix(int n, int num_segments, int max_segment_size, int bucket_size, int dim, TLR_Matrix &matrix, H2Opus_Real* &d_denseMatrix, int* &d_values_in, int* &d_offsets_sort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int max_rows, int max_cols, int max_rank){
     H2Opus_Real* d_input_matrix_segmented;
-
     gpuErrchk(cudaMalloc((void**) &d_input_matrix_segmented, max_segment_size*max_segment_size*num_segments*(uint64_t)sizeof(H2Opus_Real)));
+
+    cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
 
     int* d_scan_K_segmented;
     gpuErrchk(cudaMalloc((void**) &d_scan_K_segmented, (num_segments-1)*sizeof(int)));

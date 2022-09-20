@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+// TODO: make all header files independent
 // TODO: make EXPAND_MATRIX a config argument
 #define EXPAND_MATRIX 1
 #define BLOCK_SIZE 32
@@ -55,19 +56,17 @@ int main(int argc, char *argv[]){
 
     int  *d_values_in;
     int  *d_offsets_sort;
-    // gpuErrchk(cudaMalloc((void**) &d_values_in, config.n*sizeof(int)));
-    // gpuErrchk(cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int)));
-
     createKDTree(config.n, config.dim, config.bucket_size, num_segments, config.div_method, d_values_in, d_offsets_sort, d_dataset, max_num_segments);
 
     uint64_t max_segment_size = config.bucket_size;
     printf("max segment size: %lu\n", max_segment_size);
     printf("num segments: %lu\n", num_segments);
+
     TLR_Matrix matrix;
     H2Opus_Real* d_denseMatrix;
-    #if EXPAND_MATRIX
-    cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
-    #endif
+    // #if EXPAND_MATRIX
+    // cudaMalloc((void**) &d_denseMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
+    // #endif
 
     const int ARA_R = 10;
     int max_rows = max_segment_size;
