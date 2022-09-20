@@ -51,24 +51,14 @@ int main(int argc, char *argv[]){
 
     uint64_t num_segments = 1;
     uint64_t max_num_segments = (config.n+config.bucket_size-1)/config.bucket_size;
-
     printf("max num segments: %d\n", max_num_segments);
 
     int  *d_values_in;
     int  *d_offsets_sort;
-    gpuErrchk(cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_values_in, config.n*sizeof(int)));
+    // gpuErrchk(cudaMalloc((void**) &d_values_in, config.n*sizeof(int)));
+    // gpuErrchk(cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int)));
 
-    cudaEvent_t startKDtree, stopKDtree;
-    cudaEventCreate(&startKDtree);
-    cudaEventCreate(&stopKDtree);
-    cudaEventRecord(startKDtree);
     createKDTree(config.n, config.dim, config.bucket_size, num_segments, config.div_method, d_values_in, d_offsets_sort, d_dataset, max_num_segments);
-    cudaEventRecord(stopKDtree);
-    cudaEventSynchronize(stopKDtree);
-    cudaEventElapsedTime(&timer_arr[4], startKDtree, stopKDtree);
-    cudaEventDestroy(startKDtree);
-    cudaEventDestroy(stopKDtree);
 
     uint64_t max_segment_size = config.bucket_size;
     printf("max segment size: %lu\n", max_segment_size);

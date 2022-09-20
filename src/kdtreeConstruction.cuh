@@ -7,7 +7,11 @@
 #include <assert.h>
 #include <curand_kernel.h>
 
+// TODO: clean this file
 void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVISION_METHOD div_method, int* &d_values_in, int* &d_offsets_sort, H2Opus_Real* d_dataset, int max_num_segments){
+    cudaMalloc((void**) &d_values_in, n*sizeof(int));
+    cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int));
+
     uint64_t num_segments_reduce = num_segments*dim;
     uint64_t segment_size = upper_power_of_two(n);
 
