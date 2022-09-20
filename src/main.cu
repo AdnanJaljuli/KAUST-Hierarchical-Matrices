@@ -134,12 +134,11 @@ int main(int argc, char *argv[]){
     cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
 
     #if 1
+    // TODO: fix the number of iterations.
     for(unsigned int level = num_levels - 1; level > 0; --level){
         // TODO: set cudaMalloc and cudaFrees to outside the loop
         int* d_num_ops;
         cudaMalloc((void**) &d_num_ops, sizeof(int));
-        // TODO: no need to dynamically allocate h_num_ops. just pass the reference.
-        // int* h_num_ops = (int*)malloc(sizeof(int));
         int num_ops;
         cudaMemset(d_num_ops, 0, sizeof(int));
         numThreadsPerBlock = 1024;
@@ -150,7 +149,6 @@ int main(int argc, char *argv[]){
         printf("level: %d   num ops: %d\n", level, num_ops);
         cudaFree(d_num_ops);
 
-        // TODO: rename available tiles to existing tiles
         int* d_activeTiles;
         int* d_activeRanks;
         cudaMalloc((void**) &d_activeTiles, 4*num_ops*sizeof(int));
@@ -201,6 +199,7 @@ int main(int argc, char *argv[]){
         kblasAllocateWorkspace(kblas_handle_2);
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
+        // TODO: write a unit test for the lr_kblas_ara_batch function. 
         // TODO: optimize max_cols. max_cols shouldn't be equal to max_rows, instead, its values should depend on the ranks of the tiles
         int lr_ARA_return = lr_kblas_ara_batch(kblas_handle_2, d_rows_batch, d_cols_batch, mortonMatrix.U, mortonMatrix.V, d_activeRanks, mortonMatrix.blockOffsets, d_activeTiles,
             d_A_ptrs, d_lda_batch, d_B_ptrs, d_ldb_batch, d_ranks,
@@ -210,6 +209,7 @@ int main(int argc, char *argv[]){
         assert(lr_ARA_return == 1);
         gpuErrchk(cudaPeekAtLastError());
 
+        // TODO: move this error checking to its own function
         #if EXPAND_MATRIX
         cudaDeviceSynchronize();
         H2Opus_Real* expandedHMatrix;
