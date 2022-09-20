@@ -46,13 +46,8 @@ int main(int argc, char *argv[]){
     timer_arr[2] = (float)config.dim;
     timer_arr[3] = (float)config.tol;
 
-    cudaError_t cudaErr;
     H2Opus_Real *d_dataset;
-    gpuErrchk(cudaMalloc((void**) &d_dataset, config.n*config.dim*(uint64_t)sizeof(H2Opus_Real)));
-    unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = (config.n + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    generateDataset<<<numBlocks, numThreadsPerBlock>>> (config.n, config.dim, d_dataset);
-    cudaDeviceSynchronize();
+    generateDataset_h(config.n, config.dim, d_dataset);
 
     uint64_t num_segments = 1;
     uint64_t max_num_segments = (config.n+config.bucket_size-1)/config.bucket_size;
@@ -141,8 +136,8 @@ int main(int argc, char *argv[]){
         cudaMalloc((void**) &d_num_ops, sizeof(int));
         int num_ops;
         cudaMemset(d_num_ops, 0, sizeof(int));
-        numThreadsPerBlock = 1024;
-        numBlocks = (num_existing_tiles + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        unsigned int numThreadsPerBlock = 1024;
+        unsigned int numBlocks = (num_existing_tiles + numThreadsPerBlock - 1)/numThreadsPerBlock;
         // TODO: instead of using atmoicAdds, let each thread write to a bit vector and then do a reduce
         calcNumOps<<<numBlocks, numThreadsPerBlock>>> (num_existing_tiles, d_num_ops, HMatrixExistingTiles[level - 1]);        
         cudaMemcpy(&num_ops, d_num_ops, sizeof(int), cudaMemcpyDeviceToHost);

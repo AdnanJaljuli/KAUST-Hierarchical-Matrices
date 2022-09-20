@@ -1,3 +1,21 @@
+///////////////////////////////////////////////////////////////////
+// NAME:               helperFunctions.h
+//
+// PURPOSE:            This file is respnsible for supporting host functions.
+//
+// FUNCTIONS/OBJECTS:  gpuErrchk
+//                     generateDataset_h
+//                     printCountersInFile
+//                     isPowerOfTwo
+//                     getMaxSegmentSize
+//                     printSigmas
+//                     printKs
+//                     columnMajorToMorton
+//                     checkErrorInMatrices
+//
+// AUTHOR:             Adnan Jaljuli
+///////////////////////////////////////////////////////////////////
+
 #ifndef HELPERFUNCTIONS_H
 #define HELPERFUNCTIONS_H
 
@@ -7,6 +25,24 @@
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
 #define numTimers 13
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
+    if (code != cudaSuccess) {
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
+                line);
+        if (abort)
+            exit(code);
+    }
+}
+
+void generateDataset_h(int n, int dim, H2Opus_Real* &d_dataset){
+    gpuErrchk(cudaMalloc((void**) &d_dataset, n*dim*(uint64_t)sizeof(H2Opus_Real)));
+    unsigned int numThreadsPerBlock = 1024;
+    unsigned int numBlocks = (n + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    generateDataset<<<numBlocks, numThreadsPerBlock>>> (n, dim, d_dataset);
+    cudaDeviceSynchronize();
+}
 
 void printCountersInFile(float* times){
     char filename[100] = "results/times.csv";
