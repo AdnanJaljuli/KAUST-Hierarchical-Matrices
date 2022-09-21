@@ -75,30 +75,27 @@ int main(int argc, char *argv[]){
     printf("k sum %d\n", k_sum);
     printK<<<1, 1>>> (matrix.blockRanks, num_segments*num_segments);
     printK<<<1, 1>>> (matrix.blockOffsets, num_segments*num_segments);
-    cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
-    
+
     #if EXPAND_MATRIX
     checkErrorInMatrix(num_segments, max_segment_size, matrix, d_denseMatrix);
     #endif
-    cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
 
-    #if 0
     TLR_Matrix mortonMatrix;
     mortonMatrix.type = MORTON;
     ColumnMajorToMorton(num_segments, max_segment_size, k_sum, matrix, mortonMatrix);
     printf("morton matrix ranks\n");
     printK<<<1, 1>>> (mortonMatrix.blockRanks, num_segments*num_segments);
     printK<<<1, 1>>> (mortonMatrix.blockOffsets, num_segments*num_segments);
-    cudaDeviceSynchronize();
 
-    // #if EXPAND_MATRIX
-    // checkErrorInMatrix(num_segments, max_segment_size, mortonMatrix, d_denseMatrix);
-    // #endif
+    #if EXPAND_MATRIX
+    checkErrorInMatrix(num_segments, max_segment_size, mortonMatrix, d_denseMatrix);
+    #endif
 
 
-    
+
+    #if 0
     const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size) + 1;
     printf("num_levels: %d\n", num_levels);
     int** HMatrixRanks = (int**)malloc((num_levels - 1)*sizeof(int*));

@@ -251,11 +251,9 @@ void checkErrorInMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Ma
     cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
-    #if 1
     cudaFree(d_tmp);
     cudaFree(d_error);
     cudaFree(d_expandedMatrix);
-    #endif
 }
 
 
