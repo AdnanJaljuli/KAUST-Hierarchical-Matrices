@@ -81,8 +81,8 @@ int main(int argc, char *argv[]){
     TLR_Matrix mortonMatrix;
     mortonMatrix.type = MORTON;
     ConvertColumnMajorToMorton(numSegments, maxSegmentSize, k_sum, matrix, mortonMatrix);
+    
     matrix.cudaFreeMatrix();
-    gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(numSegments, maxSegmentSize, mortonMatrix, d_denseMatrix);
@@ -94,15 +94,17 @@ int main(int argc, char *argv[]){
     int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));
     int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
     genereateHierarchicalMatrix(config.n, config.bucket_size, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
+    
+    mortonMatrix.cudaFreeMatrix();
 
-    // cudaEventRecord(stopCode);
-    // cudaEventSynchronize(stopCode);
-    // float Code_time=0;
-    // cudaEventElapsedTime(&Code_time, startCode, stopCode);
-    // cudaEventDestroy(startCode);
-    // cudaEventDestroy(stopCode);
-    // printf("total time: %f\n", Code_time);
-    // timer_arr[11] = Code_time;
-    // printCountersInFile(timer_arr);
-    // free(timer_arr);
+    cudaEventRecord(stopCode);
+    cudaEventSynchronize(stopCode);
+    float Code_time = 0;
+    cudaEventElapsedTime(&Code_time, startCode, stopCode);
+    cudaEventDestroy(startCode);
+    cudaEventDestroy(stopCode);
+    printf("total time: %f\n", Code_time);
+    timer_arr[11] = Code_time;
+    printCountersInFile(timer_arr);
+    free(timer_arr);
 }

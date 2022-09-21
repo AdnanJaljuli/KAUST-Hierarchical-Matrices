@@ -415,202 +415,6 @@ __global__ void calcError_vector (int num_segments, int max_segment_size, H2Opus
     }
 }
 
-__global__ void GEMV(int num_segments, int max_segment_size, int* K, int* scan_k, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* diagonal, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* buffer_vector){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-
-    for(unsigned int tile = 0; tile < num_segments; ++tile){
-        if(tile == blockIdx.x){
-            H2Opus_Real tmp_sum = 0;
-            for(unsigned int index=0; index<max_segment_size; ++index){
-                tmp_sum += diagonal[blockIdx.x*max_segment_size*max_segment_size + index*max_segment_size + threadIdx.x]*input_vector[max_segment_size*blockIdx.x + index];
-            }
-            output_vector[max_segment_size*blockIdx.x + threadIdx.x] += tmp_sum;
-        }
-        else{
-            if(threadIdx.x < K[tile*num_segments + blockIdx.x]){
-                H2Opus_Real tmp_sum = 0;
-                for(unsigned int v_tile_index=0; v_tile_index<max_segment_size; ++v_tile_index){
-                    tmp_sum += V_tiled[scan_k[tile*num_segments + blockIdx.x]*max_segment_size + max_segment_size*threadIdx.x + v_tile_index]*input_vector[max_segment_size*blockIdx.x + v_tile_index];
-                }
-                buffer_vector[K[tile*num_segments + blockIdx.x] - (threadIdx.x+1) + max_segment_size*blockIdx.x] = tmp_sum;
-                // buffer_vector[threadIdx.x + max_segment_size*blockIdx.x] = tmp_sum;
-            }
-            __syncthreads();
-
-            if(threadIdx.x < max_segment_size){
-                H2Opus_Real tmp_sum = 0;
-                for(unsigned int u_tile_index=0; u_tile_index<K[tile*num_segments + blockIdx.x]; ++u_tile_index){
-                    tmp_sum += U_tiled[scan_k[tile*num_segments + blockIdx.x]*max_segment_size + u_tile_index*max_segment_size + threadIdx.x]*buffer_vector[max_segment_size*blockIdx.x + u_tile_index];
-                }
-                output_vector[max_segment_size*blockIdx.x + threadIdx.x] += tmp_sum;
-            }
-        }
-        __syncthreads();
-    }
-}
-
-__global__ void GEMM(int num_segments, int max_segment_size, H2Opus_Real* U_tiled_1, H2Opus_Real* V_tiled_1, H2Opus_Real* diagonal_1, int* K_1, int* scan_k_1, H2Opus_Real* U_tiled_2, H2Opus_Real* V_tiled_2, H2Opus_Real* diagonal_2, int* K_2, int* scan_k_2, H2Opus_Real* d_gemm_matrix_segmented, unsigned int segment, int bucket_size){
-    extern __shared__ H2Opus_Real shmem[];
-    H2Opus_Real *first_matrix = (H2Opus_Real*) shmem;
-    H2Opus_Real *second_matrix = (H2Opus_Real*)&shmem[bucket_size*bucket_size];
-    H2Opus_Real sum = 0;
-
-    for(unsigned int tile = 0; tile<num_segments; ++tile){
-        // dense*dense
-        if(blockIdx.y == tile && segment == tile){
-            first_matrix[threadIdx.x*max_segment_size + threadIdx.y] = diagonal_1[blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            second_matrix[threadIdx.x*max_segment_size + threadIdx.y] = diagonal_2[blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            __syncthreads();
-
-            for(unsigned int i=0; i<max_segment_size; ++i){
-                sum += first_matrix[i*max_segment_size + threadIdx.y]*second_matrix[threadIdx.x*max_segment_size + i];
-            }
-            __syncthreads();
-        }
-        // lowRank*lowRank
-        else if(tile!=blockIdx.y && tile!=segment){
-            H2Opus_Real temp = 0;
-            unsigned int matrix1_rank = K_1[tile*num_segments + blockIdx.y];
-            unsigned int matrix2_rank = K_2[segment*num_segments + tile];
-
-            // loads Av_s into shared memory
-            if(threadIdx.x < matrix1_rank){
-                first_matrix[threadIdx.x*bucket_size + threadIdx.y] = V_tiled_1[scan_k_1[tile*num_segments + blockIdx.y]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            // loads Bu_s into shared memory
-            if(threadIdx.x < matrix2_rank){
-                second_matrix[threadIdx.x*bucket_size + threadIdx.y] = U_tiled_2[scan_k_2[segment*num_segments + tile]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            __syncthreads();
-
-            // multiplies Av_s*Bu_s
-            // stores result in place of Av_s
-            if(threadIdx.x < matrix2_rank && threadIdx.y < matrix1_rank){
-                for(unsigned int i = 0; i < max_segment_size; ++i){
-                    temp += first_matrix[threadIdx.y*bucket_size + i] * second_matrix[bucket_size*threadIdx.x + i];
-                }
-            }
-            __syncthreads();
-
-            if(threadIdx.x < matrix2_rank && threadIdx.y < matrix1_rank){
-                first_matrix[threadIdx.x*bucket_size + threadIdx.y] = temp;
-            }
-            __syncthreads();
-
-            // loads Bv_s into shared memory. Replaces Bu_s
-            if(threadIdx.x < matrix2_rank){
-                second_matrix[threadIdx.y + bucket_size*threadIdx.x] = V_tiled_2[scan_k_2[segment*num_segments + tile]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            __syncthreads();
-
-            temp = 0.0f;
-            // multiplies (Av_s*Bu_s)*Bv_s and stores result in Av_s space
-            if(threadIdx.y < matrix1_rank){
-                for(unsigned int i = 0; i < matrix2_rank; ++i){
-                    temp += first_matrix[i*bucket_size + threadIdx.y]*second_matrix[threadIdx.x + bucket_size*i];
-                }
-            }
-            __syncthreads();
-
-            if(threadIdx.y < matrix1_rank){
-                first_matrix[threadIdx.x*bucket_size + threadIdx.y] = temp;
-            }
-            __syncthreads();
-            temp = 0.0f;
-
-            // loads Au_s into shared memory
-            if(threadIdx.x < matrix1_rank){
-                second_matrix[threadIdx.x*bucket_size + threadIdx.y] = U_tiled_1[scan_k_1[tile*num_segments + blockIdx.y]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            __syncthreads();
-            // multiplies Au_s*(Av_s*Bu_s*Bv_s) and stores result in sum
-            for(unsigned int i = 0; i < matrix1_rank; ++i){
-                temp += second_matrix[threadIdx.y + bucket_size*i]*first_matrix[threadIdx.x + bucket_size*i];
-            }
-            sum += temp;
-            __syncthreads();
-        }
-        // lowRank*dense
-        else if(tile==segment){
-            H2Opus_Real temp = 0;
-            unsigned int matrix1_rank = K_1[tile*num_segments + blockIdx.y];
-            // loads Av_s into shared memory
-            if(threadIdx.x < matrix1_rank){
-                first_matrix[threadIdx.x*bucket_size + threadIdx.y] = V_tiled_1[scan_k_1[tile*num_segments + blockIdx.y]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            if(threadIdx.x<max_segment_size && threadIdx.y<max_segment_size){
-                second_matrix[threadIdx.x*max_segment_size + threadIdx.y] = diagonal_2[segment*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            __syncthreads();
-
-            if(threadIdx.x < matrix1_rank){
-                for(unsigned int i=0; i<max_segment_size; ++i){
-                    temp += first_matrix[threadIdx.x*max_segment_size + i]*second_matrix[threadIdx.y*max_segment_size + i];
-                }
-            }
-            __syncthreads();
-
-            if(threadIdx.x < matrix1_rank && threadIdx.y < max_segment_size){
-                second_matrix[threadIdx.x*max_segment_size + threadIdx.y] = temp;
-            }
-            __syncthreads();
-            temp=0.0f;
-
-            // loads Au_s into shared memory
-            if(threadIdx.x < matrix1_rank && threadIdx.y<max_segment_size){
-                first_matrix[threadIdx.x*max_segment_size + threadIdx.y] = U_tiled_1[scan_k_1[tile*num_segments + blockIdx.y]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            __syncthreads();
-            if(threadIdx.x<max_segment_size && threadIdx.y<max_segment_size){
-                for(unsigned int i=0; i<matrix1_rank; ++i){
-                    temp += first_matrix[threadIdx.y*max_segment_size + i]*second_matrix[threadIdx.x*max_segment_size + i];
-                }
-            }
-            sum += temp;
-            __syncthreads();
-        }
-        // dense*lowrank
-        else{
-            H2Opus_Real temp = 0;
-            unsigned int matrix2_rank = K_2[segment*num_segments + tile];
-            // loads Bu_s into shared memory
-            if(threadIdx.x < matrix2_rank){
-                second_matrix[threadIdx.x*max_segment_size + threadIdx.y] = U_tiled_2[scan_k_2[segment*num_segments + tile]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            if(threadIdx.x<max_segment_size && threadIdx.y<max_segment_size){
-                first_matrix[threadIdx.x*max_segment_size + threadIdx.y] = diagonal_1[tile*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            __syncthreads();
-
-            if(threadIdx.x<matrix2_rank && threadIdx.y<max_segment_size){
-                for(unsigned int i=0; i<max_segment_size; ++i){
-                    temp += first_matrix[i*max_segment_size + threadIdx.y]*second_matrix[threadIdx.x*max_segment_size + i];
-                }
-            }
-            __syncthreads();
-
-            if(threadIdx.x<matrix2_rank && threadIdx.y<max_segment_size){
-                first_matrix[threadIdx.x*max_segment_size + threadIdx.y] = temp;
-            }
-            __syncthreads();
-            temp = 0.0f;
-
-            if(threadIdx.x<matrix2_rank && threadIdx.y<max_segment_size){
-                second_matrix[threadIdx.y + max_segment_size*threadIdx.x] = V_tiled_2[scan_k_2[segment*num_segments + tile]*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-            }
-            __syncthreads();
-            if(threadIdx.x<max_segment_size && threadIdx.y<max_segment_size){
-                for(unsigned int i=0; i<matrix2_rank; ++i){
-                    temp += first_matrix[i*max_segment_size + threadIdx.y]*second_matrix[i*max_segment_size + threadIdx.x];
-                }
-            }
-            sum += temp;
-            __syncthreads();
-        }
-    }
-    d_gemm_matrix_segmented[blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y] = sum;
-}
-
 __global__ void fillDenseMatrix(int n, H2Opus_Real* matrix) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int seed = i;
@@ -667,28 +471,25 @@ __global__ void fillLRARAArrays(int batchCount, int max_rows, int max_cols, int*
 template<class T>
 struct UnaryAoAAssign : public thrust::unary_function<int, T*>
 {
-  T* original_array;
-  int stride;
-  UnaryAoAAssign(T* original_array, int stride) { this->original_array = original_array; this->stride = stride; }
-  __host__ __device__
-  T* operator()(const unsigned int& thread_id) const { return original_array + thread_id * stride; }
+    T* original_array;
+    int stride;
+    UnaryAoAAssign(T* original_array, int stride) { this->original_array = original_array; this->stride = stride; }
+    __host__ __device__
+    T* operator()(const unsigned int& thread_id) const { return original_array + thread_id * stride; }
 };
 
 template<class T>
 void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int stride, int num_arrays, cudaStream_t stream)
 {
-    // printf("generate array of pointers\n");
-  thrust::device_ptr<T*> dev_data(array_of_arrays);
-
-  thrust::transform(
-    thrust::cuda::par.on(stream),
-    thrust::counting_iterator<int>(0),
-    thrust::counting_iterator<int>(num_arrays),
-    dev_data,
-    UnaryAoAAssign<T>(original_array, stride)
+    thrust::device_ptr<T*> dev_data(array_of_arrays);
+    thrust::transform(
+        thrust::cuda::par.on(stream),
+        thrust::counting_iterator<int>(0),
+        thrust::counting_iterator<int>(num_arrays),
+        dev_data,
+        UnaryAoAAssign<T>(original_array, stride)
     );
-    // printf("ended generate array of pointers\n");
-  cudaGetLastError();
+    cudaGetLastError();
 }
 
 __global__ void printARAOutput(H2Opus_Real* d_A, H2Opus_Real* d_B, int* k, int batchCount, int max_rows, int max_rank){
@@ -704,9 +505,6 @@ __global__ void copyTiles(int batchCount, int max_segment_size, int* d_ranks, in
         for(unsigned int i=0; i<max_segment_size; ++i){
             d_U_tiled_segmented[d_scan_k[blockIdx.x]*max_segment_size + threadIdx.x*max_segment_size + i] = d_A[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + i];
             d_V_tiled_segmented[d_scan_k[blockIdx.x]*max_segment_size + threadIdx.x*max_segment_size + i] = d_B[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + i];
-
-            // d_U_tiled_segmented[threadIdx.x*max_segment_size + i] = d_A[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + i];
-            // d_V_tiled_segmented[threadIdx.x*max_segment_size + i] = d_B[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + i];
         }
     }
 }
@@ -864,10 +662,6 @@ __global__ void errorInMatrix(int num_segments, int max_segment_size, H2Opus_Rea
 __global__ void compareMOwithCM(int num_segments, int max_segment_size, H2Opus_Real* expandedCMMatrix, H2Opus_Real* expandedMOMatrix){
     H2Opus_Real x = expandedMOMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
     H2Opus_Real y = expandedCMMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-    // printf("%lf   %lf\n", x, y);
-    if(x != y){
-        printf("%lf   %lf\n", x, y);
-    }
     assert(x == y);
 }
 
@@ -913,7 +707,6 @@ __global__ void expandHMatrixLevel(int num_ops, int max_rows, int max_cols, H2Op
 
     for(unsigned int i=0; i<d_ranks[block]; ++i){
         sum += d_A[max_rows*max_cols*block + i*max_rows + row]*d_B[max_rows*max_cols*block + i*max_rows + col];
-        // sum += d_A[block][i*max_rows + row]*d_B[block][i*max_rows + col];
     }
     expandedMatrix[block*max_rows*max_cols + col*max_rows + row] = sum;
 }
