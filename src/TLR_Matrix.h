@@ -2,7 +2,11 @@
 #define TLR_Matrix_H
 typedef double H2Opus_Real;
 
+enum Ordering {COLUMN_MAJOR, MORTON};
+
 struct TLR_Matrix{
+
+    Ordering type;
     unsigned int n;
     unsigned int blockSize;
     unsigned int numBlocks;

@@ -357,24 +357,6 @@ __global__ void getTotalMem(uint64_t* totalMem, int* K, int* scan_K, int num_seg
     *totalMem = (uint64_t)scan_K[num_segments - 1] + (uint64_t)K[num_segments - 1];
 }
 
-__global__ void expandMatrix(int num_segments, int max_segment_size, int* K, int* scan_K, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, H2Opus_Real* expMatrix){
-
-    for(unsigned int i=0; i<(max_segment_size/blockDim.x); ++i){
-        for(unsigned int j=0; j<(max_segment_size/blockDim.x); ++j){
-            unsigned int row = i*blockDim.x + threadIdx.y;
-            unsigned int col = j*blockDim.x + threadIdx.x;
-
-            int index = blockIdx.y*max_segment_size*max_segment_size + j*max_segment_size*blockDim.x + threadIdx.x*max_segment_size + i*blockDim.x + threadIdx.y;
-            expMatrix[index] = 0;
-
-            for(unsigned int k = 0; k<K[blockIdx.x*num_segments + blockIdx.y]; ++k){
-                expMatrix[index] += (U_tiled[scan_K[blockIdx.y]*max_segment_size + k*max_segment_size + row]
-                                * V_tiled[scan_K[blockIdx.y]*max_segment_size + k*max_segment_size + col]);
-            }
-        }
-    }
-}
-
 __global__ void calcError(int num_segments, int max_segment_size, H2Opus_Real* expMatrix, H2Opus_Real* input_matrix, H2Opus_Real* error, H2Opus_Real* tmp){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i < num_segments*max_segment_size*max_segment_size){
@@ -865,7 +847,7 @@ __global__ void expandMOMatrix(int num_segments, int max_segment_size, H2Opus_Re
 
 __global__ void expandCMMatrix(int num_segments, int max_segment_size, H2Opus_Real* expandedMatrix, TLR_Matrix matrix){
     if(blockIdx.x == blockIdx.y){
-        expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y] = matrix.diagonal[blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+        expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y] = matrix.diagonal[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
     }
     else{
         H2Opus_Real sum = 0;
@@ -876,9 +858,32 @@ __global__ void expandCMMatrix(int num_segments, int max_segment_size, H2Opus_Re
     }
 }
 
-__global__ void errorInMOMatrix(int num_segments, int max_segment_size, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
+__global__ void expandMatrix(int num_segments, int max_segment_size, H2Opus_Real* expandedMatrix, TLR_Matrix matrix){
+    if(blockIdx.x == blockIdx.y){
+        expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y] = matrix.diagonal[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+    }
+    else{
+        unsigned int index;
+        if(matrix.type == MORTON){
+            index = IndextoMOIndex_h(num_segments, blockIdx.x*num_segments + blockIdx.y);
+        }
+        else if(matrix.type == COLUMN_MAJOR){
+            index = blockIdx.x*num_segments + blockIdx.y;
+        }
+
+        H2Opus_Real sum = 0;
+        for(unsigned int i=0; i<matrix.blockRanks[blockIdx.x*num_segments + blockIdx.y]; ++i){
+            sum += matrix.U[matrix.blockOffsets[index]*max_segment_size + i*max_segment_size + threadIdx.y]*matrix.V[matrix.blockOffsets[index]*max_segment_size + i*max_segment_size + threadIdx.x];
+        }
+
+        expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y] = sum;
+    }
+}
+
+__global__ void errorInMatrix(int num_segments, int max_segment_size, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
     H2Opus_Real x = denseMatrix[(blockIdx.x*max_segment_size + threadIdx.x)*max_segment_size*num_segments + blockIdx.y*max_segment_size + threadIdx.y];
     H2Opus_Real y = expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+    
     atomicAdd(tmp, x*x);
     atomicAdd(error, (x-y)*(x-y));
 }
@@ -893,17 +898,12 @@ __global__ void compareMOwithCM(int num_segments, int max_segment_size, H2Opus_R
     assert(x == y);
 }
 
-__global__ void errorInCMMatrix(int num_segments, int max_segment_size, H2Opus_Real* originalMatrix, H2Opus_Real* expMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
-    if(blockIdx.x==blockIdx.y){
-        // printf("%lf %lf\n", matrix.diagonal[blockIdx.x*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y], expMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y]);
-    }
-    else{
-        int diff = (blockIdx.y > blockIdx.x) ? 1 : 0;
-        H2Opus_Real x = originalMatrix[(blockIdx.x*max_segment_size + threadIdx.x)*max_segment_size*num_segments + blockIdx.y*max_segment_size + threadIdx.y];
-        H2Opus_Real y = expMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x-y)*(x-y));
-    }
+__global__ void errorInCMMatrix(int num_segments, int max_segment_size, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
+    H2Opus_Real x = denseMatrix[(blockIdx.x*max_segment_size + threadIdx.x)*max_segment_size*num_segments + blockIdx.y*max_segment_size + threadIdx.y];
+    H2Opus_Real y = expandedMatrix[blockIdx.x*num_segments*max_segment_size*max_segment_size + blockIdx.y*max_segment_size*max_segment_size + threadIdx.x*max_segment_size + threadIdx.y];
+    printf("%lf   %lf\n", x, y);
+    atomicAdd(tmp, x*x);
+    atomicAdd(error, (x-y)*(x-y));
 }
 
 __global__ void getNewLevelCount(int num_ops, int* d_new_bit_vector, int* d_new_bit_vector_scan, int* d_newLevelCount){

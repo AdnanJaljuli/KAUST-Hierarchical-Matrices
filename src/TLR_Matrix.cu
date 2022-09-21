@@ -14,5 +14,6 @@ void TLR_Matrix::del(){
     free(U);
     free(V);
     free(diagonal);
+
 }
 

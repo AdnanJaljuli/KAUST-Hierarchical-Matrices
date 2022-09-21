@@ -159,6 +159,7 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
 }
 
 // TODO: add type of matrix (column major or morton) to the TLR_Matrix struct as an attribute, and then make only one checkErrorInMatrix function that works for both types
+#if 1
 void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_size, uint64_t k_sum, TLR_Matrix &matrix, TLR_Matrix &mortonMatrix, H2Opus_Real* &d_denseMatrix){
     H2Opus_Real* d_expandedCMMatrix;
     cudaMalloc((void**) &d_expandedCMMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
@@ -188,6 +189,7 @@ void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_siz
     cudaFree(d_tmp);
     cudaFree(d_error);
 
+    #if 0
     H2Opus_Real* d_expandedMOMatrix;
     cudaMalloc((void**) &d_expandedMOMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
     expandMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMOMatrix, mortonMatrix);
@@ -213,6 +215,48 @@ void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_siz
     compareMOwithCM<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, d_expandedMOMatrix);
     cudaFree(d_expandedCMMatrix);
     cudaFree(d_expandedMOMatrix);
+    #endif
 }
+#endif
+
+void checkErrorInMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
+    H2Opus_Real* d_expandedMatrix;
+    cudaMalloc((void**) &d_expandedMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
+
+    dim3 mm_numBlocks(num_segments, num_segments);
+    dim3 mm_numThreadsPerBlock(32, 32);
+    // if(matrix.type == COLUMN_MAJOR){ 
+    //     printf("CM\n");
+    //     expandCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMatrix, matrix);
+    // }
+    // else if(matrix.type == MORTON){
+    //     printf("MO\n");
+    //     expandMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMatrix, matrix);
+    // }
+
+    expandMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMatrix, matrix);
+
+    H2Opus_Real* d_error;
+    H2Opus_Real* d_tmp;
+    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
+    cudaMemset(d_error, 0, sizeof(H2Opus_Real));
+    cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
+
+    // errorInCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
+    errorInMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
+
+    H2Opus_Real h_error;
+    H2Opus_Real h_tmp;
+    cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+    #if 1
+    cudaFree(d_tmp);
+    cudaFree(d_error);
+    cudaFree(d_expandedMatrix);
+    #endif
+}
+
 
 #endif
