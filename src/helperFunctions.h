@@ -8,10 +8,8 @@
 //                     printCountersInFile
 //                     isPowerOfTwo
 //                     getMaxSegmentSize
-//                     printSigmas
-//                     printKs
-//                     columnMajorToMorton
-//                     checkErrorInMatrices
+//                     ConvertColumnMajorToMorton
+//                     checkErrorInLRMatrix
 //
 // AUTHOR:             Adnan Jaljuli
 ///////////////////////////////////////////////////////////////////
@@ -81,34 +79,7 @@ std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     return p;
 }
 
-void printSigmas(H2Opus_Real* S, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_size, int n, int segment){
-    FILE *fp;
-    fp = fopen("results/sigma_values.csv", "a");// "w" means that we are going to write on this file
-    if(segment == 0){
-        fprintf(fp, "bucket size: %d, n: %d, num segments: %d,\n", bucket_size, n, num_segments);
-    }
-
-    for(unsigned int i=0; i<num_segments; ++i){
-        for(unsigned int j=0; j<maxSegmentSize; ++j){
-            fprintf(fp, "%lf, ", S[i*maxSegmentSize + j]);
-        }
-        fprintf(fp, "\n");
-    }
-    fclose(fp); //Don't forget to close the file when finished
-}
-
-void printKs(int* K, uint64_t num_segments, uint64_t maxSegmentSize, int bucket_size, int n){
-    FILE *fp;
-    fp = fopen("results/K_values.csv", "a");// "w" means that we are going to write on this file
-
-    for(unsigned int i=0; i<num_segments; ++i){
-        fprintf(fp, "%d, ", K[i]);
-    }
-    fprintf(fp, "\n");
-    fclose(fp); //Don't forget to close the file when finished
-}
-
-void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix){
+void ConvertColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix){
 
     cudaMalloc((void**) &mortonMatrix.U, k_sum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
     cudaMalloc((void**) &mortonMatrix.V, k_sum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
@@ -140,7 +111,7 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
 
     for(unsigned int i=0; i<num_segments*num_segments; ++i){
         int MOIndex = IndextoMOIndex_h(num_segments, i);
-        
+
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
@@ -154,7 +125,7 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
     gpuErrchk(cudaPeekAtLastError());
 }
 
-void checkErrorInMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
+void checkErrorInLRMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
     H2Opus_Real* d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
 

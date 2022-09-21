@@ -50,17 +50,17 @@ int main(int argc, char *argv[]){
     H2Opus_Real *d_dataset;
     generateDataset_h(config.n, config.dim, d_dataset);
 
-    uint64_t num_segments = 1;
+    uint64_t numSegments = 1;
     uint64_t max_num_segments = (config.n+config.bucket_size-1)/config.bucket_size;
     printf("max num segments: %d\n", max_num_segments);
 
     int  *d_values_in;
     int  *d_offsets_sort;
-    createKDTree(config.n, config.dim, config.bucket_size, num_segments, config.div_method, d_values_in, d_offsets_sort, d_dataset, max_num_segments);
+    createKDTree(config.n, config.dim, config.bucket_size, numSegments, config.div_method, d_values_in, d_offsets_sort, d_dataset, max_num_segments);
 
     uint64_t max_segment_size = config.bucket_size;
     printf("max segment size: %lu\n", max_segment_size);
-    printf("num segments: %lu\n", num_segments);
+    printf("num segments: %lu\n", numSegments);
 
     const int ARA_R = 10;
     int max_rows = max_segment_size;
@@ -71,28 +71,26 @@ int main(int argc, char *argv[]){
     matrix.type = COLUMN_MAJOR;
     H2Opus_Real* d_denseMatrix;
 
-    uint64_t k_sum = createLRMatrix(config.n, num_segments, max_segment_size, config.bucket_size, config.dim, matrix, d_denseMatrix, d_values_in, d_offsets_sort, d_dataset, tolerance, ARA_R, max_rows, max_cols, max_rank);
+    uint64_t k_sum = createColumnMajorLRMatrix(config.n, numSegments, max_segment_size, config.bucket_size, config.dim, matrix, d_denseMatrix, d_values_in, d_offsets_sort, d_dataset, tolerance, ARA_R, max_rows, max_cols, max_rank);
     gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
-    checkErrorInMatrix(num_segments, max_segment_size, matrix, d_denseMatrix);
+    checkErrorInLRMatrix(numSegments, max_segment_size, matrix, d_denseMatrix);
     #endif
 
     TLR_Matrix mortonMatrix;
     mortonMatrix.type = MORTON;
-    ColumnMajorToMorton(num_segments, max_segment_size, k_sum, matrix, mortonMatrix);
+    ConvertColumnMajorToMorton(numSegments, max_segment_size, k_sum, matrix, mortonMatrix);
 
     #if EXPAND_MATRIX
-    checkErrorInMatrix(num_segments, max_segment_size, mortonMatrix, d_denseMatrix);
+    checkErrorInLRMatrix(numSegments, max_segment_size, mortonMatrix, d_denseMatrix);
     #endif
-
-
     #if 0
     const int num_levels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size) + 1;
     printf("num_levels: %d\n", num_levels);
     int** HMatrixRanks = (int**)malloc((num_levels - 1)*sizeof(int*));
-    int** HMatrixExistingTiles = (int**)malloc((num_levels - 1)*sizeof(int*));
-    int num_existing_tiles = num_segments*(num_segments-1);
+    int** HMatrixCandidateTiles = (int**)malloc((num_levels - 1)*sizeof(int*));
+    int numCandidateTiles = numSegments*(numSegments-1);
 
     int *d_rows_batch, *d_cols_batch, *d_ranks;
     int *d_lda_batch, *d_ldb_batch;
@@ -103,7 +101,7 @@ int main(int argc, char *argv[]){
     cudaMalloc((void**) &HMatrixExistingTiles[num_levels - 2], num_existing_tiles*sizeof(int));
 
     // TODO: parallelize
-    fillFirstLevelExistingArrays<<<1, 1>>>(num_segments, HMatrixExistingTiles[num_levels - 2], HMatrixRanks[num_levels - 2], mortonMatrix.blockRanks);
+    fillFirstLevelExistingArrays<<<1, 1>>>(numSegments, HMatrixExistingTiles[num_levels - 2], HMatrixRanks[num_levels - 2], mortonMatrix.blockRanks);
     unsigned int tile_size = config.bucket_size;
     bool stop = false;
 
@@ -114,7 +112,7 @@ int main(int argc, char *argv[]){
     cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
 
-    #if 1
+
     // TODO: fix the number of iterations.
     for(unsigned int level = num_levels - 1; level > 0; --level){
         // TODO: set cudaMalloc and cudaFrees to outside the loop
@@ -201,7 +199,7 @@ int main(int argc, char *argv[]){
 
         cudaMemset(d_error, 0, sizeof(H2Opus_Real));
         cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
-        errorInHMatrix<<<hm_numBlocks, hm_numThreadsPerBlock>>>(num_segments, max_segment_size, num_ops, max_rows, max_cols, expandedHMatrix, d_denseMatrix, d_activeTiles, d_error, d_tmp);
+        errorInHMatrix<<<hm_numBlocks, hm_numThreadsPerBlock>>>(numSegments, max_segment_size, num_ops, max_rows, max_cols, expandedHMatrix, d_denseMatrix, d_activeTiles, d_error, d_tmp);
         cudaDeviceSynchronize();
         cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
         cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
@@ -285,7 +283,6 @@ int main(int argc, char *argv[]){
         }
         break;
     }
-    #endif
     // cudaEventRecord(stopCode);
     // cudaEventSynchronize(stopCode);
     // float Code_time=0;
