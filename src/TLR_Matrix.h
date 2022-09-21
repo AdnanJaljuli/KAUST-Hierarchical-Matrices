@@ -19,4 +19,13 @@ struct TLR_Matrix{
     void del();
 };
 
+void TLR_Matrix::del(){
+    cudaFree(blockRanks);
+    cudaFree(blockOffsets);
+    cudaFree(U);
+    cudaFree(V);
+    cudaFree(diagonal);
+
+}
+
 #endif
