@@ -1,3 +1,6 @@
+#ifndef CREATELRMATRIX_CUH
+#define CREATELRMATRIX_CUH
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -214,3 +217,5 @@ uint64_t createColumnMajorLRMatrix(int n, int num_segments, int max_segment_size
 
     return k_sum;
 }
+
+#endif

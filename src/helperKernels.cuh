@@ -1,7 +1,7 @@
 #ifndef HELPERKERNELS_CUH
 #define HELPERKERNELS_CUH
 
-#include "helperFunctions.h"
+#include "TLR_Matrix.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

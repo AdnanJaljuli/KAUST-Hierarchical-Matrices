@@ -1,38 +1,4 @@
-///////////////////////////////////////////////////////////////////
-// NAME:               helperFunctions.h
-//
-// PURPOSE:            This file is respnsible for supporting host functions.
-//
-// FUNCTIONS/OBJECTS:  gpuErrchk
-//                     generateDataset_h
-//                     printCountersInFile
-//                     isPowerOfTwo
-//                     getMaxSegmentSize
-//                     ConvertColumnMajorToMorton
-//                     checkErrorInLRMatrix
-//
-// AUTHOR:             Adnan Jaljuli
-///////////////////////////////////////////////////////////////////
-
-#ifndef HELPERFUNCTIONS_H
-#define HELPERFUNCTIONS_H
-
-#include <utility>
-#include <cstdint> 
-#include "cublas_v2.h"
-#include "helperKernels.cuh"
-#include <cub/cub.cuh>
-#define numTimers 13
-
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
-    if (code != cudaSuccess) {
-        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
-                line);
-        if (abort)
-            exit(code);
-    }
-}
+#include "helperFunctions.h"
 
 void generateDataset_h(int n, int dim, H2Opus_Real* &d_dataset){
     gpuErrchk(cudaMalloc((void**) &d_dataset, n*dim*(uint64_t)sizeof(H2Opus_Real)));
@@ -151,5 +117,3 @@ void checkErrorInLRMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_
     cudaFree(d_error);
     cudaFree(d_expandedMatrix);
 }
-
-#endif

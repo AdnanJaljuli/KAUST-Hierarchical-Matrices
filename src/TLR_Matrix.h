@@ -1,11 +1,10 @@
 #ifndef TLR_Matrix_H
 #define TLR_Matrix_H
-typedef double H2Opus_Real;
 
+typedef double H2Opus_Real;
 enum Ordering {COLUMN_MAJOR, MORTON};
 
 struct TLR_Matrix{
-
     Ordering type;
     unsigned int n;
     unsigned int blockSize;
@@ -16,16 +15,15 @@ struct TLR_Matrix{
     H2Opus_Real *V;
     H2Opus_Real *diagonal;
 
-    void del();
+    void cudaFreeMatrix();
 };
 
-void TLR_Matrix::del(){
+void TLR_Matrix::cudaFreeMatrix(){
     cudaFree(blockRanks);
     cudaFree(blockOffsets);
     cudaFree(U);
     cudaFree(V);
     cudaFree(diagonal);
-
 }
 
 #endif

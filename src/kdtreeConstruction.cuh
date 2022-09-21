@@ -1,3 +1,6 @@
+#ifndef KDTREECONSTRUCTION_CUH
+#define KDTREECONSTRUCTION_CUH
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -154,3 +157,5 @@ void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVIS
     cudaFree(d_span);
     cudaFree(d_span_offsets);
 }
+
+#endif
