@@ -312,43 +312,10 @@ __global__ void isWorkDone(int num_segments, uint64_t* bit_vector, bool* workDon
     }
 }
 
-__global__ void printMatrix(int num_segments, int max_segment_size, H2Opus_Real* matrix){
-    for(unsigned int i=0; i<num_segments; ++i){
-        for(unsigned int j=0; j<max_segment_size; ++j){
-            for(unsigned int k=0; k<max_segment_size; ++k){
-                printf("%lf ", matrix[i*max_segment_size*max_segment_size + j*max_segment_size + k]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
-}
-
-__global__ void printSort(int n, H2Opus_Real* keys_out, int* values_out){
-    printf("keys out\n");
-    for(int i=0; i<n; ++i){
-        printf("%lf ", keys_out[i]);
-    }
-    printf("\n");
-    printf("values out\n");
-    for(int i=0; i<n; ++i){
-        printf("%d ", values_out[i]);
-    }
-    printf("\n");
-}
-
 __global__ void printK(int* K, int num_segments){
     printf("ks\n");
     for(int i=0; i<num_segments; ++i){
         printf("%d ", K[i]);
-    }
-    printf("\n");
-}
-
-__global__ void printOffsetsSort(int num_segments, int* offsets_sort){
-    printf("print offsets sort\n");
-    for(int i=0; i<num_segments+1; ++i){
-        printf("%d ", offsets_sort[i]);
     }
     printf("\n");
 }
@@ -364,54 +331,6 @@ __global__ void calcError(int num_segments, int max_segment_size, H2Opus_Real* e
         H2Opus_Real y = expMatrix[i];
         atomicAdd(tmp, x*x);
         atomicAdd(error, (x-y)*(x-y));
-    }
-}
-
-__global__ void printExpM(uint64_t num_segments, uint64_t max_segment_size, H2Opus_Real* expMatrix, H2Opus_Real* inputMatrix){
-        for(unsigned int j=0; j<max_segment_size*max_segment_size; ++j){
-            if(j%max_segment_size==0){
-                printf("\n");
-            }
-            printf("%lf ", expMatrix[(j%max_segment_size)*max_segment_size + (j/max_segment_size)]);
-        }
-        printf("\n");
-
-    for(unsigned int j=0; j<max_segment_size*max_segment_size; ++j){
-            if(j%max_segment_size==0){
-                printf("\n");
-            }
-            printf("%lf ", inputMatrix[(j%max_segment_size)*max_segment_size + (j/max_segment_size)]);
-        }
-        printf("\n");
-}
-
-__global__ void fillVector(int num_segments, int max_segment_size, H2Opus_Real* input_vector, H2Opus_Real* output_vector, H2Opus_Real* output_vector_org){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i < num_segments*max_segment_size){
-        unsigned int seed = i;
-        curandState s;
-        curand_init(seed, 0, 0, &s);
-        H2Opus_Real random_n = curand_uniform(&s);
-        input_vector[i]= random_n;
-        output_vector[i]= 0;
-        output_vector_org[i]= 0;
-    }
-}
-
-__global__ void PrintVector(unsigned int num_segments, unsigned int max_segment_size, H2Opus_Real * d_output_vector){
-    for (unsigned int i = 0; i < num_segments*max_segment_size; ++i){
-        printf("%lf ", d_output_vector[i]);
-    }
-    printf("\n");
-}
-
-__global__ void calcError_vector (int num_segments, int max_segment_size, H2Opus_Real* output_vector, H2Opus_Real* output_vector_org, H2Opus_Real* error_vector, H2Opus_Real* tmp_vector){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i < num_segments*max_segment_size){
-        H2Opus_Real x = output_vector_org[i];
-        H2Opus_Real y = output_vector[i];
-        atomicAdd(tmp_vector, x*x);
-        atomicAdd(error_vector, (x-y)*(x-y));
     }
 }
 
