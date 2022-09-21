@@ -72,27 +72,19 @@ int main(int argc, char *argv[]){
     H2Opus_Real* d_denseMatrix;
 
     uint64_t k_sum = createLRMatrix(config.n, num_segments, max_segment_size, config.bucket_size, config.dim, matrix, d_denseMatrix, d_values_in, d_offsets_sort, d_dataset, tolerance, ARA_R, max_rows, max_cols, max_rank);
-    printf("k sum %d\n", k_sum);
-    printK<<<1, 1>>> (matrix.blockRanks, num_segments*num_segments);
-    printK<<<1, 1>>> (matrix.blockOffsets, num_segments*num_segments);
     gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
     checkErrorInMatrix(num_segments, max_segment_size, matrix, d_denseMatrix);
     #endif
-    gpuErrchk(cudaPeekAtLastError());
 
     TLR_Matrix mortonMatrix;
     mortonMatrix.type = MORTON;
     ColumnMajorToMorton(num_segments, max_segment_size, k_sum, matrix, mortonMatrix);
-    printf("morton matrix ranks\n");
-    printK<<<1, 1>>> (mortonMatrix.blockRanks, num_segments*num_segments);
-    printK<<<1, 1>>> (mortonMatrix.blockOffsets, num_segments*num_segments);
 
     #if EXPAND_MATRIX
     checkErrorInMatrix(num_segments, max_segment_size, mortonMatrix, d_denseMatrix);
     #endif
-
 
 
     #if 0

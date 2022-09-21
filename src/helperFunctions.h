@@ -121,9 +121,6 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
     copyCMRanksToMORanks<<<numBlocks, numThreadsPerBlock>>>(num_segments, maxSegmentSize, matrix.blockRanks, mortonMatrix.blockRanks);
     cudaDeviceSynchronize();
 
-    printK<<<1, 1>>>(matrix.blockRanks, num_segments*num_segments);
-    printK<<<1, 1>>>(mortonMatrix.blockRanks, num_segments*num_segments);
-
     // scan mortonMatrix ranks
     void* d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
@@ -143,9 +140,7 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
 
     for(unsigned int i=0; i<num_segments*num_segments; ++i){
         int MOIndex = IndextoMOIndex_h(num_segments, i);
-        unsigned int x = i%num_segments;
-        unsigned int y = i/num_segments;
-
+        
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
@@ -154,70 +149,10 @@ void ColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_
             copyTilestoMO<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
         }
     }
+    
     cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, num_segments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
     gpuErrchk(cudaPeekAtLastError());
 }
-
-// TODO: add type of matrix (column major or morton) to the TLR_Matrix struct as an attribute, and then make only one checkErrorInMatrix function that works for both types
-#if 1
-void checkErrorInMatrices(int n, uint64_t num_segments, uint64_t max_segment_size, uint64_t k_sum, TLR_Matrix &matrix, TLR_Matrix &mortonMatrix, H2Opus_Real* &d_denseMatrix){
-    H2Opus_Real* d_expandedCMMatrix;
-    cudaMalloc((void**) &d_expandedCMMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
-    dim3 mm_numBlocks(num_segments, num_segments);
-    dim3 mm_numThreadsPerBlock(32, 32);
-    expandCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, matrix);
-    cudaDeviceSynchronize();
-
-    H2Opus_Real* d_error;
-    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-    H2Opus_Real* h_error = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_error = 0;
-    cudaMemcpy(d_error, h_error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    H2Opus_Real* d_tmp;
-    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-    H2Opus_Real* h_tmp = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_tmp = 0;
-    cudaMemcpy(d_tmp, h_tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-
-    errorInCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedCMMatrix, d_error, d_tmp);
-
-    cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error in column major ordered matrix: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
-    free(h_tmp);
-    free(h_error);
-    cudaFree(d_tmp);
-    cudaFree(d_error);
-
-    #if 0
-    H2Opus_Real* d_expandedMOMatrix;
-    cudaMalloc((void**) &d_expandedMOMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
-    expandMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMOMatrix, mortonMatrix);
-
-    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-    h_error = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_error = 0;
-    cudaMemcpy(d_error, h_error, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-    h_tmp = (H2Opus_Real*)malloc(sizeof(H2Opus_Real));
-    *h_tmp = 0;
-    cudaMemcpy(d_tmp, h_tmp, sizeof(H2Opus_Real), cudaMemcpyHostToDevice);
-
-    errorInMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMOMatrix, d_error, d_tmp);
-    cudaMemcpy(h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error in morton ordered matrix: %lf\n", sqrt(*h_error)/sqrt(*h_tmp));
-    free(h_tmp);
-    free(h_error);
-    cudaFree(d_tmp);
-    cudaFree(d_error);
-
-    compareMOwithCM<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedCMMatrix, d_expandedMOMatrix);
-    cudaFree(d_expandedCMMatrix);
-    cudaFree(d_expandedMOMatrix);
-    #endif
-}
-#endif
 
 void checkErrorInMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
     H2Opus_Real* d_expandedMatrix;
@@ -225,15 +160,6 @@ void checkErrorInMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Ma
 
     dim3 mm_numBlocks(num_segments, num_segments);
     dim3 mm_numThreadsPerBlock(32, 32);
-    // if(matrix.type == COLUMN_MAJOR){ 
-    //     printf("CM\n");
-    //     expandCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMatrix, matrix);
-    // }
-    // else if(matrix.type == MORTON){
-    //     printf("MO\n");
-    //     expandMOMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMatrix, matrix);
-    // }
-
     expandMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_expandedMatrix, matrix);
 
     H2Opus_Real* d_error;
@@ -243,7 +169,6 @@ void checkErrorInMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Ma
     cudaMemset(d_error, 0, sizeof(H2Opus_Real));
     cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
 
-    // errorInCMMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
     errorInMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(num_segments, max_segment_size, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
 
     H2Opus_Real h_error;
@@ -255,6 +180,5 @@ void checkErrorInMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Ma
     cudaFree(d_error);
     cudaFree(d_expandedMatrix);
 }
-
 
 #endif
