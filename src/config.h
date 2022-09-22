@@ -53,10 +53,10 @@ struct Config
 {
     // Version version;
     DIVISION_METHOD div_method;
-    unsigned int n;
-    unsigned int dim;
+    unsigned int n; // TODO: rename
+    unsigned int dim; // TODO: rename
     unsigned int bucket_size;
-    float tol;
+    float tol; // TODO: rename to something more representative (e.g., lowestLevelTolerance)
 };
 
 static Config parseArgs(int argc, char **argv)
@@ -90,6 +90,7 @@ static Config parseArgs(int argc, char **argv)
             break;
         default:
             fprintf(stderr, "\nUnrecognized option!\n");
+            // TODO: print list of options and what they mean
             exit(0);
         }
     }
@@ -98,3 +99,4 @@ static Config parseArgs(int argc, char **argv)
 }
 
 #endif
+

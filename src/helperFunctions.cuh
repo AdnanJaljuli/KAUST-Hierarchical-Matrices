@@ -23,7 +23,10 @@
 #include "TLR_Matrix.h"
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
+
 #define numTimers 13
+
+// TODO: for all functions declared in this header file, define them in another file or define them as static in this file
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
@@ -35,7 +38,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     }
 }
 
-void generateDataset_h(int n, int dim, H2Opus_Real* &d_dataset);
+void generateDataset(int n, int dim);
 void printCountersInFile(float* times);
 bool isPowerOfTwo (int x);
 std::pair<int, int> getMaxSegmentSize(int n, int bucket_size);
@@ -44,11 +47,11 @@ void checkErrorInLRMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_
 __device__ __host__ int upper_power_of_two(int v);
 
 
-void generateDataset_h(int n, int dim, H2Opus_Real* &d_dataset){
-    gpuErrchk(cudaMalloc((void**) &d_dataset, n*dim*(uint64_t)sizeof(H2Opus_Real)));
+void generateDataset(int n, int dim, H2Opus_Real* d_dataset) {
+    // TODO: use a 2D grid that's n x dim
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (n + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    generateDataset<<<numBlocks, numThreadsPerBlock>>> (n, dim, d_dataset);
+    generateDataset_kernel<<<numBlocks, numThreadsPerBlock>>> (n, dim, d_dataset);
     cudaDeviceSynchronize();
 }
 

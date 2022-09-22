@@ -16,13 +16,14 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-__global__ void generateDataset(int n, int dim, H2Opus_Real* dataset){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<n){
+__global__ void generateDataset_kernel(int n, int dim, H2Opus_Real* dataset){
+    // TODO: use a 2D grid that's n x dim (seed in this case can be j*n + i)
+    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i < n) {
         unsigned int seed = i;
         curandState s;
         curand_init(seed, 0, 0, &s);
-        for(unsigned int j=0; j<dim; ++j){
+        for(unsigned int j = 0; j < dim; ++j) {
             dataset[j*n + i] = curand_uniform(&s);
         }
     }

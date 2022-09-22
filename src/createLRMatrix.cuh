@@ -160,7 +160,6 @@ uint64_t createColumnMajorLRMatrix(int n, int num_segments, int max_segment_size
     cudaFree(d_scan_K_segmented);
     cudaFree(d_values_in);
     cudaFree(d_offsets_sort);
-    cudaFree(d_dataset);
 
     cudaFree(d_rows_batch);
     cudaFree(d_cols_batch);
