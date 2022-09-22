@@ -19,6 +19,8 @@
 
 // TODO: make all header files independent
 // TODO: make EXPAND_MATRIX a config argument
+// TODO: fix timer_arr
+
 #define EXPAND_MATRIX 1
 #define BLOCK_SIZE 32
 using namespace std;
@@ -87,15 +89,16 @@ int main(int argc, char *argv[]){
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(numSegments, maxSegmentSize, mortonMatrix, d_denseMatrix);
     #endif
-    gpuErrchk(cudaPeekAtLastError());
 
+    return 0;
     const int numLevels = __builtin_ctz(config.n) - __builtin_ctz(config.bucket_size) + 1;
     printf("numLevels: %d\n", numLevels);
     int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));
     int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
     genereateHierarchicalMatrix(config.n, config.bucket_size, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
-    
+
     mortonMatrix.cudaFreeMatrix();
+    gpuErrchk(cudaPeekAtLastError());
 
     cudaEventRecord(stopCode);
     cudaEventSynchronize(stopCode);

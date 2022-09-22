@@ -1,5 +1,5 @@
-#ifndef HIERARCHICALMATRIX_H
-#define HIERARCHICALMATRIX_H
+#ifndef HIERARCHICALMATRIX_FUNCTIONS_H
+#define HIERARCHICALMATRIX_FUNCTIONS_H
 
 void genereateHierarchicalMatrix(int n, int bucket_size, int numSegments, int maxSegmentSize, int numLevels, TLR_Matrix mortonMatrix, int** HMatrixExistingRanks, int** HMatrixExistingTiles){
     int numExistingTiles = numSegments*(numSegments-1);
@@ -23,8 +23,8 @@ void genereateHierarchicalMatrix(int n, int bucket_size, int numSegments, int ma
     H2Opus_Real* d_tmp;
     cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-    #if 0
 
+    #if 0
     // TODO: fix the number of iterations.
     for(unsigned int level = numLevels - 1; level > 0; --level){
         // TODO: set cudaMalloc and cudaFrees to outside the loop
