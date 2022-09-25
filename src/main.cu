@@ -103,4 +103,3 @@ int main(int argc, char *argv[]) {
     gpuErrchk(cudaPeekAtLastError());
     return 0; // XXX: XXX XXX XXX
 }
-

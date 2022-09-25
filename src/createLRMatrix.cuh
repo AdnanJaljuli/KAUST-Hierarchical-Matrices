@@ -38,7 +38,6 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
     gpuErrchk(cudaMalloc((void**) &matrix.blockRanks, numSegments*numSegments*sizeof(int)));
     gpuErrchk(cudaMalloc((void**) &matrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real)));
 
-
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
@@ -87,7 +86,6 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
     dim3 m_numBlocks(1, numSegments);
 
     for(unsigned int segment = 0; segment < numSegments; ++segment){
-        // TODO: launch a 1D grid instead of a 2D grid
         #if EXPAND_MATRIX
         generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal, d_denseMatrix, 1);
         #else
@@ -95,7 +93,7 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
         #endif
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
-        
+
         generateArrayOfPointersT<H2Opus_Real>(d_inputMatrixSegmented, d_MPtrs, maxRows*maxCols, numSegments - 1, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxCols, numSegments - 1, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxCols, numSegments - 1, 0);
@@ -133,7 +131,6 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
         cudaFree(d_tempStorage);
 
         printK<<<1, 1>>>(d_ranks + segment*(numSegments - 1), numSegments - 1);
-
         getTotalMem<<<1, 1>>> (d_totalMem, d_ranks + segment*(numSegments - 1), d_scanRanksSegmented, numSegments - 1);
         cudaMemcpy(totalMem, d_totalMem, sizeof(uint64_t), cudaMemcpyDeviceToHost);
 
