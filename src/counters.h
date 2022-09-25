@@ -30,12 +30,12 @@ static void startTime(counterName counter, Counters* counters) {
 
 static void endTime(counterName counter, Counters *counters) {
     #if USE_COUNTERS
-    // counters->totalTime[counetr] += clock64() - counters->startTime[counter];
     cudaEventCreate(&counters->endEvent[counter]);
     cudaEventRecord(counters->endEvent[counter]);
     cudaEventSynchronize(counters->endEvent[counter]);
-    float time;
     cudaEventElapsedTime(&counters->totalTime[counter], counters->startEvent[counter], counters->endEvent[counter]);
+    cudaEventDestroy(counters->startEvent[counter]);
+    cudaEventDestroy(counters->endEvent[counter]);
     #endif
 }
 

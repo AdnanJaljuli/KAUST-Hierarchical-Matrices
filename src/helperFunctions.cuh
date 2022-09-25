@@ -55,7 +55,7 @@ static void generateDataset(int n, int dim, H2Opus_Real* d_dataset) {
     cudaDeviceSynchronize();
 }
 
-static __device__ __host__ int upper_power_of_two(int v){
+static __device__ __host__ int upperPowerOfTwo(int v){
     v--;
     v |= v >> 1;
     v |= v >> 2;

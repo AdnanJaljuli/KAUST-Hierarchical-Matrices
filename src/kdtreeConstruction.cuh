@@ -11,150 +11,149 @@
 #include <stddef.h>
 
 // TODO: clean this file
-void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVISION_METHOD div_method, int* &d_values_in, int* &d_offsets_sort, H2Opus_Real* d_dataset, int max_num_segments){
+void createKDTree(int n, int dim, int bucketSize, uint64_t *numSegments, DIVISION_METHOD divMethod, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* d_dataset, int maxNumSegments) {
 
-    num_segments = 1;
-    uint64_t num_segments_reduce = num_segments*dim;
-    uint64_t segment_size = upper_power_of_two(n);
+    *numSegments = 1;
+    uint64_t numSegmentsReduce = *numSegments*dim;
+    uint64_t segment_size = upperPowerOfTwo(n);
 
-    int *d_offsets_reduce;
-    H2Opus_Real *d_keys_in;
-    H2Opus_Real *d_keys_out;
-    int  *d_values_out;
-    int *d_curr_dim;
-    H2Opus_Real *d_reduce_in;
-    H2Opus_Real *d_reduce_min_out;
-    H2Opus_Real *d_reduce_max_out;
+    int *d_offsetsReduce;
+    H2Opus_Real *d_keysIn;
+    H2Opus_Real *d_keysOut;
+    int  *d_valuesOut;
+    int *d_currentDim;
+    H2Opus_Real *d_reduceIn;
+    H2Opus_Real *d_reduceMinOut;
+    H2Opus_Real *d_reduceMaxOut;
     int *d_temp;
     H2Opus_Real *d_span;
-    int* d_span_offsets;
-    cub::KeyValuePair<int, H2Opus_Real> *d_span_reduce_out;
+    int* d_spanOffsets;
+    cub::KeyValuePair<int, H2Opus_Real> *d_spanReduceOut;
 
     unsigned int largest_segment_size = n;
 
     // TODO: fix memory allocated
-    cudaMalloc((void**) &d_offsets_reduce, (long long)((max_num_segments*dim + 1)*(long long)sizeof(int)));
-    cudaMalloc((void**) &d_keys_in, n*sizeof(H2Opus_Real));    
-    cudaMalloc((void**) &d_keys_out, n*sizeof(H2Opus_Real));    
-    cudaMalloc((void**) &d_values_out, n*sizeof(int));    
-    cudaMalloc((void**) &d_curr_dim, (max_num_segments + 1)*sizeof(int));    
-    cudaMalloc((void**) &d_reduce_in, (long long)n*(long long)dim*(long long)sizeof(H2Opus_Real));    
-    cudaMalloc((void**) &d_reduce_min_out, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));    
-    cudaMalloc((void**) &d_reduce_max_out, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));    
-    cudaMalloc((void**) &d_span, (long long)((max_num_segments+1)*dim)*(long long)sizeof(int));    
-    cudaMalloc((void**) &d_span_offsets, (max_num_segments + 1)*sizeof(int));    
-    cudaMalloc((void**) &d_span_reduce_out, (max_num_segments+1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));    
+    cudaMalloc((void**) &d_offsetsReduce, (maxNumSegments*dim + 1)*sizeof(int));
+    cudaMalloc((void**) &d_keysIn, n*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_keysOut, n*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_valuesOut, n*sizeof(int));
+    cudaMalloc((void**) &d_currentDim, (maxNumSegments + 1)*sizeof(int));
+    cudaMalloc((void**) &d_reduceIn, n*dim*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_reduceMinOut, (maxNumSegments + 1)*dim*sizeof(int));
+    cudaMalloc((void**) &d_reduceMaxOut, (maxNumSegments + 1)*dim*sizeof(int));
+    cudaMalloc((void**) &d_span, (maxNumSegments + 1)*dim*sizeof(int));
+    cudaMalloc((void**) &d_spanOffsets, (maxNumSegments + 1)*sizeof(int));
+    cudaMalloc((void**) &d_spanReduceOut, (maxNumSegments + 1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (n + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    initializeArrays<<<numBlocks, numThreadsPerBlock>>>(n, d_values_in, d_curr_dim, max_num_segments);
+    initializeArrays<<<numBlocks, numThreadsPerBlock>>>(n, d_valuesIn, d_currentDim, maxNumSegments);
 
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
     unsigned int iteration = 0;
 
-    while(segment_size > bucket_size)
-    {
+    while(segment_size > bucketSize) {
         numThreadsPerBlock = 1024;
-        numBlocks = (num_segments+1+numThreadsPerBlock-1)/numThreadsPerBlock;
-        fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
+        numBlocks = (*numSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, *numSegments, segment_size, d_offsetsSort, d_offsetsReduce);
 
         numThreadsPerBlock = 1024;
         numBlocks = (long long)((long long)n*(long long)dim + numThreadsPerBlock-1)/numThreadsPerBlock;
 
-        fillReductionArray<<<numBlocks, numThreadsPerBlock>>> (n, dim, d_dataset, d_values_in, d_reduce_in);
+        fillReductionArray<<<numBlocks, numThreadsPerBlock>>> (n, dim, d_dataset, d_valuesIn, d_reduceIn);
         cudaDeviceSynchronize();
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
-        cub::DeviceSegmentedReduce::Min(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_min_out,
-            num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
+        cub::DeviceSegmentedReduce::Min(d_temp_storage, temp_storage_bytes, d_reduceIn, d_reduceMinOut,
+            numSegmentsReduce, d_offsetsReduce, d_offsetsReduce + 1);
 
         cudaMalloc(&d_temp_storage, temp_storage_bytes);
 
-        cub::DeviceSegmentedReduce::Min(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_min_out,
-            num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
+        cub::DeviceSegmentedReduce::Min(d_temp_storage, temp_storage_bytes, d_reduceIn, d_reduceMinOut,
+            numSegmentsReduce, d_offsetsReduce, d_offsetsReduce + 1);
         cudaFree(d_temp_storage);
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
-        cub::DeviceSegmentedReduce::Max(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_max_out,
-            num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
+        cub::DeviceSegmentedReduce::Max(d_temp_storage, temp_storage_bytes, d_reduceIn, d_reduceMaxOut,
+            numSegmentsReduce, d_offsetsReduce, d_offsetsReduce + 1);
 
         cudaMalloc(&d_temp_storage, temp_storage_bytes);
 
-        cub::DeviceSegmentedReduce::Max(d_temp_storage, temp_storage_bytes, d_reduce_in, d_reduce_max_out,
-            num_segments_reduce, d_offsets_reduce, d_offsets_reduce + 1);
+        cub::DeviceSegmentedReduce::Max(d_temp_storage, temp_storage_bytes, d_reduceIn, d_reduceMaxOut,
+            numSegmentsReduce, d_offsetsReduce, d_offsetsReduce + 1);
         cudaFree(d_temp_storage);
 
         numThreadsPerBlock = 1024;
-        numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
+        numBlocks = (*numSegments+numThreadsPerBlock-1)/numThreadsPerBlock;
 
-        findSpan<<<numBlocks, numThreadsPerBlock>>> (n, dim, num_segments, d_reduce_min_out, d_reduce_max_out, d_span, d_span_offsets);
+        findSpan<<<numBlocks, numThreadsPerBlock>>> (n, dim, *numSegments, d_reduceMinOut, d_reduceMaxOut, d_span, d_spanOffsets);
         cudaDeviceSynchronize();
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
-        cub::DeviceSegmentedReduce::ArgMax(d_temp_storage, temp_storage_bytes, d_span, d_span_reduce_out,
-            num_segments, d_span_offsets, d_span_offsets + 1);
+        cub::DeviceSegmentedReduce::ArgMax(d_temp_storage, temp_storage_bytes, d_span, d_spanReduceOut,
+            *numSegments, d_spanOffsets, d_spanOffsets + 1);
         // Allocate temporary storage
         cudaMalloc(&d_temp_storage, temp_storage_bytes);
         // Run argmax-reduction
-        cub::DeviceSegmentedReduce::ArgMax(d_temp_storage, temp_storage_bytes, d_span, d_span_reduce_out,
-            num_segments, d_span_offsets, d_span_offsets + 1);
+        cub::DeviceSegmentedReduce::ArgMax(d_temp_storage, temp_storage_bytes, d_span, d_spanReduceOut,
+            *numSegments, d_spanOffsets, d_spanOffsets + 1);
         cudaFree(d_temp_storage);
 
         numThreadsPerBlock = 1024;
-        numBlocks = (num_segments+numThreadsPerBlock-1)/numThreadsPerBlock;
-        fillCurrDim<<<numBlocks, numThreadsPerBlock>>> (n, num_segments, d_curr_dim, d_span_reduce_out);
+        numBlocks = (*numSegments+numThreadsPerBlock-1)/numThreadsPerBlock;
+        fillCurrDim<<<numBlocks, numThreadsPerBlock>>> (n, *numSegments, d_currentDim, d_spanReduceOut);
 
         // fill keys_in array
         numThreadsPerBlock = 1024;
         numBlocks = (n+numThreadsPerBlock-1)/numThreadsPerBlock;
-        fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, segment_size, d_keys_in, d_curr_dim, d_values_in, d_dataset);
+        fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (n, segment_size, d_keysIn, d_currentDim, d_valuesIn, d_dataset);
         cudaDeviceSynchronize();
 
         d_temp_storage = NULL;
         temp_storage_bytes = 0;
 
         cub::DeviceSegmentedRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-        d_keys_in, d_keys_out, d_values_in, d_values_out,
-        n, num_segments, d_offsets_sort, d_offsets_sort + 1);
+        d_keysIn, d_keysOut, d_valuesIn, d_valuesOut,
+        n, *numSegments, d_offsetsSort, d_offsetsSort + 1);
 
         cudaMalloc(&d_temp_storage, temp_storage_bytes);
 
         cub::DeviceSegmentedRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-        d_keys_in, d_keys_out, d_values_in, d_values_out,
-        n, num_segments, d_offsets_sort, d_offsets_sort + 1);
+        d_keysIn, d_keysOut, d_valuesIn, d_valuesOut,
+        n, *numSegments, d_offsetsSort, d_offsetsSort + 1);
         cudaFree(d_temp_storage);
 
-        d_temp = d_values_in;
-        d_values_in = d_values_out;
-        d_values_out = d_temp;
+        d_temp = d_valuesIn;
+        d_valuesIn = d_valuesOut;
+        d_valuesOut = d_temp;
         ++iteration;
 
         segment_size /= 2;
-        num_segments = (n+segment_size-1)/segment_size;
-        num_segments_reduce = num_segments*dim;
+        *numSegments = (n+segment_size-1)/segment_size;
+        numSegmentsReduce = *numSegments*dim;
     }
 
 
-    fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, num_segments, segment_size, d_offsets_sort, d_offsets_reduce);
+    fillOffsets<<<numBlocks, numThreadsPerBlock>>>(n, dim, *numSegments, segment_size, d_offsetsSort, d_offsetsReduce);
 
-    cudaFree(d_offsets_reduce);
-    cudaFree(d_keys_in);
-    cudaFree(d_keys_out);
-    cudaFree(d_values_out);
-    cudaFree(d_curr_dim);
-    cudaFree(d_reduce_in);
-    cudaFree(d_reduce_min_out);
-    cudaFree(d_reduce_max_out);
-    cudaFree(d_span_reduce_out);
+    cudaFree(d_offsetsReduce);
+    cudaFree(d_keysIn);
+    cudaFree(d_keysOut);
+    cudaFree(d_valuesOut);
+    cudaFree(d_currentDim);
+    cudaFree(d_reduceIn);
+    cudaFree(d_reduceMinOut);
+    cudaFree(d_reduceMaxOut);
+    cudaFree(d_spanReduceOut);
     cudaFree(d_span);
-    cudaFree(d_span_offsets);
+    cudaFree(d_spanOffsets);
 }
 
 #endif

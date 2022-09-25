@@ -1,5 +1,4 @@
 
-// TODO: make all header files independent
 #include "config.h"
 #include "counters.h"
 #include "createLRMatrix.cuh"
@@ -50,11 +49,12 @@ int main(int argc, char *argv[]) {
     cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
     cudaMalloc((void**) &d_offsetsSort, (maxNumSegments + 1)*sizeof(int));
     // TODO: move the frees for the two mallocs above to the end of the main function
-    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, numSegments, config.divMethod, d_valuesIn, d_offsetsSort, d_dataset, maxNumSegments);
+    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, &numSegments, config.divMethod, d_valuesIn, d_offsetsSort, d_dataset, maxNumSegments);
 
     uint64_t maxSegmentSize = config.bucketSize;
     printf("max segment size: %lu\n", maxSegmentSize);
     printf("num segments: %lu\n", numSegments);
+
     const int ARA_R = 10;
     int max_rows = maxSegmentSize;
     int max_cols = maxSegmentSize;
@@ -88,17 +88,14 @@ int main(int argc, char *argv[]) {
     #endif
 
     mortonMatrix.cudaFreeMatrix();
-    gpuErrchk(cudaPeekAtLastError());
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);
     printCountersInFile(config, &counters);
     #endif
-    // Clean up
+
     cudaFree(d_dataset);
-    #if 0
-    free(counters);
-    #endif
+    gpuErrchk(cudaPeekAtLastError());
     return 0; // XXX: XXX XXX XXX
 }
 
