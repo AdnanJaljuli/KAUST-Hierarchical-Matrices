@@ -8,8 +8,9 @@
 enum counterName { TOTAL_TIME = 0, NUM_COUNTERS };
 
 struct Counters {
-    unsigned long long startTime[NUM_COUNTERS];
-    unsigned long long totalTime[NUM_COUNTERS];
+    cudaEvent_t startEvent[NUM_COUNTERS];
+    cudaEvent_t endEvent[NUM_COUNTERS];
+    float totalTime[NUM_COUNTERS];
 };
 
 static void initCounters(Counters* counters) {
@@ -22,13 +23,19 @@ static void initCounters(Counters* counters) {
 
 static void startTime(counterName counter, Counters* counters) {
     #if USE_COUNTERS
-    counters->startTime[counter] = clock64();
+    cudaEventCreate(&counters->startEvent[counter]);
+    cudaEventRecord(counters->startEvent[counter]);
     #endif
 }
 
 static void endTime(counterName counter, Counters *counters) {
     #if USE_COUNTERS
-    counters->totalTime[counetr] += clock64() - counters->startTime[counter];
+    // counters->totalTime[counetr] += clock64() - counters->startTime[counter];
+    cudaEventCreate(&counters->endEvent[counter]);
+    cudaEventRecord(counters->endEvent[counter]);
+    cudaEventSynchronize(counters->endEvent[counter]);
+    float time;
+    cudaEventElapsedTime(&counters->totalTime[counter], counters->startEvent[counter], counters->endEvent[counter]);
     #endif
 }
 
@@ -39,6 +46,7 @@ static void printCountersInFile(Config config, Counters *counters) {
 
     for(unsigned int i = 0; i < NUM_COUNTERS; ++i){
         fprintf(output_file,"%f, ", counters->totalTime[i]);
+        printf("counters total time: %f\n", counters->totalTime[i]);
     }
 
     fprintf(output_file, "\n");

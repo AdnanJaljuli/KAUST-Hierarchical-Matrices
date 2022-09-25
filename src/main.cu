@@ -22,38 +22,27 @@
 #include <utility>
 using namespace std;
 
-// TODO: make EXPAND_MATRIX a config argument
+// TODO: make EXPAND_MATRIX a config argument (or similar to USE_COUNTERS)
 #define EXPAND_MATRIX 1
 
 int main(int argc, char *argv[]) {
 
     cudaDeviceSynchronize();
 
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
-    printf("\nDevice name: %s\n\n", prop.name);
-
-    cudaEvent_t startCode;
-    cudaEventCreate(&startCode);
-    cudaEventRecord(startCode);
-
     Config config = parseArgs(argc, argv);
-    // TODO: move printfs below to their own function printArgs defined inside of config.h
-    printf("n: %d\n", config.numberOfInputPoints);
-    printf("bucket size: %d\n", config.bucketSize);
-    printf("epsilon: %f\n", config.lowestLevelTolerance);
-    printf("dimensionOfInputPoints: %d\n", config.dimensionOfInputPoints);
-    printf("num counters: %d\n", NUM_COUNTERS);
+    printArgs(config, NUM_COUNTERS);
 
-    // TODO: fix counters (use enum, not macros; see vertex cover code for how we define counters in an extensible way)
+    #if USE_COUNTERS
     Counters counters;
     initCounters(&counters);
+    startTime(TOTAL_TIME, &counters);
+    #endif
 
     H2Opus_Real* d_dataset;
     gpuErrchk(cudaMalloc((void**) &d_dataset, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real)));
     generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_dataset);
 
-    uint64_t maxNumSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize; // TODO: use camel case everywhere
+    uint64_t maxNumSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
     printf("max num segments: %d\n", maxNumSegments);
     uint64_t numSegments;
     int  *d_valuesIn;
@@ -90,36 +79,26 @@ int main(int argc, char *argv[]) {
     checkErrorInLRMatrix(numSegments, maxSegmentSize, mortonMatrix, d_denseMatrix);
     #endif
 
-
+    #if 0
     const int numLevels = __builtin_ctz(config.numberOfInputPoints/config.bucketSize) + 1;
     printf("numLevels: %d\n", numLevels);
     int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));
     int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
     genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
+    #endif
 
     mortonMatrix.cudaFreeMatrix();
     gpuErrchk(cudaPeekAtLastError());
 
-    cudaEvent_t stopCode;
-    cudaEventCreate(&stopCode);
-    cudaEventRecord(stopCode);
-    cudaEventSynchronize(stopCode);
-    float codeTime = 0;
-    cudaEventElapsedTime(&codeTime, startCode, stopCode);
-    // counters[11] = codeTime;
-    printf("total time: %f\n", codeTime);
-
-    #if 0
-    printCountersInFile(config, counters);
+    #if USE_COUNTERS
+    endTime(TOTAL_TIME, &counters);
+    printCountersInFile(config, &counters);
     #endif
     // Clean up
-    cudaEventDestroy(startCode);
-    cudaEventDestroy(stopCode);
     cudaFree(d_dataset);
     #if 0
     free(counters);
     #endif
-
-    return 0;
+    return 0; // XXX: XXX XXX XXX
 }
 
