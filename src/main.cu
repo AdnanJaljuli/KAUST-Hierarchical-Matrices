@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 
     uint64_t maxNumSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
     printf("max num segments: %d\n", maxNumSegments);
-    
+
     uint64_t numSegments;
     int  *d_valuesIn;
     int  *d_offsetsSort;
@@ -58,7 +58,12 @@ int main(int argc, char *argv[]) {
     int max_rank = max_cols;
     TLR_Matrix matrix;
     matrix.type = COLUMN_MAJOR;
+
     H2Opus_Real* d_denseMatrix;
+    #if EXPAND_MATRIX
+    // TODO: assert that this doesn't exceed memory limit
+    cudaMalloc((void**) &d_denseMatrix, numSegments*numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
+    #endif
     uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_dataset, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
 
     cudaFree(d_valuesIn);
