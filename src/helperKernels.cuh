@@ -30,7 +30,7 @@ __global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfI
 }
 
 __global__ void initializeArrays(int numberOfInputPoints, int* valuesIn, int* currentDim, int maxNumSegments){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i < numberOfInputPoints){
         valuesIn[i] = i;
     }
@@ -45,13 +45,13 @@ __global__ void initializeArrays(int n, int dim, int* values_in, int* currentDim
         values_in[i] = i;
         input_search[i] = i;
     }
-    if(i<maxNumSegments){
+    if(i < maxNumSegments){
         currentDim[i] = -1;
     }
     if(threadIdx.x==0 && blockIdx.x==0){
         offsets_sort[0] = 0;
         offsets_sort[1] = n;
-        for(unsigned int j=0; j<dim+1; ++j){ //TODO: might have to be <dim+1
+        for(unsigned int j = 0; j < dim + 1; ++j){
             offsets_reduce[j] = j*n;
         }
     }
@@ -106,9 +106,6 @@ __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segmen
 
 __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* aux_offsets_sort){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    // if(i==0){
-    //     printf("num segments fill offsets sort: %d\n", num_segments);
-    // }
     if(i==0){
         aux_offsets_sort[num_segments*2] = n;
     }
@@ -216,13 +213,12 @@ __global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t 
             int xDim = offsets_sort[segment + 1] - offsets_sort[segment];
             int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
 
-            int diff = (blockIdx.y>segment) ? 1 : 0;
+            unsigned int diff = (blockIdx.y > segment) ? 1 : 0;
 
             if(((uint64_t)col*num_segments*max_segment_size + (uint64_t)row) >= (max_segment_size*max_segment_size*num_segments*num_segments)){
                 assert(0);
             }
             if(blockIdx.y == segment){
-                // diagonal[segment*max_segment_size*max_segment_size + j*max_segment_size*blockDim.x + threadIdx.x*max_segment_size + i*blockDim.x + threadIdx.y] = matrix[blockIdx.y*max_segment_size*max_segment_size + j*blockDim.x*max_segment_size + threadIdx.x*max_segment_size + i*blockDim.x + threadIdx.y];
                 diagonal[segment*max_segment_size*max_segment_size + j*max_segment_size*blockDim.x + threadIdx.x*max_segment_size + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);
                 if(expand_matrix == 1){
                     denseMatrix[(segment*max_segment_size + threadIdx.x)*max_segment_size*num_segments + blockIdx.y*max_segment_size + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);

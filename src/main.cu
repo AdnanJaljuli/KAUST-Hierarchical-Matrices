@@ -21,9 +21,6 @@
 #include <utility>
 using namespace std;
 
-// TODO: make EXPAND_MATRIX a config argument (or similar to USE_COUNTERS)
-#define EXPAND_MATRIX 1
-
 int main(int argc, char *argv[]) {
 
     cudaDeviceSynchronize();
@@ -43,12 +40,12 @@ int main(int argc, char *argv[]) {
 
     uint64_t maxNumSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
     printf("max num segments: %d\n", maxNumSegments);
+    
     uint64_t numSegments;
     int  *d_valuesIn;
     int  *d_offsetsSort;
     cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
     cudaMalloc((void**) &d_offsetsSort, (maxNumSegments + 1)*sizeof(int));
-    // TODO: move the frees for the two mallocs above to the end of the main function
     createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, &numSegments, config.divMethod, d_valuesIn, d_offsetsSort, d_dataset, maxNumSegments);
 
     uint64_t maxSegmentSize = config.bucketSize;
@@ -63,6 +60,9 @@ int main(int argc, char *argv[]) {
     matrix.type = COLUMN_MAJOR;
     H2Opus_Real* d_denseMatrix;
     uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_dataset, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
+
+    cudaFree(d_valuesIn);
+    cudaFree(d_offsetsSort);
     gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
