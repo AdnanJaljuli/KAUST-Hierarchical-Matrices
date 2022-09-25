@@ -1,3 +1,5 @@
+
+// TODO: split the functions in this file into two. Those which are called in kdtreeConstruction.cuh and others
 #ifndef HELPERKERNELS_CUH
 #define HELPERKERNELS_CUH
 
@@ -16,16 +18,14 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-__global__ void generateDataset_kernel(int n, int dim, H2Opus_Real* dataset){
+__global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* dataset){
     // TODO: use a 2D grid that's n x dim (seed in this case can be j*n + i)
     unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
-    if(i < n) {
+    if(i < numberOfInputPoints*dimensionOfInputPoints) {
         unsigned int seed = i;
         curandState s;
         curand_init(seed, 0, 0, &s);
-        for(unsigned int j = 0; j < dim; ++j) {
-            dataset[j*n + i] = curand_uniform(&s);
-        }
+        dataset[i] = curand_uniform(&s);
     }
 }
 
