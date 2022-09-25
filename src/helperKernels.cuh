@@ -29,24 +29,24 @@ __global__ void generateDataset_kernel(int n, int dim, H2Opus_Real* dataset){
     }
 }
 
-__global__ void initializeArrays(int n, int* values_in, int* currDimArray, int max_num_segments){
+__global__ void initializeArrays(int numberOfInputPoints, int* valuesIn, int* currentDim, int maxNumSegments){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<n){
-        values_in[i] = i;
+    if(i < numberOfInputPoints){
+        valuesIn[i] = i;
     }
-    if(i<max_num_segments){
-        currDimArray[i] = -1;
+    if(i < maxNumSegments){
+        currentDim[i] = -1;
     }
 }
 
-__global__ void initializeArrays(int n, int dim, int* values_in, int* currDimArray, int* offsets_sort, int* offsets_reduce, int* input_search, int max_num_segments){
+__global__ void initializeArrays(int n, int dim, int* values_in, int* currentDim, int* offsets_sort, int* offsets_reduce, int* input_search, int maxNumSegments){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
         values_in[i] = i;
         input_search[i] = i;
     }
-    if(i<max_num_segments){
-        currDimArray[i] = -1;
+    if(i<maxNumSegments){
+        currentDim[i] = -1;
     }
     if(threadIdx.x==0 && blockIdx.x==0){
         offsets_sort[0] = 0;
@@ -153,17 +153,17 @@ __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2O
     }
 }
 
-__global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
+__global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
-        currDimArray[i] = spanReduced[i].key;
+        currentDim[i] = spanReduced[i].key;
     }
 }
 
-__global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray, cub::KeyValuePair<int, H2Opus_Real>* spanReduced, uint64_t* bit_vector){
+__global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, cub::KeyValuePair<int, H2Opus_Real>* spanReduced, uint64_t* bit_vector){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
-        currDimArray[i] = spanReduced[i].key;
+        currentDim[i] = spanReduced[i].key;
     }
 
     unsigned int last_index = (num_segments+sizeof(uint64_t)*8-1)/(sizeof(uint64_t)*8);
@@ -172,18 +172,18 @@ __global__ void fillCurrDim(int n, unsigned int num_segments, int* currDimArray,
     }
 }
 
-__global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_in, int* currDimArray, int* values_in, H2Opus_Real* dataset){
+__global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* dataset){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
-        keys_in[i] = dataset[(long long)currDimArray[i/segment_size]*n + (long long)values_in[i]];
+        keys_in[i] = dataset[(long long)currentDim[i/segment_size]*n + (long long)values_in[i]];
     }
 }
 
-__global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currDimArray, int* values_in, H2Opus_Real* dataset, int* offsets_sort, int* output){
+__global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* dataset, int* offsets_sort, int* output){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
         int segment_index = output[i] - 1;
-        keys_in[i] = dataset[(long long)currDimArray[segment_index]*n + (long long)values_in[i]];
+        keys_in[i] = dataset[(long long)currentDim[segment_index]*n + (long long)values_in[i]];
     }
 }
 
