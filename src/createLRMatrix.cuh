@@ -25,7 +25,7 @@
 #include <thrust/functional.h>
 
 // TODO: clean this file
-uint64_t createColumnMajorLRMatrix(int n, int numSegments, int maxSegmentSize, int bucketSize, int dim, TLR_Matrix &matrix, H2Opus_Real* &d_denseMatrix, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int maxRows, int maxCols, int maxRank){
+uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int maxSegmentSize, int bucketSize, int dimensionOfInputPoints, TLR_Matrix &matrix, H2Opus_Real* &d_denseMatrix, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int maxRows, int maxCols, int maxRank){
     H2Opus_Real* d_inputMatrixSegmented;
     gpuErrchk(cudaMalloc((void**) &d_inputMatrixSegmented, maxSegmentSize*maxSegmentSize*numSegments*(uint64_t)sizeof(H2Opus_Real)));
 
@@ -38,7 +38,6 @@ uint64_t createColumnMajorLRMatrix(int n, int numSegments, int maxSegmentSize, i
     gpuErrchk(cudaMalloc((void**) &matrix.blockRanks, numSegments*numSegments*sizeof(int)));
     gpuErrchk(cudaMalloc((void**) &matrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real)));
 
-    magma_init();
 
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
@@ -61,13 +60,12 @@ uint64_t createColumnMajorLRMatrix(int n, int numSegments, int maxSegmentSize, i
     int numThreadsPerBlock = 1024;
     int numBlocks = ((numSegments - 1) + numThreadsPerBlock - 1)/numThreadsPerBlock;
     fillARAArrays<<<numBlocks, numThreadsPerBlock>>>(numSegments - 1, maxRows, maxCols, d_rowsBatch, d_colsBatch, d_LDMBatch, d_LDABatch, d_LDBBatch);
-    cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
 
+    magma_init();
     kblasHandle_t kblasHandle;
     kblasRandState_t randState;
     kblasCreate(&kblasHandle);
-    cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
 
     kblasInitRandState(kblasHandle, &randState, 1<<15, 0);
@@ -76,13 +74,14 @@ uint64_t createColumnMajorLRMatrix(int n, int numSegments, int maxSegmentSize, i
     kblasEnableMagma(kblasHandle);
     kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, maxCols, numSegments - 1);
     kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, bucketSize, numSegments - 1);
-    cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
     kblasAllocateWorkspace(kblasHandle);
-    cudaDeviceSynchronize();
 
     float ARATotalTime = 0;
     uint64_t rankSum = 0;
+    uint64_t* totalMem = (uint64_t*)malloc(sizeof(uint64_t));
+    uint64_t* d_totalMem;
+    cudaMalloc((void**) &d_totalMem, sizeof(uint64_t));
 
     dim3 m_numThreadsPerBlock(min(32, (int)maxSegmentSize), min(32, (int)maxSegmentSize));
     dim3 m_numBlocks(1, numSegments);
@@ -90,21 +89,19 @@ uint64_t createColumnMajorLRMatrix(int n, int numSegments, int maxSegmentSize, i
     for(unsigned int segment = 0; segment < numSegments; ++segment){
         // TODO: launch a 1D grid instead of a 2D grid
         #if EXPAND_MATRIX
-        generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, numSegments, maxSegmentSize, dim, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal, d_denseMatrix, 1);
+        generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal, d_denseMatrix, 1);
         #else
-        generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(n, numSegments, maxSegmentSize, dim, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal, d_denseMatrix, 0);
+        generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal, d_denseMatrix, 0);
         #endif
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
         
         generateArrayOfPointersT<H2Opus_Real>(d_inputMatrixSegmented, d_MPtrs, maxRows*maxCols, numSegments - 1, 0);
-        gpuErrchk(cudaPeekAtLastError());
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxCols, numSegments - 1, 0);
-        gpuErrchk(cudaPeekAtLastError());
         generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxCols, numSegments - 1, 0);
-        gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
         cudaDeviceSynchronize();
+        gpuErrchk(cudaPeekAtLastError());
 
         cudaEvent_t startARA, stopARA;
         cudaEventCreate(&startARA);
@@ -137,30 +134,24 @@ uint64_t createColumnMajorLRMatrix(int n, int numSegments, int maxSegmentSize, i
 
         printK<<<1, 1>>>(d_ranks + segment*(numSegments - 1), numSegments - 1);
 
-        uint64_t* totalMem = (uint64_t*)malloc(sizeof(uint64_t));
-        uint64_t* d_totalMem;
-        cudaMalloc((void**) &d_totalMem, sizeof(uint64_t));
         getTotalMem<<<1, 1>>> (d_totalMem, d_ranks + segment*(numSegments - 1), d_scanRanksSegmented, numSegments - 1);
-        cudaDeviceSynchronize();
         cudaMemcpy(totalMem, d_totalMem, sizeof(uint64_t), cudaMemcpyDeviceToHost);
-        cudaFree(d_totalMem);
 
-        gpuErrchk(cudaMalloc((void**) &d_UTiledTemp[segment], maxSegmentSize*(*totalMem)*(uint64_t)sizeof(H2Opus_Real)));
-        gpuErrchk(cudaMalloc((void**) &d_VTiledTemp[segment], maxSegmentSize*(*totalMem)*(uint64_t)sizeof(H2Opus_Real)));
+        gpuErrchk(cudaMalloc((void**) &d_UTiledTemp[segment], maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real)));
+        gpuErrchk(cudaMalloc((void**) &d_VTiledTemp[segment], maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real)));
 
         // TODO: optimize thread allocation here
         int numThreadsPerBlock = maxSegmentSize;
         int numBlocks = numSegments - 1;
         copyTiles<<<numBlocks, numThreadsPerBlock>>>(numSegments - 1, maxSegmentSize, d_ranks + segment*(numSegments - 1), d_scanRanksSegmented, d_UTiledTemp[segment], d_A, d_VTiledTemp[segment], d_B);
-        cudaDeviceSynchronize();
 
         rankSum += (*totalMem);
-        free(totalMem);
     }
 
+    free(totalMem);
+    cudaFree(d_totalMem);
     cudaFree(d_inputMatrixSegmented);
     cudaFree(d_scanRanksSegmented);
-
     cudaFree(d_rowsBatch);
     cudaFree(d_colsBatch);
     cudaFree(d_LDMBatch);
