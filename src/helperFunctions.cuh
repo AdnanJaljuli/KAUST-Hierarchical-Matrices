@@ -20,13 +20,22 @@
 #include <utility>
 #include <cstdint> 
 #include "cublas_v2.h"
+#include "kblas.h"
 #include "TLR_Matrix.h"
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
 
-#define numTimers 13
-
 // TODO: for all functions declared in this header file, define them in another file or define them as static in this file
+
+#if 0
+void generateDataset(int n, int dim);
+void printCountersInFile(float* times);
+bool isPowerOfTwo (int x);
+std::pair<int, int> getMaxSegmentSize(int n, int bucket_size);
+void ConvertColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix);
+void checkErrorInLRMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix);
+__device__ __host__ int upper_power_of_two(int v);
+#endif
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
@@ -38,16 +47,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     }
 }
 
-void generateDataset(int n, int dim);
-void printCountersInFile(float* times);
-bool isPowerOfTwo (int x);
-std::pair<int, int> getMaxSegmentSize(int n, int bucket_size);
-void ConvertColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix);
-void checkErrorInLRMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix);
-__device__ __host__ int upper_power_of_two(int v);
-
-
-void generateDataset(int n, int dim, H2Opus_Real* d_dataset) {
+static void generateDataset(int n, int dim, H2Opus_Real* d_dataset) {
     // TODO: use a 2D grid that's n x dim
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (n + numThreadsPerBlock - 1)/numThreadsPerBlock;
@@ -55,17 +55,7 @@ void generateDataset(int n, int dim, H2Opus_Real* d_dataset) {
     cudaDeviceSynchronize();
 }
 
-void printCountersInFile(float* times){
-    char filename[100] = "results/times.csv";
-    FILE *output_file = fopen(filename, "a");
-    for(unsigned int i = 0; i<numTimers; ++i){
-        fprintf(output_file,"%f, ",times[i]);
-    }
-    fprintf(output_file, "\n");
-    fclose(output_file);
-}
-
-__device__ __host__ int upper_power_of_two(int v){
+static __device__ __host__ int upper_power_of_two(int v){
     v--;
     v |= v >> 1;
     v |= v >> 2;
@@ -76,11 +66,11 @@ __device__ __host__ int upper_power_of_two(int v){
     return v;
 }
 
-bool isPowerOfTwo (int x) {
+static bool isPowerOfTwo (int x) {
     return x && (!(x&(x-1)));
 }
 
-std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
+static std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     int it=0;
     while(n > bucket_size){
         n = (n + 1)/2;
@@ -92,7 +82,7 @@ std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     return p;
 }
 
-void ConvertColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix){
+static void ConvertColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, uint64_t k_sum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix){
 
     cudaMalloc((void**) &mortonMatrix.U, k_sum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
     cudaMalloc((void**) &mortonMatrix.V, k_sum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
@@ -138,7 +128,7 @@ void ConvertColumnMajorToMorton(uint64_t num_segments, uint64_t maxSegmentSize, 
     gpuErrchk(cudaPeekAtLastError());
 }
 
-void checkErrorInLRMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
+static void checkErrorInLRMatrix(uint64_t num_segments, uint64_t max_segment_size, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
     H2Opus_Real* d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, num_segments*max_segment_size*num_segments*max_segment_size*sizeof(H2Opus_Real));
 

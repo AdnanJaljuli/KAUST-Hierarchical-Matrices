@@ -1,24 +1,28 @@
+
 #ifndef CREATELRMATRIX_CUH
 #define CREATELRMATRIX_CUH
 
+#include <assert.h>
+#include <ctype.h>
+#include <cub/cub.cuh>
+#include <curand_kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <stddef.h>
-#include <cub/cub.cuh>
-#include <assert.h>
-#include <curand_kernel.h>
 
-#include "magma_auxiliary.h"
-
+// TODO: ask Izzat about the order of the below 3 header files. If their order is different, it throus a compilation error.
+#include "cublas_v2.h"
 #include "kblas.h"
 #include "batch_rand.h"
+#include "helperFunctions.cuh"
+#include "helperKernels.cuh"
+#include "magma_auxiliary.h"
 
 #include <thrust/binary_search.h>
 #include <thrust/device_vector.h>
-#include <thrust/functional.h>
 #include <thrust/execution_policy.h>
+#include <thrust/functional.h>
 
 // TODO: clean this file
 uint64_t createColumnMajorLRMatrix(int n, int num_segments, int max_segment_size, int bucket_size, int dim, TLR_Matrix &matrix, H2Opus_Real* &d_denseMatrix, int* &d_values_in, int* &d_offsets_sort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int max_rows, int max_cols, int max_rank){

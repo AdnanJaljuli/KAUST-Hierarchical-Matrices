@@ -1,14 +1,14 @@
 #ifndef KDTREECONSTRUCTION_CUH
 #define KDTREECONSTRUCTION_CUH
 
+#include <assert.h>
+#include <ctype.h>
+#include <cub/cub.cuh>
+#include <curand_kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <stddef.h>
-#include <cub/cub.cuh>
-#include <assert.h>
-#include <curand_kernel.h>
 
 // TODO: clean this file
 void createKDTree(int n, int dim, int bucket_size, uint64_t &num_segments, DIVISION_METHOD div_method, int* &d_values_in, int* &d_offsets_sort, H2Opus_Real* d_dataset, int max_num_segments){

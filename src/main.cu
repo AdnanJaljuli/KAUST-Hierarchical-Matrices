@@ -1,31 +1,29 @@
 
 // TODO: make all header files independent
-
-// TODO: alphabetical order
+#include "config.h"
+#include "counters.h"
+#include "createLRMatrix.cuh"
+#include "helperFunctions.cuh"
+#include "hierarchicalMatrixFunctions.cuh"
+#include "kblas.h"
+#include "kdtreeConstruction.cuh"
 #include "tlr_example.h"
 #include "TLR_Matrix.h"
-#include "helperFunctions.cuh"
-#include "config.h"
-#include "kdtreeConstruction.cuh"
-#include "createLRMatrix.cuh"
-#include "hierarchicalMatrix.cuh"
 
-// TODO: alphabetical order
-#include <iostream>
-#include <utility>
-#include <time.h>
-#include <assert.h>
-#include <math.h>
-#include <typeinfo>
 #include <algorithm>
+#include <assert.h>
+#include <inttypes.h>
+#include <iostream>
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
-#include <inttypes.h>
+#include <time.h>
+#include <typeinfo>
+#include <utility>
 using namespace std;
 
 // TODO: make EXPAND_MATRIX a config argument
 #define EXPAND_MATRIX 1
-#define BLOCK_SIZE 32
 
 int main(int argc, char *argv[]) {
 
@@ -41,33 +39,31 @@ int main(int argc, char *argv[]) {
 
     Config config = parseArgs(argc, argv);
     // TODO: move printfs below to their own function printArgs defined inside of config.h
-    printf("n: %d\n", config.n);
-    printf("bucket size: %d\n", config.bucket_size);
-    printf("epsilon: %f\n", config.tol);
-    printf("dim: %d\n", config.dim);
+    printf("n: %d\n", config.numberOfInputPoints);
+    printf("bucket size: %d\n", config.bucketSize);
+    printf("epsilon: %f\n", config.lowestLevelTolerance);
+    printf("dimensionOfInputPoints: %d\n", config.dimensionOfInputPoints);
+    printf("num counters: %d\n", NUM_COUNTERS);
 
     // TODO: fix counters (use enum, not macros; see vertex cover code for how we define counters in an extensible way)
-    float* counters = (float*)malloc(NUM_COUNTERS*sizeof(float));
-    counters[0] = (float)config.n;
-    counters[1] = (float)config.bucket_size;
-    counters[2] = (float)config.dim;
-    counters[3] = (float)config.tol;
+    Counters counters;
+    initCounters(&counters);
 
     H2Opus_Real* d_dataset;
-    gpuErrchk(cudaMalloc((void**) &d_dataset, config.n*config.dim*sizeof(H2Opus_Real)));
-    generateDataset(config.n, config.dim);
+    gpuErrchk(cudaMalloc((void**) &d_dataset, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real)));
+    generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_dataset);
 
-    uint64_t max_num_segments = (config.n + config.bucket_size - 1)/config.bucket_size; // TODO: use camel case everywhere
-    printf("max num segments: %d\n", max_num_segments);
+    uint64_t maxNumSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize; // TODO: use camel case everywhere
+    printf("max num segments: %d\n", maxNumSegments);
     uint64_t numSegments;
-    int  *d_values_in;
-    int  *d_offsets_sort;
-    cudaMalloc((void**) &d_values_in, n*sizeof(int));
-    cudaMalloc((void**) &d_offsets_sort, (max_num_segments + 1)*sizeof(int));
-    // TODO: mode the frees for the two mallocs above to the end of the main function
-    createKDTree(config.n, config.dim, config.bucket_size, numSegments, config.div_method, d_values_in, d_offsets_sort, d_dataset, max_num_segments);
+    int  *d_valuesIn;
+    int  *d_offsetsSort;
+    cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
+    cudaMalloc((void**) &d_offsetsSort, (maxNumSegments + 1)*sizeof(int));
+    // TODO: move the frees for the two mallocs above to the end of the main function
+    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, numSegments, config.divMethod, d_valuesIn, d_offsetsSort, d_dataset, maxNumSegments);
 
-    uint64_t maxSegmentSize = config.bucket_size;
+    uint64_t maxSegmentSize = config.bucketSize;
     printf("max segment size: %lu\n", maxSegmentSize);
     printf("num segments: %lu\n", numSegments);
     const int ARA_R = 10;
@@ -77,7 +73,7 @@ int main(int argc, char *argv[]) {
     TLR_Matrix matrix;
     matrix.type = COLUMN_MAJOR;
     H2Opus_Real* d_denseMatrix;
-    uint64_t k_sum = createColumnMajorLRMatrix(config.n, numSegments, maxSegmentSize, config.bucket_size, config.dim, matrix, d_denseMatrix, d_values_in, d_offsets_sort, d_dataset, config.tol, ARA_R, max_rows, max_cols, max_rank);
+    uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_dataset, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
     gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
@@ -86,7 +82,7 @@ int main(int argc, char *argv[]) {
 
     TLR_Matrix mortonMatrix;
     mortonMatrix.type = MORTON;
-    ConvertColumnMajorToMorton(numSegments, maxSegmentSize, k_sum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names
+    ConvertColumnMajorToMorton(numSegments, maxSegmentSize, kSum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names
     
     matrix.cudaFreeMatrix();
 
@@ -94,13 +90,12 @@ int main(int argc, char *argv[]) {
     checkErrorInLRMatrix(numSegments, maxSegmentSize, mortonMatrix, d_denseMatrix);
     #endif
 
-    return 0; // XXX: XXX XXX XXX
 
-    const int numLevels = __builtin_ctz(config.n/config.bucket_size) + 1;
+    const int numLevels = __builtin_ctz(config.numberOfInputPoints/config.bucketSize) + 1;
     printf("numLevels: %d\n", numLevels);
     int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));
     int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
-    genereateHierarchicalMatrix(config.n, config.bucket_size, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
+    genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
 
     mortonMatrix.cudaFreeMatrix();
     gpuErrchk(cudaPeekAtLastError());
@@ -109,18 +104,22 @@ int main(int argc, char *argv[]) {
     cudaEventCreate(&stopCode);
     cudaEventRecord(stopCode);
     cudaEventSynchronize(stopCode);
-    float Code_time = 0; //  TODO: do not capitalize first letter of identifiers
-    cudaEventElapsedTime(&Code_time, startCode, stopCode);
-    counters[11] = Code_time;
-    printf("total time: %f\n", Code_time);
+    float codeTime = 0;
+    cudaEventElapsedTime(&codeTime, startCode, stopCode);
+    // counters[11] = codeTime;
+    printf("total time: %f\n", codeTime);
 
-    printCountersInFile(counters);
-
+    #if 0
+    printCountersInFile(config, counters);
+    #endif
     // Clean up
     cudaEventDestroy(startCode);
     cudaEventDestroy(stopCode);
     cudaFree(d_dataset);
+    #if 0
     free(counters);
+    #endif
 
+    return 0;
 }
 
