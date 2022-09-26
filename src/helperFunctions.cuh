@@ -1,12 +1,12 @@
 
-#ifndef HELPERFUNCTIONS_H
-#define HELPERFUNCTIONS_H
+#ifndef __HELPER_FUNCTIONS_H__
+#define __HELPER_FUNCTIONS_H__
 
 #include <utility>
 #include <cstdint> 
 #include "cublas_v2.h"
 #include "kblas.h"
-#include "TLR_Matrix.h"
+#include "TLRMatrix.h"
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
 

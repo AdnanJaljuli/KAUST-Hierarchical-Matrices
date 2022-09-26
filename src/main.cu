@@ -5,9 +5,9 @@
 #include "helperFunctions.cuh"
 #include "hierarchicalMatrixFunctions.cuh"
 #include "kblas.h"
-#include "kdtreeConstruction.cuh"
+#include "kDTreeConstruction.cuh"
 #include "tlr_example.h"
-#include "TLR_Matrix.h"
+#include "TLRMatrix.h"
 
 #include <algorithm>
 #include <assert.h>

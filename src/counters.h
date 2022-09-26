@@ -1,6 +1,6 @@
 
-#ifndef COUNTERS_H
-#define COUNTERS_H
+#ifndef __COUNTERS_H__
+#define __COUNTERS_H__
 
 #include <string.h>
 #include "config.h"

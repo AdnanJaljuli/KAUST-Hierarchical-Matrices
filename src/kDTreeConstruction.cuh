@@ -1,6 +1,8 @@
 
-#ifndef KDTREECONSTRUCTION_CUH
-#define KDTREECONSTRUCTION_CUH
+#ifndef __KDTREECONSTRUCTION_CUH__
+#define __KDTREECONSTRUCTION_CUH__
+
+#include "kDTreeHelpers.cuh"
 
 #include <assert.h>
 #include <ctype.h>

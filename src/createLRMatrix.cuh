@@ -1,6 +1,6 @@
 
-#ifndef CREATELRMATRIX_CUH
-#define CREATELRMATRIX_CUH
+#ifndef __CREATE_LR_MATRIX_CUH__
+#define __CREATE_LR_MATRIX_CUH__
 
 #include <assert.h>
 #include <ctype.h>

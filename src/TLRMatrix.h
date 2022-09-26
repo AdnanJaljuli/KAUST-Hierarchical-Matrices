@@ -1,5 +1,5 @@
-#ifndef TLR_Matrix_H
-#define TLR_Matrix_H
+#ifndef __TLR_MATRIX_H__
+#define __TLR_MATRIX_H__
 
 typedef double H2Opus_Real;
 enum Ordering {COLUMN_MAJOR, MORTON};
