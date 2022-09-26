@@ -35,21 +35,18 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Generate the points
-    H2Opus_Real* d_dataset; // TODO: rename to something more representative
-    gpuErrchk(cudaMalloc((void**) &d_dataset, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real)));
-    generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_dataset);
+    H2Opus_Real* d_pointsDataset;
+    gpuErrchk(cudaMalloc((void**) &d_pointsDataset, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real)));
+    generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointsDataset);
 
     // Build the KD-tree
-    // TODO: consolidate the numSegments and maxNumSegments variables
-    uint64_t maxNumSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
-    printf("max num segments: %d\n", maxNumSegments);
-    uint64_t numSegments;
+    uint64_t numSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
     // TODO: Combine into a struct that represents the KD-tree
     int  *d_valuesIn; // TODO: rename to something more representative
     int  *d_offsetsSort; // TODO: rename to something more representative
     cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
-    cudaMalloc((void**) &d_offsetsSort, (maxNumSegments + 1)*sizeof(int));
-    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, &numSegments, config.divMethod, d_valuesIn, d_offsetsSort, d_dataset, maxNumSegments);
+    cudaMalloc((void**) &d_offsetsSort, (numSegments + 1)*sizeof(int));
+    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, config.divMethod, d_valuesIn, d_offsetsSort, d_pointsDataset, numSegments);
 
     // Build the TLR matrix
     uint64_t maxSegmentSize = config.bucketSize;
@@ -67,8 +64,8 @@ int main(int argc, char *argv[]) {
     cudaMalloc((void**) &d_denseMatrix, numSegments*numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
     #endif
     // TODO: separate the code that expands the matrix from the code that doesn't; have a separate call that passes and calculates the dense matrix; this call should only be called if the EXPAND_MATRIX macro is enabled
-    uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_dataset, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
-    cudaFree(d_dataset);
+    uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_pointsDataset, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
+    cudaFree(d_pointsDataset);
     cudaFree(d_valuesIn);
     cudaFree(d_offsetsSort);
     gpuErrchk(cudaPeekAtLastError());
