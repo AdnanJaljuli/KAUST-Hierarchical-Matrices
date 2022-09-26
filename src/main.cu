@@ -35,18 +35,18 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Generate the points
-    H2Opus_Real* d_pointsDataset;
-    gpuErrchk(cudaMalloc((void**) &d_pointsDataset, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real)));
-    generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointsDataset);
+    H2Opus_Real* d_pointCloud;
+    gpuErrchk(cudaMalloc((void**) &d_pointCloud, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real)));
+    generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
 
     // Build the KD-tree
-    uint64_t numSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
     // TODO: Combine into a struct that represents the KD-tree
+    uint64_t numSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
     int  *d_valuesIn; // TODO: rename to something more representative
     int  *d_offsetsSort; // TODO: rename to something more representative
     cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
     cudaMalloc((void**) &d_offsetsSort, (numSegments + 1)*sizeof(int));
-    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, config.divMethod, d_valuesIn, d_offsetsSort, d_pointsDataset, numSegments);
+    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, numSegments, config.bucketSize, config.divMethod, d_valuesIn, d_offsetsSort, d_pointCloud);
 
     // Build the TLR matrix
     uint64_t maxSegmentSize = config.bucketSize;
@@ -64,8 +64,8 @@ int main(int argc, char *argv[]) {
     cudaMalloc((void**) &d_denseMatrix, numSegments*numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
     #endif
     // TODO: separate the code that expands the matrix from the code that doesn't; have a separate call that passes and calculates the dense matrix; this call should only be called if the EXPAND_MATRIX macro is enabled
-    uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_pointsDataset, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
-    cudaFree(d_pointsDataset);
+    uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_pointCloud, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
+    cudaFree(d_pointCloud);
     cudaFree(d_valuesIn);
     cudaFree(d_offsetsSort);
     gpuErrchk(cudaPeekAtLastError());
@@ -104,4 +104,3 @@ int main(int argc, char *argv[]) {
     return 0;
 
 }
-

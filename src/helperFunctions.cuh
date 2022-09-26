@@ -1,21 +1,6 @@
+
 #ifndef HELPERFUNCTIONS_H
 #define HELPERFUNCTIONS_H
-
-///////////////////////////////////////////////////////////////////
-// NAME:               helperFunctions.cuh
-//
-// PURPOSE:            This file is respnsible for supporting host functions.
-//
-// FUNCTIONS/OBJECTS:  gpuErrchk
-//                     generateDataset_h
-//                     printCountersInFile
-//                     isPowerOfTwo
-//                     getMaxSegmentSize
-//                     ConvertColumnMajorToMorton
-//                     checkErrorInLRMatrix
-//
-// AUTHOR:             Adnan Jaljuli
-///////////////////////////////////////////////////////////////////
 
 #include <utility>
 #include <cstdint> 
@@ -24,18 +9,6 @@
 #include "TLR_Matrix.h"
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
-
-// TODO: for all functions declared in this header file, define them in another file or define them as static in this file
-
-#if 0
-void generateDataset(int n, int dim);
-void printCountersInFile(float* times);
-bool isPowerOfTwo (int x);
-std::pair<int, int> getMaxSegmentSize(int n, int bucket_size);
-void ConvertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix);
-void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix);
-__device__ __host__ int upper_power_of_two(int v);
-#endif
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
@@ -47,10 +20,20 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     }
 }
 
-static void generateDataset(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* d_dataset) {
+__global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* pointCloud) {
+    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i < numberOfInputPoints*dimensionOfInputPoints) {
+        unsigned int seed = i;
+        curandState s;
+        curand_init(seed, 0, 0, &s);
+        pointCloud[i] = curand_uniform(&s);
+    }
+}
+
+static void generateDataset(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* d_pointCloud) {
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    generateDataset_kernel<<<numBlocks, numThreadsPerBlock>>> (numberOfInputPoints, dimensionOfInputPoints, d_dataset);
+    generateDataset_kernel<<<numBlocks, numThreadsPerBlock>>> (numberOfInputPoints, dimensionOfInputPoints, d_pointCloud);
     cudaDeviceSynchronize();
 }
 

@@ -18,58 +18,29 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-// TODO: place in same file as generateDataset
-__global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* dataset) {
-    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
-    if(i < numberOfInputPoints*dimensionOfInputPoints) {
-        unsigned int seed = i;
-        curandState s;
-        curand_init(seed, 0, 0, &s);
-        dataset[i] = curand_uniform(&s);
-    }
-}
-
-__global__ void initializeArrays(int numberOfInputPoints, int* valuesIn, int* currentDim, int maxNumSegments){
+__global__ void initializeArrays(int numberOfInputPoints, int* valuesIn, int* currentDim, int numSegments){
     unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i < numberOfInputPoints){
         valuesIn[i] = i;
     }
-    if(i < maxNumSegments){
+    if(i < numSegments){
         currentDim[i] = -1;
     }
 }
 
-__global__ void initializeArrays(int n, int dim, int* values_in, int* currentDim, int* offsets_sort, int* offsets_reduce, int* input_search, int maxNumSegments){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<n){
-        values_in[i] = i;
-        input_search[i] = i;
-    }
-    if(i < maxNumSegments){
-        currentDim[i] = -1;
-    }
-    if(threadIdx.x==0 && blockIdx.x==0){
-        offsets_sort[0] = 0;
-        offsets_sort[1] = n;
-        for(unsigned int j = 0; j < dim + 1; ++j){
-            offsets_reduce[j] = j*n;
-        }
-    }
-}
+__global__ void fillOffsets(int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int numSegments, unsigned int segmentSize, int* offsets_sort, int* offsets_reduce){
+    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
 
-__global__ void fillOffsets(int n, unsigned int dim, unsigned int num_segments, unsigned int segment_size, int* offsets_sort, int* offsets_reduce){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i < numSegments + 1){
+        offsets_sort[i] = (i < numSegments) ? (i*segmentSize) : numberOfInputPoints;
 
-    if(i<num_segments+1){
-        offsets_sort[i] = (i<num_segments) ? (i*segment_size) : n;
-
-        if(threadIdx.x==0 && blockIdx.x==0){
+        if(threadIdx.x == 0 && blockIdx.x == 0){
             offsets_reduce[0] = 0;
         }
 
-        for(unsigned int j=0; j<dim; ++j){
-            if(i < num_segments){
-                offsets_reduce[j*num_segments + i + 1] = (i+1<num_segments) ? ((i+1)*segment_size + n*j) : n*(j+1);
+        for(unsigned int j = 0; j < dimensionOfInputPoints; ++j){
+            if(i < numSegments){
+                offsets_reduce[j*numSegments + i + 1] = (i + 1 < numSegments) ? ((i + 1)*segmentSize + numberOfInputPoints*j) : numberOfInputPoints*(j + 1);
             }
         }
     }
@@ -129,10 +100,10 @@ __global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int
     }
 }
 
-__global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* dataset, int* values_in, H2Opus_Real* reduce_in){
+__global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* pointCloud, int* values_in, H2Opus_Real* reduce_in){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<(long long)n*(long long)dim){
-        reduce_in[i] = dataset[(long long)values_in[i - (i/n)*n] + (long long)(i/n)*n];
+        reduce_in[i] = pointCloud[(long long)values_in[i - (i/n)*n] + (long long)(i/n)*n];
     }
 }
 
@@ -169,18 +140,18 @@ __global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, c
     }
 }
 
-__global__ void fillKeysIn(int n, unsigned int segment_size, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* dataset){
+__global__ void fillKeysIn(int n, unsigned int segmentSize, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* pointCloud){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
-        keys_in[i] = dataset[(long long)currentDim[i/segment_size]*n + (long long)values_in[i]];
+        keys_in[i] = pointCloud[(long long)currentDim[i/segmentSize]*n + (long long)values_in[i]];
     }
 }
 
-__global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* dataset, int* offsets_sort, int* output){
+__global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* pointCloud, int* offsets_sort, int* output){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
         int segment_index = output[i] - 1;
-        keys_in[i] = dataset[(long long)currentDim[segment_index]*n + (long long)values_in[i]];
+        keys_in[i] = pointCloud[(long long)currentDim[segment_index]*n + (long long)values_in[i]];
     }
 }
 
@@ -188,15 +159,15 @@ __device__ H2Opus_Real getCorrelationLength(int dim){
     return dim == 3 ? 0.2 : 0.1;
 }
 
-__device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real* dataset){
+__device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real* pointCloud){
     assert(col<n);
     assert(row<n);
 
     H2Opus_Real diff = 0;
     H2Opus_Real x, y;
     for (int d = 0; d < dim; ++d){
-        x = dataset[d*n + col];
-        y = dataset[d*n + row];
+        x = pointCloud[d*n + col];
+        y = pointCloud[d*n + row];
         diff += (x - y)*(x - y);
     }
 
@@ -204,7 +175,7 @@ __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real
     return exp(-dist / getCorrelationLength(dim));
 }
 
-__global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t maxSegmentSize, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* dataset, int* offsets_sort, int segment, H2Opus_Real* diagonal, H2Opus_Real* denseMatrix, int expand_matrix){
+__global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t maxSegmentSize, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* pointCloud, int* offsets_sort, int segment, H2Opus_Real* diagonal, H2Opus_Real* denseMatrix, int expand_matrix){
     for(unsigned int i=0; i<(maxSegmentSize/blockDim.x); ++i){
         for(unsigned int j=0; j<(maxSegmentSize/blockDim.x); ++j){
             unsigned int row = blockIdx.y*maxSegmentSize + i*blockDim.x + threadIdx.y;
@@ -219,9 +190,9 @@ __global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t 
                 assert(0);
             }
             if(blockIdx.y == segment){
-                diagonal[segment*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);
+                diagonal[segment*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
                 if(expand_matrix == 1){
-                    denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);
+                    denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
                 }
             }
             else{
@@ -240,9 +211,9 @@ __global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t 
                     }
                 }
                 else {
-                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);
+                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
                     if(expand_matrix == 1){
-                        denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], dataset);
+                        denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
                     }
                 }
             }
