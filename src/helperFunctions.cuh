@@ -48,7 +48,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
 }
 
 static void generateDataset(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* d_dataset) {
-    // TODO: use a 2D grid that's n x dim
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
     generateDataset_kernel<<<numBlocks, numThreadsPerBlock>>> (numberOfInputPoints, dimensionOfInputPoints, d_dataset);

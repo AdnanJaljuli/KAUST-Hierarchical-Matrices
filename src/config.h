@@ -132,7 +132,7 @@ static Config parseArgs(int argc, char **argv)
     return config;
 }
 
-static void printArgs(Config config, int num_counters){
+static void printArgs(Config config) {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
     printf("\nDevice name: %s\n\n", prop.name);
@@ -140,7 +140,6 @@ static void printArgs(Config config, int num_counters){
     printf("bucket size: %d\n", config.bucketSize);
     printf("lowest level tolerance: %f\n", config.lowestLevelTolerance);
     printf("dimension of input points: %d\n", config.dimensionOfInputPoints);
-    printf("number of counters: %d\n", num_counters);
 }
 
 #endif

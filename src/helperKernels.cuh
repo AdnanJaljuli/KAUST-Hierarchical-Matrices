@@ -18,8 +18,8 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-__global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* dataset){
-    // TODO: use a 2D grid that's n x dim (seed in this case can be j*n + i)
+// TODO: place in same file as generateDataset
+__global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* dataset) {
     unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i < numberOfInputPoints*dimensionOfInputPoints) {
         unsigned int seed = i;
