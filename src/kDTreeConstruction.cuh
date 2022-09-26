@@ -13,11 +13,11 @@
 #include <string.h>
 #include <stddef.h>
 
-static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, uint64_t numSegments, unsigned int bucketSize, DIVISION_METHOD divMethod, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* d_pointCloud) {
+static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, uint64_t numSegments, unsigned int bucketSize, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* d_pointCloud) {
 
     uint64_t currentNumSegments = 1;
     uint64_t numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
-    uint64_t segmentSize = upperPowerOfTwo(numberOfInputPoints);
+    uint64_t currentSegmentSize = upperPowerOfTwo(numberOfInputPoints);
 
     int *d_offsetsReduce;
     H2Opus_Real *d_keysIn;
@@ -51,14 +51,13 @@ static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensio
     size_t tempStorageBytes = 0;
     int *d_temp;
 
-    while (segmentSize > bucketSize) {
+    while (currentSegmentSize > bucketSize) {
         numThreadsPerBlock = 1024;
         numBlocks = (currentNumSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillOffsets<<<numBlocks, numThreadsPerBlock>>>(numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, segmentSize, d_offsetsSort, d_offsetsReduce);
+        fillOffsets<<<numBlocks, numThreadsPerBlock>>>(numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, d_offsetsSort, d_offsetsReduce);
 
         numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
-
         fillReductionArray<<<numBlocks, numThreadsPerBlock>>> (numberOfInputPoints, dimensionOfInputPoints, d_pointCloud, d_valuesIn, d_reduceIn);
         cudaDeviceSynchronize();
 
@@ -100,30 +99,29 @@ static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensio
 
         numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (numberOfInputPoints, segmentSize, d_keysIn, d_currentDim, d_valuesIn, d_pointCloud);
+        fillKeysIn<<<numBlocks, numThreadsPerBlock>>> (numberOfInputPoints, currentSegmentSize, d_keysIn, d_currentDim, d_valuesIn, d_pointCloud);
         cudaDeviceSynchronize();
 
         d_tempStorage = NULL;
         tempStorageBytes = 0;
-
         cub::DeviceSegmentedRadixSort::SortPairs(d_tempStorage, tempStorageBytes,
-        d_keysIn, d_keysOut, d_valuesIn, d_valuesOut,
-        numberOfInputPoints, currentNumSegments, d_offsetsSort, d_offsetsSort + 1);
+            d_keysIn, d_keysOut, d_valuesIn, d_valuesOut,
+            numberOfInputPoints, currentNumSegments, d_offsetsSort, d_offsetsSort + 1);
         cudaMalloc(&d_tempStorage, tempStorageBytes);
         cub::DeviceSegmentedRadixSort::SortPairs(d_tempStorage, tempStorageBytes,
-        d_keysIn, d_keysOut, d_valuesIn, d_valuesOut,
-        numberOfInputPoints, currentNumSegments, d_offsetsSort, d_offsetsSort + 1);
+            d_keysIn, d_keysOut, d_valuesIn, d_valuesOut,
+            numberOfInputPoints, currentNumSegments, d_offsetsSort, d_offsetsSort + 1);
         cudaFree(d_tempStorage);
 
         d_temp = d_valuesIn;
         d_valuesIn = d_valuesOut;
         d_valuesOut = d_temp;
-        segmentSize /= 2;
-        currentNumSegments = (numberOfInputPoints + segmentSize - 1)/segmentSize;
+
+        currentSegmentSize >>= 2;
+        currentNumSegments = (numberOfInputPoints + currentSegmentSize - 1)/currentSegmentSize;
         numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
     }
-
-    fillOffsets<<<numBlocks, numThreadsPerBlock>>>(numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, segmentSize, d_offsetsSort, d_offsetsReduce);
+    fillOffsets<<<numBlocks, numThreadsPerBlock>>>(numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, d_offsetsSort, d_offsetsReduce);
 
     cudaFree(d_offsetsReduce);
     cudaFree(d_keysIn);

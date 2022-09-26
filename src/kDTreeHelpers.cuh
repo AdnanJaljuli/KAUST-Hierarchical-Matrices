@@ -10,7 +10,7 @@
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
 
-__global__ void initializeArrays(int numberOfInputPoints, int* valuesIn, int* currentDim, int numSegments){
+static __global__ void initializeArrays(int numberOfInputPoints, int* valuesIn, int* currentDim, int numSegments){
     unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i < numberOfInputPoints){
         valuesIn[i] = i;
@@ -20,7 +20,7 @@ __global__ void initializeArrays(int numberOfInputPoints, int* valuesIn, int* cu
     }
 }
 
-__global__ void fillOffsets(int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int numSegments, unsigned int segmentSize, int* offsets_sort, int* offsets_reduce){
+static __global__ void fillOffsets(int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int numSegments, unsigned int segmentSize, int* offsets_sort, int* offsets_reduce){
     unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i < numSegments + 1){
         offsets_sort[i] = (i < numSegments) ? (i*segmentSize) : numberOfInputPoints;
@@ -37,7 +37,7 @@ __global__ void fillOffsets(int numberOfInputPoints, unsigned int dimensionOfInp
     }
 }
 
-__global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* aux_offsets_sort, uint64_t* bit_vector, short* popc_scan, unsigned int* new_num_segments, bool* workDone, int bucket_size){
+static __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* aux_offsets_sort, uint64_t* bit_vector, short* popc_scan, unsigned int* new_num_segments, bool* workDone, int bucket_size){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
 
     if(i < num_segments){
@@ -66,7 +66,7 @@ __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segmen
     }
 }
 
-__global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* aux_offsets_sort){
+static __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* aux_offsets_sort){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i==0){
         aux_offsets_sort[num_segments*2] = n;
@@ -79,7 +79,7 @@ __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segmen
     }
 }
 
-__global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce){
+static __global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i==0){
         offsets_reduce[0] = 0;
@@ -91,14 +91,14 @@ __global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int
     }
 }
 
-__global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* pointCloud, int* values_in, H2Opus_Real* reduce_in){
+static __global__ void fillReductionArray(int n, unsigned int dim, H2Opus_Real* pointCloud, int* values_in, H2Opus_Real* reduce_in){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<(long long)n*(long long)dim){
         reduce_in[i] = pointCloud[(long long)values_in[i - (i/n)*n] + (long long)(i/n)*n];
     }
 }
 
-__global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2Opus_Real* reduce_min_out, H2Opus_Real* reduce_max_out, H2Opus_Real* span, int* span_offsets){
+static __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2Opus_Real* reduce_min_out, H2Opus_Real* reduce_max_out, H2Opus_Real* span, int* span_offsets){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
         for(unsigned int j=0; j<dim; ++j){
@@ -112,14 +112,14 @@ __global__ void findSpan(int n, unsigned int dim, unsigned int num_segments, H2O
     }
 }
 
-__global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
+static __global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, cub::KeyValuePair<int, H2Opus_Real>* spanReduced){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
         currentDim[i] = spanReduced[i].key;
     }
 }
 
-__global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, cub::KeyValuePair<int, H2Opus_Real>* spanReduced, uint64_t* bit_vector){
+static __global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, cub::KeyValuePair<int, H2Opus_Real>* spanReduced, uint64_t* bit_vector){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_segments){
         currentDim[i] = spanReduced[i].key;
@@ -131,14 +131,14 @@ __global__ void fillCurrDim(int n, unsigned int num_segments, int* currentDim, c
     }
 }
 
-__global__ void fillKeysIn(int n, unsigned int segmentSize, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* pointCloud){
+static __global__ void fillKeysIn(int n, unsigned int segmentSize, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* pointCloud){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
         keys_in[i] = pointCloud[(long long)currentDim[i/segmentSize]*n + (long long)values_in[i]];
     }
 }
 
-__global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* pointCloud, int* offsets_sort, int* output){
+static __global__ void fillKeysIn(int n, H2Opus_Real* keys_in, int* currentDim, int* values_in, H2Opus_Real* pointCloud, int* offsets_sort, int* output){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<n){
         int segment_index = output[i] - 1;

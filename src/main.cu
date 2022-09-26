@@ -2,6 +2,7 @@
 #include "config.h"
 #include "counters.h"
 #include "createLRMatrix.cuh"
+#include "expandMatrixHelpers.cuh"
 #include "helperFunctions.cuh"
 #include "hierarchicalMatrixFunctions.cuh"
 #include "kblas.h"
@@ -46,7 +47,7 @@ int main(int argc, char *argv[]) {
     int  *d_offsetsSort; // TODO: rename to something more representative
     cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
     cudaMalloc((void**) &d_offsetsSort, (numSegments + 1)*sizeof(int));
-    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, numSegments, config.bucketSize, config.divMethod, d_valuesIn, d_offsetsSort, d_pointCloud);
+    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, numSegments, config.bucketSize, d_valuesIn, d_offsetsSort, d_pointCloud);
 
     // Build the TLR matrix
     uint64_t maxSegmentSize = config.bucketSize;
@@ -57,14 +58,18 @@ int main(int argc, char *argv[]) {
     int max_cols = maxSegmentSize;
     int max_rank = max_cols;
     TLR_Matrix matrix;
-    matrix.type = COLUMN_MAJOR;
-    H2Opus_Real* d_denseMatrix;
+    matrix.ordering = COLUMN_MAJOR;
+
+    // TODO: separate the code that expands the matrix from the code that doesn't; have a separate call that passes and calculates the dense matrix; this call should only be called if the EXPAND_MATRIX macro is enabled
+    uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_valuesIn, d_offsetsSort, d_pointCloud, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
+
     #if EXPAND_MATRIX
     // TODO: assert that this doesn't exceed memory limit
+    H2Opus_Real* d_denseMatrix;
     cudaMalloc((void**) &d_denseMatrix, numSegments*numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
+    generateDenseMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.dimensionOfInputPoints, d_denseMatrix, d_valuesIn, d_offsetsSort, d_pointCloud);
     #endif
-    // TODO: separate the code that expands the matrix from the code that doesn't; have a separate call that passes and calculates the dense matrix; this call should only be called if the EXPAND_MATRIX macro is enabled
-    uint64_t kSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_denseMatrix, d_valuesIn, d_offsetsSort, d_pointCloud, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
+
     cudaFree(d_pointCloud);
     cudaFree(d_valuesIn);
     cudaFree(d_offsetsSort);
@@ -76,8 +81,8 @@ int main(int argc, char *argv[]) {
 
     // Convert TLR matrix to morton order
     TLR_Matrix mortonMatrix;
-    mortonMatrix.type = MORTON;
-    ConvertColumnMajorToMorton(numSegments, maxSegmentSize, kSum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names    
+    mortonMatrix.ordering = MORTON;
+    ConvertColumnMajorToMorton(numSegments, maxSegmentSize, rankSum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names    
     matrix.cudaFreeMatrix();
 
     #if EXPAND_MATRIX
@@ -93,8 +98,12 @@ int main(int argc, char *argv[]) {
     int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
     genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
     #endif
+
     mortonMatrix.cudaFreeMatrix();
     gpuErrchk(cudaPeekAtLastError());
+    #if EXPAND_MATRIX
+    cudaFree(d_denseMatrix);
+    #endif
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);
@@ -102,5 +111,4 @@ int main(int argc, char *argv[]) {
     #endif
 
     return 0;
-
 }

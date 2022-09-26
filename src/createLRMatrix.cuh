@@ -25,7 +25,7 @@
 #include <thrust/functional.h>
 
 // TODO: clean this file
-uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int maxSegmentSize, int bucketSize, int dimensionOfInputPoints, TLR_Matrix &matrix, H2Opus_Real* &d_denseMatrix, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int maxRows, int maxCols, int maxRank){
+uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int maxSegmentSize, int bucketSize, int dimensionOfInputPoints, TLR_Matrix &matrix, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int maxRows, int maxCols, int maxRank){
     H2Opus_Real* d_inputMatrixSegmented;
     gpuErrchk(cudaMalloc((void**) &d_inputMatrixSegmented, maxSegmentSize*maxSegmentSize*numSegments*(uint64_t)sizeof(H2Opus_Real)));
 
@@ -86,11 +86,8 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
     dim3 m_numBlocks(1, numSegments);
 
     for(unsigned int segment = 0; segment < numSegments; ++segment){
-        #if EXPAND_MATRIX
-        generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal, d_denseMatrix, 1);
-        #else
-        generateInputMatrix<<<m_numBlocks, m_numThreadsPerBlock>>>(numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal, d_denseMatrix, 0);
-        #endif
+
+        generateDenseBlockColumn<<<m_numBlocks, m_numThreadsPerBlock>>>(numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal);
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
 

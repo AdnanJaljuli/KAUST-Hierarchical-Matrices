@@ -1,5 +1,4 @@
 
-// TODO: split the functions in this file into two. Those which are called in kdtreeConstruction.cuh and others
 #ifndef __HELPERKERNELS_CUH__
 #define __HELPERKERNELS_CUH__
 
@@ -19,11 +18,11 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-__device__ H2Opus_Real getCorrelationLength(int dim){
+static __device__ H2Opus_Real getCorrelationLength(int dim){
     return dim == 3 ? 0.2 : 0.1;
 }
 
-__device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real* pointCloud){
+static __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real* pointCloud){
     assert(col<n);
     assert(row<n);
 
@@ -39,53 +38,40 @@ __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real
     return exp(-dist / getCorrelationLength(dim));
 }
 
-__global__ void generateInputMatrix(uint64_t n, uint64_t num_segments, uint64_t maxSegmentSize, int dim, int* index_map, H2Opus_Real* matrix, H2Opus_Real* pointCloud, int* offsets_sort, int segment, H2Opus_Real* diagonal, H2Opus_Real* denseMatrix, int expand_matrix){
-    for(unsigned int i=0; i<(maxSegmentSize/blockDim.x); ++i){
-        for(unsigned int j=0; j<(maxSegmentSize/blockDim.x); ++j){
+static __global__ void generateDenseBlockColumn(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, int* index_map, H2Opus_Real* matrix, H2Opus_Real* pointCloud, int* offsets_sort, int segment, H2Opus_Real* diagonal){
+    for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i){
+        for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j){
             unsigned int row = blockIdx.y*maxSegmentSize + i*blockDim.x + threadIdx.y;
             unsigned int col = segment*maxSegmentSize + j*blockDim.x + threadIdx.x;
 
-            int xDim = offsets_sort[segment + 1] - offsets_sort[segment];
-            int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
-
-            unsigned int diff = (blockIdx.y > segment) ? 1 : 0;
-
-            if(((uint64_t)col*num_segments*maxSegmentSize + (uint64_t)row) >= (maxSegmentSize*maxSegmentSize*num_segments*num_segments)){
+            if(((uint64_t)col*numSegments*maxSegmentSize + (uint64_t)row) >= (maxSegmentSize*maxSegmentSize*numSegments*numSegments)){
                 assert(0);
             }
+
             if(blockIdx.y == segment){
-                diagonal[segment*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
-                if(expand_matrix == 1){
-                    denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
-                }
+                diagonal[segment*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
             }
             else{
+                unsigned int diff = (blockIdx.y > segment) ? 1 : 0;
+                int xDim = offsets_sort[segment + 1] - offsets_sort[segment];
+                int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
                 if(threadIdx.x + j*blockDim.x >= xDim || threadIdx.y + i*blockDim.x >= yDim) {
                     if(col == row){
-                        matrix[blockIdx.y*maxSegmentSize*maxSegmentSize  + (-1*diff*maxSegmentSize*maxSegmentSize) + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 1;
-                        if(expand_matrix == 1){
-                            denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = 1;
-                        }
+                        matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 1;
                     }
                     else{
                         matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 0;
-                        if(expand_matrix == 1){
-                            denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = 0;
-                        }
                     }
                 }
                 else {
-                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
-                    if(expand_matrix == 1){
-                        denseMatrix[(segment*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y] = interaction(n, dim, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
-                    }
+                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
                 }
             }
         }
     }
 }
 
-__global__ void calcMemNeeded(int maxSegmentSize, unsigned int* K, H2Opus_Real* S, float eps){
+static __global__ void calcMemNeeded(int maxSegmentSize, unsigned int* K, H2Opus_Real* S, float eps){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
 
     __shared__ int k;
@@ -106,7 +92,7 @@ __global__ void calcMemNeeded(int maxSegmentSize, unsigned int* K, H2Opus_Real* 
     }
 }
 
-__global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_Real* S, H2Opus_Real* U, H2Opus_Real* V, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, unsigned int* K, int* K_scan, int segment){
+static __global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_Real* S, H2Opus_Real* U, H2Opus_Real* V, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, unsigned int* K, int* K_scan, int segment){
     if(threadIdx.x < K[blockIdx.y] && threadIdx.y < maxSegmentSize){
         U_tiled[K_scan[blockIdx.y]*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]
           = U[blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]
@@ -119,7 +105,7 @@ __global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_R
     }
 }
 
-__global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offsets_sort, int bucket_size){
+static __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offsets_sort, int bucket_size){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
 
     if(i < num_segments){
@@ -131,20 +117,20 @@ __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offse
     }
 }
 
-__global__ void  fillPopCount(int num_threads, uint64_t* bit_vector, short int* popc_bit_vector){
+static __global__ void  fillPopCount(int num_threads, uint64_t* bit_vector, short int* popc_bit_vector){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i<num_threads){
         popc_bit_vector[i] = __popcll(bit_vector[i]);
     }
 }
 
-__global__ void isWorkDone(int num_segments, uint64_t* bit_vector, bool* workDone){
+static __global__ void isWorkDone(int num_segments, uint64_t* bit_vector, bool* workDone){
     if(bit_vector[0] == 0ULL){
         *workDone = true;
     }
 }
 
-__global__ void printK(int* K, int num_segments){
+static __global__ void printK(int* K, int num_segments){
     printf("ks\n");
     for(int i=0; i<num_segments; ++i){
         printf("%d ", K[i]);
@@ -152,11 +138,11 @@ __global__ void printK(int* K, int num_segments){
     printf("\n");
 }
 
-__global__ void getTotalMem(uint64_t* totalMem, int* K, int* scan_K, int num_segments){
+static __global__ void getTotalMem(uint64_t* totalMem, int* K, int* scan_K, int num_segments){
     *totalMem = (uint64_t)scan_K[num_segments - 1] + (uint64_t)K[num_segments - 1];
 }
 
-__global__ void calcError(int num_segments, int maxSegmentSize, H2Opus_Real* expMatrix, H2Opus_Real* input_matrix, H2Opus_Real* error, H2Opus_Real* tmp){
+static __global__ void calcError(int num_segments, int maxSegmentSize, H2Opus_Real* expMatrix, H2Opus_Real* input_matrix, H2Opus_Real* error, H2Opus_Real* tmp){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i < num_segments*maxSegmentSize*maxSegmentSize){
         H2Opus_Real x = input_matrix[i];
@@ -166,7 +152,7 @@ __global__ void calcError(int num_segments, int maxSegmentSize, H2Opus_Real* exp
     }
 }
 
-__global__ void fillDenseMatrix(int n, H2Opus_Real* matrix) {
+static __global__ void fillDenseMatrix(int n, H2Opus_Real* matrix) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int seed = i;
     if(i<n){
@@ -179,7 +165,7 @@ __global__ void fillDenseMatrix(int n, H2Opus_Real* matrix) {
     }
 }
 
-__global__ void filltmpVector(int n, H2Opus_Real* vector){
+static __global__ void filltmpVector(int n, H2Opus_Real* vector){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int seed = i;
     if(i<n){
@@ -190,7 +176,7 @@ __global__ void filltmpVector(int n, H2Opus_Real* vector){
     }
 }
 
-__global__ void fillBatch(int num_segments, int* rows_batch, int* cols_batch, int maxSegmentSize){
+static __global__ void fillBatch(int num_segments, int* rows_batch, int* cols_batch, int maxSegmentSize){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i<num_segments){
         rows_batch[i] = maxSegmentSize;
@@ -198,7 +184,7 @@ __global__ void fillBatch(int num_segments, int* rows_batch, int* cols_batch, in
     }
 }
 
-__global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
+static __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchCount){
         d_rows_batch[i] = max_rows;
@@ -209,7 +195,7 @@ __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d
     }
 }
 
-__global__ void fillLRARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_lda_batch, int* d_ldb_batch){
+static __global__ void fillLRARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_lda_batch, int* d_ldb_batch){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchCount){
         d_rows_batch[i] = max_rows;
@@ -230,7 +216,7 @@ struct UnaryAoAAssign : public thrust::unary_function<int, T*>
 };
 
 template<class T>
-void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int stride, int num_arrays, cudaStream_t stream)
+static void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int stride, int num_arrays, cudaStream_t stream)
 {
     thrust::device_ptr<T*> dev_data(array_of_arrays);
     thrust::transform(
@@ -243,7 +229,7 @@ void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int stride
     cudaGetLastError();
 }
 
-__global__ void printARAOutput(H2Opus_Real* d_A, H2Opus_Real* d_B, int* k, int batchCount, int max_rows, int max_rank){
+static __global__ void printARAOutput(H2Opus_Real* d_A, H2Opus_Real* d_B, int* k, int batchCount, int max_rows, int max_rank){
     printf("ks\n");
     for(unsigned int i=0;i<batchCount; ++i){
         printf("%d ", k[i]);
@@ -251,7 +237,7 @@ __global__ void printARAOutput(H2Opus_Real* d_A, H2Opus_Real* d_B, int* k, int b
     printf("\n");
 }
 
-__global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
+static __global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
     if(threadIdx.x < d_ranks[blockIdx.x]){
         for(unsigned int i = 0; i < maxSegmentSize; ++i) {
             d_U_tiled_segmented[d_scan_k[blockIdx.x]*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
@@ -260,7 +246,7 @@ __global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int*
     }
 }
 
-__global__ void copyRanks(int num_segments, int maxSegmentSize, int* from_ranks, int* to_ranks){
+static __global__ void copyRanks(int num_segments, int maxSegmentSize, int* from_ranks, int* to_ranks){
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < num_segments*(num_segments-1)){
         int row = i%(num_segments-1);
@@ -273,7 +259,7 @@ __global__ void copyRanks(int num_segments, int maxSegmentSize, int* from_ranks,
     }
 }
 
-__host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
+static __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
     static const unsigned int B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF};
     static const unsigned int S[] = {1, 2, 4, 8};
 
@@ -291,13 +277,13 @@ __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
     return z;
 }
 
-__host__ __device__ int IndextoMOIndex_h(int num_segments, int n){
+static __host__ __device__ int IndextoMOIndex_h(int num_segments, int n){
     unsigned int i = n%num_segments;
     unsigned int j = n/num_segments;
     return getMOfromXY_h(j, i);
 }
 
-__global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
+static __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i<num_segments*num_segments){
         int MOIndex = IndextoMOIndex_h(num_segments, i);
@@ -305,14 +291,14 @@ __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* 
     }
 }
 
-__global__ void copyTilestoMO(int n, H2Opus_Real* toArray, H2Opus_Real* fromArray, int offset_1, int offset_2){
+static __global__ void copyTilestoMO(int n, H2Opus_Real* toArray, H2Opus_Real* fromArray, int offset_1, int offset_2){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i<n){
         toArray[offset_1 + i] = fromArray[offset_2 + i];
     }
 }
 
-__device__ uint32_t morton1(uint32_t x)
+static __device__ uint32_t morton1(uint32_t x)
 {
     x = x & 0x55555555;
     x = (x | (x >> 1)) & 0x33333333;
@@ -322,7 +308,7 @@ __device__ uint32_t morton1(uint32_t x)
     return x;
 }
 
-__global__ void fillFirstLevelExistingArrays(int num_segments, int* existingArrays, int* existingRanks, int* matrixRanks){
+static __global__ void fillFirstLevelExistingArrays(int num_segments, int* existingArrays, int* existingRanks, int* matrixRanks){
     int tmp = 0;
     for(unsigned int i=0; i<num_segments*num_segments; ++i){
         int x = morton1(i);
@@ -334,7 +320,7 @@ __global__ void fillFirstLevelExistingArrays(int num_segments, int* existingArra
     }
 }
 
-__global__ void fillActiveTiles(int numExistingArrays, int* activeArrays, int* existingArrays, int* activeRanks, int* existingRanks){
+static __global__ void fillActiveTiles(int numExistingArrays, int* activeArrays, int* existingArrays, int* activeRanks, int* existingRanks){
     int tmp = 0;
     for(int i=0; i<numExistingArrays; ++i){
         if(existingArrays[i]%4 == 0 && i<=(numExistingArrays-4)){
@@ -356,7 +342,7 @@ __global__ void fillActiveTiles(int numExistingArrays, int* activeArrays, int* e
     }
 }
 
-__global__ void fillBitVector(int num_ops, int tile_size, int* new_ranks, int* old_ranks, int* new_level_bit_vector, int* old_level_bit_vector){
+static __global__ void fillBitVector(int num_ops, int tile_size, int* new_ranks, int* old_ranks, int* new_level_bit_vector, int* old_level_bit_vector){
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < num_ops){
         if(2*tile_size*(old_ranks[i*4] + old_ranks[i*4 + 1] + old_ranks[i*4 + 2] + old_ranks[i*4 + 3]) > 4*tile_size*new_ranks[i]){
@@ -370,7 +356,7 @@ __global__ void fillBitVector(int num_ops, int tile_size, int* new_ranks, int* o
     }
 }
 
-__global__ void fillNewLevel(int num_ops, int* bit_vector, int* bit_vector_scan, int* ranks_output, int* new_ranks, int* old_active_tiles, int* new_active_tiles){
+static __global__ void fillNewLevel(int num_ops, int* bit_vector, int* bit_vector_scan, int* ranks_output, int* new_ranks, int* old_active_tiles, int* new_active_tiles){
     int i = threadIdx.x + blockDim.x*blockIdx.x;
     if(i < num_ops){
         if(bit_vector[i] == 1){
@@ -380,16 +366,16 @@ __global__ void fillNewLevel(int num_ops, int* bit_vector, int* bit_vector_scan,
     }
 }
 
-__global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix matrix){
+static __global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix matrix){
     if(blockIdx.x == blockIdx.y){
         expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = matrix.diagonal[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     }
     else{
         unsigned int index;
-        if(matrix.type == MORTON){
+        if(matrix.ordering == MORTON){
             index = IndextoMOIndex_h(num_segments, blockIdx.x*num_segments + blockIdx.y);
         }
-        else if(matrix.type == COLUMN_MAJOR){
+        else if(matrix.ordering == COLUMN_MAJOR){
             index = blockIdx.x*num_segments + blockIdx.y;
         }
 
@@ -402,7 +388,7 @@ __global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* 
     }
 }
 
-__global__ void errorInMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
+static __global__ void errorInMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
     H2Opus_Real x = denseMatrix[(blockIdx.x*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y];
     H2Opus_Real y = expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     
@@ -410,17 +396,17 @@ __global__ void errorInMatrix(int num_segments, int maxSegmentSize, H2Opus_Real*
     atomicAdd(error, (x-y)*(x-y));
 }
 
-__global__ void compareMOwithCM(int num_segments, int maxSegmentSize, H2Opus_Real* expandedCMMatrix, H2Opus_Real* expandedMOMatrix){
+static __global__ void compareMOwithCM(int num_segments, int maxSegmentSize, H2Opus_Real* expandedCMMatrix, H2Opus_Real* expandedMOMatrix){
     H2Opus_Real x = expandedMOMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     H2Opus_Real y = expandedCMMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     assert(x == y);
 }
 
-__global__ void getNewLevelCount(int num_ops, int* d_new_bit_vector, int* d_new_bit_vector_scan, int* d_newLevelCount){
+static __global__ void getNewLevelCount(int num_ops, int* d_new_bit_vector, int* d_new_bit_vector_scan, int* d_newLevelCount){
     d_newLevelCount[0] = d_new_bit_vector_scan[num_ops - 1] + d_new_bit_vector[num_ops - 1];
 }
 
-__global__ void copyTilesToNewLevel(int num_ops, int* bit_vector, TLR_Matrix mortonMatrix, H2Opus_Real* d_A, H2Opus_Real* d_B, int* new_ranks, int* old_active_tiles, int row, int col){
+static __global__ void copyTilesToNewLevel(int num_ops, int* bit_vector, TLR_Matrix mortonMatrix, H2Opus_Real* d_A, H2Opus_Real* d_B, int* new_ranks, int* old_active_tiles, int row, int col){
     unsigned int i = threadIdx.x + blockIdx.x*blockDim.x;
     if(i < num_ops){
         if(bit_vector[i] == 1){
@@ -432,7 +418,7 @@ __global__ void copyTilesToNewLevel(int num_ops, int* bit_vector, TLR_Matrix mor
     }
 }
 
-__global__ void calcNumOps(int num_existing_tiles, int* num_ops, int* availableTiles){
+static __global__ void calcNumOps(int num_existing_tiles, int* num_ops, int* availableTiles){
     unsigned int i = threadIdx.x + blockIdx.x*blockDim.x;
     if(i < num_existing_tiles){
         if(availableTiles[i]%4 == 0){
@@ -450,7 +436,7 @@ __global__ void calcNumOps(int num_existing_tiles, int* num_ops, int* availableT
     }
 }
 
-__global__ void expandHMatrixLevel(int num_ops, int max_rows, int max_cols, H2Opus_Real* d_A, H2Opus_Real* d_B, int* d_ranks, H2Opus_Real* expandedMatrix){
+static __global__ void expandHMatrixLevel(int num_ops, int max_rows, int max_cols, H2Opus_Real* d_A, H2Opus_Real* d_B, int* d_ranks, H2Opus_Real* expandedMatrix){
     int col = threadIdx.x + blockIdx.x*(max_cols/2);
     int row = threadIdx.y + (blockIdx.y%2)*(max_rows/2);
     int block = blockIdx.y/2;
@@ -462,7 +448,7 @@ __global__ void expandHMatrixLevel(int num_ops, int max_rows, int max_cols, H2Op
     expandedMatrix[block*max_rows*max_cols + col*max_rows + row] = sum;
 }
 
-__global__ void errorInHMatrix(int num_segments, int maxSegmentSize, int num_ops, int max_rows, int max_cols, H2Opus_Real* expandedMatrix, H2Opus_Real* d_denseMatrix, int* activeTiles, H2Opus_Real* d_error, H2Opus_Real* d_tmp){
+static __global__ void errorInHMatrix(int num_segments, int maxSegmentSize, int num_ops, int max_rows, int max_cols, H2Opus_Real* expandedMatrix, H2Opus_Real* d_denseMatrix, int* activeTiles, H2Opus_Real* d_error, H2Opus_Real* d_tmp){
     int col = threadIdx.x + blockIdx.x*(max_cols/2);
     int row = threadIdx.y + (blockIdx.y%2)*(max_rows/2);
     int block = blockIdx.y/2;
