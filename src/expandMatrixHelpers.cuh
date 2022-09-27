@@ -24,7 +24,7 @@ static __global__ void generateDenseMatrix_kernel(uint64_t numberOfInputPoints, 
 
             int xDim = offsetsSort[blockIdx.x + 1] - offsetsSort[blockIdx.x];
             int yDim = offsetsSort[blockIdx.y + 1] - offsetsSort[blockIdx.y];
-
+            
             if(blockIdx.y == blockIdx.x){
                     denseMatrix[(blockIdx.x*maxSegmentSize + threadIdx.x)*maxSegmentSize*numSegments + blockIdx.y*maxSegmentSize + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, indexMap[offsetsSort[blockIdx.x] + blockDim.x*j + threadIdx.x], indexMap[offsetsSort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
             }

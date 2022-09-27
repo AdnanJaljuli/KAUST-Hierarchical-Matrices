@@ -59,8 +59,6 @@ int main(int argc, char *argv[]) {
     int max_rank = max_cols;
     TLR_Matrix matrix;
     matrix.ordering = COLUMN_MAJOR;
-
-    // TODO: separate the code that expands the matrix from the code that doesn't; have a separate call that passes and calculates the dense matrix; this call should only be called if the EXPAND_MATRIX macro is enabled
     uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_valuesIn, d_offsetsSort, d_pointCloud, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
 
     #if EXPAND_MATRIX

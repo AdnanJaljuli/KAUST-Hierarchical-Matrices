@@ -38,33 +38,32 @@ static __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Op
     return exp(-dist / getCorrelationLength(dim));
 }
 
-static __global__ void generateDenseBlockColumn(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, int* index_map, H2Opus_Real* matrix, H2Opus_Real* pointCloud, int* offsets_sort, int segment, H2Opus_Real* diagonal){
+static __global__ void generateDenseBlockColumn(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, int* index_map, H2Opus_Real* matrix, H2Opus_Real* pointCloud, int* offsets_sort, int columnIndex, H2Opus_Real* diagonal){
+
     for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i){
         for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j){
             unsigned int row = blockIdx.y*maxSegmentSize + i*blockDim.x + threadIdx.y;
-            unsigned int col = segment*maxSegmentSize + j*blockDim.x + threadIdx.x;
+            unsigned int col = columnIndex*maxSegmentSize + j*blockDim.x + threadIdx.x;
 
-            if(((uint64_t)col*numSegments*maxSegmentSize + (uint64_t)row) >= (maxSegmentSize*maxSegmentSize*numSegments*numSegments)){
-                assert(0);
+            if (blockIdx.y == columnIndex) {
+                diagonal[columnIndex*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.y + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[columnIndex] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
             }
-
-            if(blockIdx.y == segment){
-                diagonal[segment*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
-            }
-            else{
-                unsigned int diff = (blockIdx.y > segment) ? 1 : 0;
-                int xDim = offsets_sort[segment + 1] - offsets_sort[segment];
+            else {
+                unsigned int diff = (blockIdx.y > columnIndex) ? 1 : 0;
+                unsigned int matrixIndex = blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.y + threadIdx.y;
+                int xDim = offsets_sort[columnIndex + 1] - offsets_sort[columnIndex];
                 int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
+
                 if(threadIdx.x + j*blockDim.x >= xDim || threadIdx.y + i*blockDim.x >= yDim) {
                     if(col == row){
-                        matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 1;
+                        matrix[matrixIndex] = 1;
                     }
                     else{
-                        matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = 0;
+                        matrix[matrixIndex] = 0;
                     }
                 }
                 else {
-                    matrix[blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.x + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[segment] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
+                    matrix[matrixIndex] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[columnIndex] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
                 }
             }
         }
