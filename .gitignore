@@ -1,4 +1,5 @@
 *.o
+*.csv
 /src/results/*
 cub-1.8.0/*
 output
