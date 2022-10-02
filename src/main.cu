@@ -6,6 +6,7 @@
 #include "helperFunctions.cuh"
 #include "hierarchicalMatrixFunctions.cuh"
 #include "kblas.h"
+#include "kDTree.h"
 #include "kDTreeConstruction.cuh"
 #include "TLRMatrix.h"
 
@@ -41,49 +42,50 @@ int main(int argc, char *argv[]) {
 
     // Build the KD-tree
     // TODO: Combine into a struct that represents the KD-tree
-    uint64_t numSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
-    int  *d_valuesIn; // TODO: rename to something more representative
-    int  *d_offsetsSort; // TODO: rename to something more representative
-    cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
-    cudaMalloc((void**) &d_offsetsSort, (numSegments + 1)*sizeof(int));
-    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, numSegments, config.bucketSize, d_valuesIn, d_offsetsSort, d_pointCloud);
+    // uint64_t numSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
+    // int  *d_valuesIn; // TODO: rename to something more representative
+    // int  *d_offsetsSort; // TODO: rename to something more representative
+    // cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
+    // cudaMalloc((void**) &d_offsetsSort, (numSegments + 1)*sizeof(int));
+    KDTree kDTree;
+    allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
+    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, kDTree.numSegments, config.bucketSize, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud);
 
     // Build the TLR matrix
     uint64_t maxSegmentSize = config.bucketSize;
     printf("max segment size: %lu\n", maxSegmentSize);
-    printf("num segments: %lu\n", numSegments);
+    printf("num segments: %lu\n", kDTree.numSegments);
     const int ARA_R = 10;
     int max_rows = maxSegmentSize;
     int max_cols = maxSegmentSize;
     int max_rank = max_cols;
     TLR_Matrix matrix;
     matrix.ordering = COLUMN_MAJOR;
-    uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, d_valuesIn, d_offsetsSort, d_pointCloud, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
+    uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, kDTree.numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
 
     #if EXPAND_MATRIX
     // TODO: assert that this doesn't exceed memory limit
     H2Opus_Real* d_denseMatrix;
-    cudaMalloc((void**) &d_denseMatrix, numSegments*numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
-    generateDenseMatrix(config.numberOfInputPoints, numSegments, maxSegmentSize, config.dimensionOfInputPoints, d_denseMatrix, d_valuesIn, d_offsetsSort, d_pointCloud);
+    cudaMalloc((void**) &d_denseMatrix, kDTree.numSegments*kDTree.numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
+    generateDenseMatrix(config.numberOfInputPoints, kDTree.numSegments, maxSegmentSize, config.dimensionOfInputPoints, d_denseMatrix, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud);
     #endif
 
     cudaFree(d_pointCloud);
-    cudaFree(d_valuesIn);
-    cudaFree(d_offsetsSort);
+    cudaFreeKDTree(kDTree);
     gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
-    checkErrorInLRMatrix(numSegments, maxSegmentSize, matrix, d_denseMatrix);
+    checkErrorInLRMatrix(kDTree.numSegments, maxSegmentSize, matrix, d_denseMatrix);
     #endif
 
     // Convert TLR matrix to morton order
     TLR_Matrix mortonMatrix;
     mortonMatrix.ordering = MORTON;
-    ConvertColumnMajorToMorton(numSegments, maxSegmentSize, rankSum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names    
+    ConvertColumnMajorToMorton(kDTree.numSegments, maxSegmentSize, rankSum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names    
     cudaFreeMatrix(matrix);
 
     #if EXPAND_MATRIX
-    checkErrorInLRMatrix(numSegments, maxSegmentSize, mortonMatrix, d_denseMatrix);
+    checkErrorInLRMatrix(kDTree.numSegments, maxSegmentSize, mortonMatrix, d_denseMatrix);
     #endif
 
     // Build hierarchical matrix
@@ -93,7 +95,7 @@ int main(int argc, char *argv[]) {
     printf("numLevels: %d\n", numLevels);
     int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));
     int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
-    genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
+    genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
     #endif
 
     cudaFreeMatrix(mortonMatrix);

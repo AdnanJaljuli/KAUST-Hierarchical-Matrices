@@ -14,8 +14,6 @@ struct TLR_Matrix{
     H2Opus_Real *U;
     H2Opus_Real *V;
     H2Opus_Real *diagonal;
-
-    void cudaFreeMatrix();
 };
 
 void cudaFreeMatrix(TLR_Matrix matrix){
