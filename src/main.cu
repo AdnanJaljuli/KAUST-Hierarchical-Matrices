@@ -41,7 +41,6 @@ int main(int argc, char *argv[]) {
     generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
 
     // Build the KD-tree
-    // TODO: Combine into a struct that represents the KD-tree
     KDTree kDTree;
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
     createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
@@ -76,7 +75,7 @@ int main(int argc, char *argv[]) {
     // Convert TLR matrix to morton order
     TLR_Matrix mortonMatrix;
     mortonMatrix.ordering = MORTON;
-    ConvertColumnMajorToMorton(kDTree.numSegments, maxSegmentSize, rankSum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names    
+    convertColumnMajorToMorton(kDTree.numSegments, maxSegmentSize, rankSum, matrix, mortonMatrix);
     cudaFreeMatrix(matrix);
 
     #if EXPAND_MATRIX

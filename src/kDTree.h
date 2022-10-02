@@ -9,7 +9,7 @@ struct KDTree{
 
 void allocateKDTree(KDTree &tree, unsigned int numberOfInputPoints, unsigned int bucketSize){
     tree.numSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
-    cudaMalloc((void**) &tree.segmentIndices, numberOfInputPoints*sizeof(int));
+    cudaMalloc((void**) &tree.segmentIndices, numberOfInputPoints*sizeof(int)); // TODO: rename to pointIndices
     cudaMalloc((void**) &tree.segmentOffsets, (tree.numSegments + 1)*sizeof(int));
 }
 
