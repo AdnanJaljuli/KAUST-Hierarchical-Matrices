@@ -42,14 +42,9 @@ int main(int argc, char *argv[]) {
 
     // Build the KD-tree
     // TODO: Combine into a struct that represents the KD-tree
-    // uint64_t numSegments = (config.numberOfInputPoints + config.bucketSize - 1)/config.bucketSize;
-    // int  *d_valuesIn; // TODO: rename to something more representative
-    // int  *d_offsetsSort; // TODO: rename to something more representative
-    // cudaMalloc((void**) &d_valuesIn, config.numberOfInputPoints*sizeof(int));
-    // cudaMalloc((void**) &d_offsetsSort, (numSegments + 1)*sizeof(int));
     KDTree kDTree;
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
-    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, kDTree.numSegments, config.bucketSize, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud);
+    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
 
     // Build the TLR matrix
     uint64_t maxSegmentSize = config.bucketSize;
