@@ -14,6 +14,7 @@
 // TODO: ask Izzat about the order of the below 3 header files. If their order is different, it throus a compilation error.
 #include "cublas_v2.h"
 #include "kblas.h"
+#include "kDTree.h"
 #include "batch_rand.h"
 #include "helperFunctions.cuh"
 #include "helperKernels.cuh"
@@ -24,41 +25,27 @@
 #include <thrust/execution_policy.h>
 #include <thrust/functional.h>
 
-// TODO: clean this file
-uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int maxSegmentSize, int bucketSize, int dimensionOfInputPoints, TLR_Matrix &matrix, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* &d_dataset, float tolerance, int ARA_R, int maxRows, int maxCols, int maxRank){
-    H2Opus_Real* d_inputMatrixSegmented;
-    gpuErrchk(cudaMalloc((void**) &d_inputMatrixSegmented, maxSegmentSize*maxSegmentSize*numSegments*(uint64_t)sizeof(H2Opus_Real)));
-
-    int* d_scanRanksSegmented;
-    gpuErrchk(cudaMalloc((void**) &d_scanRanksSegmented, (numSegments - 1)*sizeof(int)));
-
-    H2Opus_Real** d_UTiledTemp = (H2Opus_Real**)malloc(numSegments*sizeof(H2Opus_Real*));
-    H2Opus_Real** d_VTiledTemp = (H2Opus_Real**)malloc(numSegments*sizeof(H2Opus_Real*));
-
-    gpuErrchk(cudaMalloc((void**) &matrix.blockRanks, numSegments*numSegments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &matrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real)));
+uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned int maxSegmentSize, unsigned int bucketSize, unsigned int dimensionOfInputPoints, TLR_Matrix &matrix, KDTree kDTree, H2Opus_Real* &d_dataset, float tolerance, int ARA_R) {
 
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
-    H2Opus_Real** d_MPtrs, **d_APtrs, **d_BPtrs;
-
-    gpuErrchk(cudaMalloc((void**) &d_rowsBatch, (numSegments - 1)*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_colsBatch, (numSegments - 1)*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_ranks, (numSegments - 1)*numSegments*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_LDMBatch, (numSegments - 1)*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_LDABatch, (numSegments - 1)*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_LDBBatch, (numSegments - 1)*sizeof(int)));
-    gpuErrchk(cudaMalloc((void**) &d_A, (numSegments - 1)*maxRows*maxRank*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_B, (numSegments - 1)*maxRows*maxRank*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &d_MPtrs, (numSegments - 1)*sizeof(H2Opus_Real*)));
-    gpuErrchk(cudaMalloc((void**) &d_APtrs, (numSegments - 1)*sizeof(H2Opus_Real*)));
-    gpuErrchk(cudaMalloc((void**) &d_BPtrs, (numSegments - 1)*sizeof(H2Opus_Real*)));
-    gpuErrchk(cudaPeekAtLastError());
+    H2Opus_Real **d_MPtrs, **d_APtrs, **d_BPtrs;
+    gpuErrchk(cudaMalloc((void**) &d_rowsBatch, (kDTree.numSegments - 1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_colsBatch, (kDTree.numSegments - 1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_ranks, (kDTree.numSegments - 1)*kDTree.numSegments*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_LDMBatch, (kDTree.numSegments - 1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_LDABatch, (kDTree.numSegments - 1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_LDBBatch, (kDTree.numSegments - 1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &d_A, (kDTree.numSegments - 1)*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real)));
+    gpuErrchk(cudaMalloc((void**) &d_B, (kDTree.numSegments - 1)*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real)));
+    gpuErrchk(cudaMalloc((void**) &d_MPtrs, (kDTree.numSegments - 1)*sizeof(H2Opus_Real*)));
+    gpuErrchk(cudaMalloc((void**) &d_APtrs, (kDTree.numSegments - 1)*sizeof(H2Opus_Real*)));
+    gpuErrchk(cudaMalloc((void**) &d_BPtrs, (kDTree.numSegments - 1)*sizeof(H2Opus_Real*)));
 
     int numThreadsPerBlock = 1024;
-    int numBlocks = ((numSegments - 1) + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillARAArrays<<<numBlocks, numThreadsPerBlock>>>(numSegments - 1, maxRows, maxCols, d_rowsBatch, d_colsBatch, d_LDMBatch, d_LDABatch, d_LDBBatch);
+    int numBlocks = (kDTree.numSegments - 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillARAArrays <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments - 1, maxSegmentSize, d_rowsBatch, d_colsBatch, d_LDMBatch, d_LDABatch, d_LDBBatch);
     gpuErrchk(cudaPeekAtLastError());
 
     magma_init();
@@ -71,8 +58,8 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
     gpuErrchk(cudaPeekAtLastError());
 
     kblasEnableMagma(kblasHandle);
-    kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, maxCols, numSegments - 1);
-    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, bucketSize, numSegments - 1);
+    kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxSegmentSize, maxSegmentSize, kDTree.numSegments - 1);
+    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, bucketSize, kDTree.numSegments - 1);
     gpuErrchk(cudaPeekAtLastError());
     kblasAllocateWorkspace(kblasHandle);
 
@@ -82,18 +69,27 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
     uint64_t* d_totalMem;
     cudaMalloc((void**) &d_totalMem, sizeof(uint64_t));
 
+    H2Opus_Real* d_inputMatrixSegmented;
+    int* d_scanRanksSegmented;
+    gpuErrchk(cudaMalloc((void**) &d_inputMatrixSegmented, maxSegmentSize*maxSegmentSize*kDTree.numSegments*(uint64_t)sizeof(H2Opus_Real)));
+    gpuErrchk(cudaMalloc((void**) &d_scanRanksSegmented, (kDTree.numSegments - 1)*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &matrix.blockRanks, kDTree.numSegments*kDTree.numSegments*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &matrix.diagonal, kDTree.numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real)));
+    H2Opus_Real** d_UTiledTemp = (H2Opus_Real**)malloc(kDTree.numSegments*sizeof(H2Opus_Real*));
+    H2Opus_Real** d_VTiledTemp = (H2Opus_Real**)malloc(kDTree.numSegments*sizeof(H2Opus_Real*));
+
     dim3 m_numThreadsPerBlock(min(32, (int)maxSegmentSize), min(32, (int)maxSegmentSize));
-    dim3 m_numBlocks(1, numSegments);
+    dim3 m_numBlocks(1, kDTree.numSegments);
 
-    for(unsigned int segment = 0; segment < numSegments; ++segment){
+    for(unsigned int segment = 0; segment < kDTree.numSegments; ++segment) {
 
-        generateDenseBlockColumn<<<m_numBlocks, m_numThreadsPerBlock>>>(numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_valuesIn, d_inputMatrixSegmented, d_dataset, d_offsetsSort, segment, matrix.diagonal);
+        generateDenseBlockColumn <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, maxSegmentSize, dimensionOfInputPoints, d_inputMatrixSegmented, d_dataset, kDTree, segment, matrix.diagonal);
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
 
-        generateArrayOfPointersT<H2Opus_Real>(d_inputMatrixSegmented, d_MPtrs, maxRows*maxCols, numSegments - 1, 0);
-        generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxCols, numSegments - 1, 0);
-        generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxCols, numSegments - 1, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_inputMatrixSegmented, d_MPtrs, maxSegmentSize*maxSegmentSize, kDTree.numSegments - 1, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxSegmentSize*maxSegmentSize, kDTree.numSegments - 1, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxSegmentSize*maxSegmentSize, kDTree.numSegments - 1, 0);
         gpuErrchk(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
         cudaDeviceSynchronize();
         gpuErrchk(cudaPeekAtLastError());
@@ -105,8 +101,8 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
 
         int kblas_ara_return = kblas_ara_batch(
             kblasHandle, d_rowsBatch, d_colsBatch, d_MPtrs, d_LDMBatch, 
-            d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks + segment*(numSegments - 1),
-            tolerance, maxRows, maxCols, maxRank, 32, ARA_R, randState, 0, numSegments - 1
+            d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks + segment*(kDTree.numSegments - 1),
+            tolerance, maxSegmentSize, maxSegmentSize, maxSegmentSize, 32, ARA_R, randState, 0, kDTree.numSegments - 1
         );
         assert(kblas_ara_return == 1);
 
@@ -121,14 +117,14 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
 
         void* d_tempStorage = NULL;
         size_t tempStorageBytes = 0;
-        cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(numSegments - 1), d_scanRanksSegmented, numSegments - 1);
+        cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaMalloc(&d_tempStorage, tempStorageBytes);
-        cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(numSegments - 1), d_scanRanksSegmented, numSegments - 1);
+        cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaDeviceSynchronize();
         cudaFree(d_tempStorage);
 
-        printK<<<1, 1>>>(d_ranks + segment*(numSegments - 1), numSegments - 1);
-        getTotalMem<<<1, 1>>> (d_totalMem, d_ranks + segment*(numSegments - 1), d_scanRanksSegmented, numSegments - 1);
+        printK<<<1, 1>>>(d_ranks + segment*(kDTree.numSegments - 1), kDTree.numSegments - 1);
+        getTotalMem<<<1, 1>>> (d_totalMem, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaMemcpy(totalMem, d_totalMem, sizeof(uint64_t), cudaMemcpyDeviceToHost);
 
         gpuErrchk(cudaMalloc((void**) &d_UTiledTemp[segment], maxSegmentSize*(*totalMem)*sizeof(H2Opus_Real)));
@@ -136,8 +132,8 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
 
         // TODO: optimize thread allocation here
         int numThreadsPerBlock = maxSegmentSize;
-        int numBlocks = numSegments - 1;
-        copyTiles<<<numBlocks, numThreadsPerBlock>>>(numSegments - 1, maxSegmentSize, d_ranks + segment*(numSegments - 1), d_scanRanksSegmented, d_UTiledTemp[segment], d_A, d_VTiledTemp[segment], d_B);
+        int numBlocks = kDTree.numSegments - 1;
+        copyTiles<<<numBlocks, numThreadsPerBlock>>>(kDTree.numSegments - 1, maxSegmentSize, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, d_UTiledTemp[segment], d_A, d_VTiledTemp[segment], d_B);
 
         rankSum += (*totalMem);
     }
@@ -159,46 +155,45 @@ uint64_t createColumnMajorLRMatrix(int numberOfInputPoints, int numSegments, int
 
     gpuErrchk(cudaMalloc((void**) &matrix.U, rankSum*maxSegmentSize*sizeof(H2Opus_Real)));
     gpuErrchk(cudaMalloc((void**) &matrix.V, rankSum*maxSegmentSize*sizeof(H2Opus_Real)));
-    gpuErrchk(cudaMalloc((void**) &matrix.blockOffsets, numSegments*numSegments*sizeof(int)));
+    gpuErrchk(cudaMalloc((void**) &matrix.blockOffsets, kDTree.numSegments*kDTree.numSegments*sizeof(int)));
 
     numThreadsPerBlock = 1024;
-    numBlocks = ((numSegments - 1)*numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    copyRanks<<<numBlocks, numThreadsPerBlock>>>(numSegments, maxSegmentSize, d_ranks, matrix.blockRanks);
+    numBlocks = ((kDTree.numSegments - 1)*kDTree.numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    copyRanks <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments, maxSegmentSize, d_ranks, matrix.blockRanks);
     cudaDeviceSynchronize();
     cudaFree(d_ranks);
 
     void *d_tempStorage = NULL;
     size_t tempStorageBytes = 0;
-    cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, matrix.blockRanks, matrix.blockOffsets, numSegments*numSegments);
+    cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, matrix.blockRanks, matrix.blockOffsets, kDTree.numSegments*kDTree.numSegments);
     cudaMalloc(&d_tempStorage, tempStorageBytes);
-    cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, matrix.blockRanks, matrix.blockOffsets, numSegments*numSegments);
+    cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, matrix.blockRanks, matrix.blockOffsets, kDTree.numSegments*kDTree.numSegments);
     cudaDeviceSynchronize();
     cudaFree(d_tempStorage);
     gpuErrchk(cudaPeekAtLastError());
 
-    int* h_scanRanks = (int*)malloc(numSegments*numSegments*sizeof(int));
-    gpuErrchk(cudaMemcpy(h_scanRanks, matrix.blockOffsets, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost));
+    int* h_scanRanks = (int*)malloc(kDTree.numSegments*kDTree.numSegments*sizeof(int));
+    gpuErrchk(cudaMemcpy(h_scanRanks, matrix.blockOffsets, kDTree.numSegments*kDTree.numSegments*sizeof(int), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaPeekAtLastError());
 
-    for(unsigned int segment = 0; segment < numSegments - 1; ++segment){
-        gpuErrchk(cudaMemcpy(&matrix.U[h_scanRanks[numSegments*segment]*maxSegmentSize], d_UTiledTemp[segment], (h_scanRanks[numSegments*(segment+1)] - h_scanRanks[numSegments*segment])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
-        gpuErrchk(cudaMemcpy(&matrix.V[h_scanRanks[numSegments*segment]*maxSegmentSize], d_VTiledTemp[segment], (h_scanRanks[numSegments*(segment+1)] - h_scanRanks[numSegments*segment])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
+    for(unsigned int segment = 0; segment < kDTree.numSegments - 1; ++segment) {
+        gpuErrchk(cudaMemcpy(&matrix.U[h_scanRanks[kDTree.numSegments*segment]*maxSegmentSize], d_UTiledTemp[segment], (h_scanRanks[kDTree.numSegments*(segment + 1)] - h_scanRanks[kDTree.numSegments*segment])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
+        gpuErrchk(cudaMemcpy(&matrix.V[h_scanRanks[kDTree.numSegments*segment]*maxSegmentSize], d_VTiledTemp[segment], (h_scanRanks[kDTree.numSegments*(segment + 1)] - h_scanRanks[kDTree.numSegments*segment])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
     }
     gpuErrchk(cudaPeekAtLastError());
 
-    gpuErrchk(cudaMemcpy(&matrix.U[h_scanRanks[numSegments*(numSegments - 1)]*maxSegmentSize], d_UTiledTemp[numSegments - 1], (rankSum - h_scanRanks[numSegments*(numSegments - 1)])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
-    gpuErrchk(cudaMemcpy(&matrix.V[h_scanRanks[numSegments*(numSegments - 1)]*maxSegmentSize], d_VTiledTemp[numSegments - 1], (rankSum - h_scanRanks[numSegments*(numSegments - 1)])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
+    gpuErrchk(cudaMemcpy(&matrix.U[h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)]*maxSegmentSize], d_UTiledTemp[kDTree.numSegments - 1], (rankSum - h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
+    gpuErrchk(cudaMemcpy(&matrix.V[h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)]*maxSegmentSize], d_VTiledTemp[kDTree.numSegments - 1], (rankSum - h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)])*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice));
     free(h_scanRanks);
     gpuErrchk(cudaPeekAtLastError());
 
-    for(unsigned int segment = 0; segment < numSegments; ++segment){
+    for(unsigned int segment = 0; segment < kDTree.numSegments; ++segment) {
         cudaFree(d_UTiledTemp[segment]);
         cudaFree(d_VTiledTemp[segment]);
     }
     free(d_UTiledTemp);
     free(d_VTiledTemp);
     gpuErrchk(cudaPeekAtLastError());
-
     return rankSum;
 }
 

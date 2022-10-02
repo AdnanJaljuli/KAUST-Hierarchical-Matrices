@@ -14,15 +14,13 @@
 #include <string.h>
 #include <stddef.h>
 
+// TODO: continue cleaning the file
 static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int bucketSize, KDTree kDTree, H2Opus_Real* d_pointCloud) {
-
-    // TODO: rename all of these
 
     int *d_dimxNSegmentOffsets;
     H2Opus_Real *d_kDTreePoints;
     H2Opus_Real *d_kDTreePointsOutput;
     int  *d_indexMapOutput;
-    int *d_currentDim; // TODO: stop using d_currDim, isntead use d_spanReduceOut.key
     H2Opus_Real *d_reduceIn;
     H2Opus_Real *d_minSegmentItem;
     H2Opus_Real *d_maxSegmentItem;
@@ -34,7 +32,6 @@ static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensio
     cudaMalloc((void**) &d_kDTreePoints, numberOfInputPoints*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_kDTreePointsOutput, numberOfInputPoints*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_indexMapOutput, numberOfInputPoints*sizeof(int));
-    cudaMalloc((void**) &d_currentDim, (kDTree.numSegments + 1)*sizeof(int));
     cudaMalloc((void**) &d_reduceIn, numberOfInputPoints*dimensionOfInputPoints*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_minSegmentItem, (kDTree.numSegments + 1)*dimensionOfInputPoints*sizeof(int));
     cudaMalloc((void**) &d_maxSegmentItem, (kDTree.numSegments + 1)*dimensionOfInputPoints*sizeof(int));
@@ -51,13 +48,13 @@ static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensio
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numberOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    initializeArrays <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, kDTree.segmentIndices, d_currentDim, kDTree.numSegments);
+    initIndexMap <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, kDTree);
 
     while(currentSegmentSize > bucketSize) {
 
         numThreadsPerBlock = 1024;
         numBlocks = (currentNumSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree.segmentOffsets, d_dimxNSegmentOffsets);
+        fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
 
         numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
@@ -98,12 +95,8 @@ static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensio
         cudaFree(d_tempStorage);
 
         numThreadsPerBlock = 1024;
-        numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillCurrDim <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, currentNumSegments, d_currentDim, d_segmentSpanReduction);
-
-        numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, currentSegmentSize, d_kDTreePoints, d_currentDim, kDTree.segmentIndices, d_pointCloud);
+        fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, currentSegmentSize, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud);
         cudaDeviceSynchronize();
 
         d_tempStorage = NULL;
@@ -125,13 +118,12 @@ static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensio
         currentNumSegments = (numberOfInputPoints + currentSegmentSize - 1)/currentSegmentSize;
         numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
     }
-    fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree.segmentOffsets, d_dimxNSegmentOffsets);
+    fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
 
     cudaFree(d_dimxNSegmentOffsets);
     cudaFree(d_kDTreePoints);
     cudaFree(d_kDTreePointsOutput);
     cudaFree(d_indexMapOutput);
-    cudaFree(d_currentDim);
     cudaFree(d_reduceIn);
     cudaFree(d_minSegmentItem);
     cudaFree(d_maxSegmentItem);

@@ -49,13 +49,11 @@ int main(int argc, char *argv[]) {
     uint64_t maxSegmentSize = config.bucketSize;
     printf("max segment size: %lu\n", maxSegmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
+
     const int ARA_R = 10;
-    int max_rows = maxSegmentSize;
-    int max_cols = maxSegmentSize;
-    int max_rank = max_cols;
     TLR_Matrix matrix;
     matrix.ordering = COLUMN_MAJOR;
-    uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, kDTree.numSegments, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud, config.lowestLevelTolerance, ARA_R, max_rows, max_cols, max_rank);
+    uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, maxSegmentSize, config.bucketSize, config.dimensionOfInputPoints, matrix, kDTree, d_pointCloud, config.lowestLevelTolerance, ARA_R);
 
     #if EXPAND_MATRIX
     // TODO: assert that this doesn't exceed memory limit
@@ -85,6 +83,9 @@ int main(int argc, char *argv[]) {
     // Build hierarchical matrix
     // TODO: move declarations not used later inside the function
     #if 0
+    int max_rows = maxSegmentSize;
+    int max_cols = maxSegmentSize;
+    int max_rank = max_cols;
     const int numLevels = __builtin_ctz(config.numberOfInputPoints/config.bucketSize) + 1;
     printf("numLevels: %d\n", numLevels);
     int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));

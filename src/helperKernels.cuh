@@ -2,6 +2,7 @@
 #ifndef __HELPERKERNELS_CUH__
 #define __HELPERKERNELS_CUH__
 
+#include "kDTree.h"
 #include "TLRMatrix.h"
 
 #include <ctype.h>
@@ -35,35 +36,34 @@ static __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Op
     }
 
     H2Opus_Real dist = sqrt(diff);
-    return exp(-dist / getCorrelationLength(dim));
+    return exp(-dist/getCorrelationLength(dim));
 }
 
-static __global__ void generateDenseBlockColumn(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, int* index_map, H2Opus_Real* matrix, H2Opus_Real* pointCloud, int* offsets_sort, int columnIndex, H2Opus_Real* diagonal){
-
-    for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i){
-        for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j){
+static __global__ void generateDenseBlockColumn(uint64_t numberOfInputPoints, uint64_t maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* matrix, H2Opus_Real* pointCloud, KDTree kDTree, int columnIndex, H2Opus_Real* diagonal) {
+    for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i) {
+        for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j) {
             unsigned int row = blockIdx.y*maxSegmentSize + i*blockDim.x + threadIdx.y;
             unsigned int col = columnIndex*maxSegmentSize + j*blockDim.x + threadIdx.x;
 
-            if (blockIdx.y == columnIndex) {
-                diagonal[columnIndex*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.y + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[columnIndex] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
+            if(blockIdx.y == columnIndex) {
+                diagonal[columnIndex*maxSegmentSize*maxSegmentSize + j*maxSegmentSize*blockDim.x + threadIdx.x*maxSegmentSize + i*blockDim.y + threadIdx.y] = interaction(numberOfInputPoints, dimensionOfInputPoints, kDTree.segmentIndices[kDTree.segmentOffsets[columnIndex] + blockDim.x*j + threadIdx.x], kDTree.segmentIndices[kDTree.segmentOffsets[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
             }
             else {
                 unsigned int diff = (blockIdx.y > columnIndex) ? 1 : 0;
                 unsigned int matrixIndex = blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.y + threadIdx.y;
-                int xDim = offsets_sort[columnIndex + 1] - offsets_sort[columnIndex];
-                int yDim = offsets_sort[blockIdx.y + 1] - offsets_sort[blockIdx.y];
+                int xDim = kDTree.segmentOffsets[columnIndex + 1] - kDTree.segmentOffsets[columnIndex];
+                int yDim = kDTree.segmentOffsets[blockIdx.y + 1] - kDTree.segmentOffsets[blockIdx.y];
 
                 if(threadIdx.x + j*blockDim.x >= xDim || threadIdx.y + i*blockDim.x >= yDim) {
-                    if(col == row){
+                    if(col == row) {
                         matrix[matrixIndex] = 1;
                     }
-                    else{
+                    else {
                         matrix[matrixIndex] = 0;
                     }
                 }
                 else {
-                    matrix[matrixIndex] = interaction(numberOfInputPoints, dimensionOfInputPoints, index_map[offsets_sort[columnIndex] + blockDim.x*j + threadIdx.x], index_map[offsets_sort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
+                    matrix[matrixIndex] = interaction(numberOfInputPoints, dimensionOfInputPoints, kDTree.segmentIndices[kDTree.segmentOffsets[columnIndex] + blockDim.x*j + threadIdx.x], kDTree.segmentIndices[kDTree.segmentOffsets[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
                 }
             }
         }
@@ -183,14 +183,14 @@ static __global__ void fillBatch(int num_segments, int* rows_batch, int* cols_ba
     }
 }
 
-static __global__ void fillARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
+static __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchCount){
-        d_rows_batch[i] = max_rows;
-        d_cols_batch[i] = max_cols;
-        d_ldm_batch[i] = max_rows;
-        d_lda_batch[i] = max_rows;
-        d_ldb_batch[i] = max_rows;
+        d_rows_batch[i] = maxSegmentSize;
+        d_cols_batch[i] = maxSegmentSize;
+        d_ldm_batch[i] = maxSegmentSize;
+        d_lda_batch[i] = maxSegmentSize;
+        d_ldb_batch[i] = maxSegmentSize;
     }
 }
 
