@@ -7,7 +7,6 @@
 #include "hierarchicalMatrixFunctions.cuh"
 #include "kblas.h"
 #include "kDTreeConstruction.cuh"
-#include "tlr_example.h"
 #include "TLRMatrix.h"
 
 #include <algorithm>
@@ -81,7 +80,7 @@ int main(int argc, char *argv[]) {
     TLR_Matrix mortonMatrix;
     mortonMatrix.ordering = MORTON;
     ConvertColumnMajorToMorton(numSegments, maxSegmentSize, rankSum, matrix, mortonMatrix); // TODO: Do not capitalize the first letter of function names    
-    matrix.cudaFreeMatrix();
+    cudaFreeMatrix(matrix);
 
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(numSegments, maxSegmentSize, mortonMatrix, d_denseMatrix);
@@ -97,7 +96,7 @@ int main(int argc, char *argv[]) {
     genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, numSegments, maxSegmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
     #endif
 
-    mortonMatrix.cudaFreeMatrix();
+    cudaFreeMatrix(mortonMatrix);
     gpuErrchk(cudaPeekAtLastError());
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);

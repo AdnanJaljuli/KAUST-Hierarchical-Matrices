@@ -18,12 +18,12 @@ struct TLR_Matrix{
     void cudaFreeMatrix();
 };
 
-void TLR_Matrix::cudaFreeMatrix(){
-    cudaFree(blockRanks);
-    cudaFree(blockOffsets);
-    cudaFree(U);
-    cudaFree(V);
-    cudaFree(diagonal);
+void cudaFreeMatrix(TLR_Matrix matrix){
+    cudaFree(matrix.blockRanks);
+    cudaFree(matrix.blockOffsets);
+    cudaFree(matrix.U);
+    cudaFree(matrix.V);
+    cudaFree(matrix.diagonal);
 }
 
 #endif
