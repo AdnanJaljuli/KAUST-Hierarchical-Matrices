@@ -33,11 +33,11 @@ __global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfI
 static void generateDataset(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* d_pointCloud) {
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    generateDataset_kernel<<<numBlocks, numThreadsPerBlock>>> (numberOfInputPoints, dimensionOfInputPoints, d_pointCloud);
+    generateDataset_kernel <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, d_pointCloud);
     cudaDeviceSynchronize();
 }
 
-static __device__ __host__ int upperPowerOfTwo(int v){
+static __device__ __host__ int upperPowerOfTwo(int v) {
     v--;
     v |= v >> 1;
     v |= v >> 2;
@@ -48,13 +48,13 @@ static __device__ __host__ int upperPowerOfTwo(int v){
     return v;
 }
 
-static bool isPowerOfTwo (int x) {
-    return x && (!(x&(x-1)));
+static bool isPowerOfTwo (int v) {
+    return v && (!(v&(v - 1)));
 }
 
-static std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
-    int it=0;
-    while(n > bucket_size){
+static std::pair<int, int> getMaxSegmentSize(int n, int bucket_size) {
+    int it = 0;
+    while(n > bucket_size) {
         n = (n + 1)/2;
         ++it;
     }
@@ -64,7 +64,7 @@ static std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     return p;
 }
 
-static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix){
+static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
 
     cudaMalloc((void**) &mortonMatrix.U, rankSum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
     cudaMalloc((void**) &mortonMatrix.V, rankSum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
@@ -74,7 +74,7 @@ static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegment
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numSegments*numSegments + 1024 - 1)/1024;
-    copyCMRanksToMORanks<<<numBlocks, numThreadsPerBlock>>>(numSegments, maxSegmentSize, matrix.blockRanks, mortonMatrix.blockRanks);
+    copyCMRanksToMORanks <<< numBlocks, numThreadsPerBlock >>> (numSegments, maxSegmentSize, matrix.blockRanks, mortonMatrix.blockRanks);
     cudaDeviceSynchronize();
 
     // scan mortonMatrix ranks
@@ -96,16 +96,15 @@ static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegment
 
     for(unsigned int i=0; i<numSegments*numSegments; ++i){
         int MOIndex = IndextoMOIndex_h(numSegments, i);
-
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
         if(h_matrix_ranks[i] > 0){
-            copyTilestoMO<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
-            copyTilestoMO<<<numBlocks, numThreadsPerBlock>>>(h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            copyTilestoMO <<< numBlocks, numThreadsPerBlock >>> (h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            copyTilestoMO <<< numBlocks, numThreadsPerBlock >>> (h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
         }
     }
-    
+
     cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
     gpuErrchk(cudaPeekAtLastError());
 }
@@ -116,7 +115,7 @@ static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, 
 
     dim3 mm_numBlocks(numSegments, numSegments);
     dim3 mm_numThreadsPerBlock(32, 32);
-    expandMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(numSegments, maxSegmentSize, d_expandedMatrix, matrix);
+    expandMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_expandedMatrix, matrix);
 
     H2Opus_Real* d_error;
     H2Opus_Real* d_tmp;
@@ -125,7 +124,7 @@ static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, 
     cudaMemset(d_error, 0, sizeof(H2Opus_Real));
     cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
 
-    errorInMatrix<<<mm_numBlocks, mm_numThreadsPerBlock>>>(numSegments, maxSegmentSize, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
+    errorInMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
 
     H2Opus_Real h_error;
     H2Opus_Real h_tmp;
