@@ -1,6 +1,67 @@
 #ifndef HIERARCHICALMATRIX_FUNCTIONS_H
 #define HIERARCHICALMATRIX_FUNCTIONS_H
 
+static __global__ void getNewLevelCount(int num_ops, int* d_new_bit_vector, int* d_new_bit_vector_scan, int* d_newLevelCount){
+    d_newLevelCount[0] = d_new_bit_vector_scan[num_ops - 1] + d_new_bit_vector[num_ops - 1];
+}
+
+static __global__ void copyTilesToNewLevel(int num_ops, int* bit_vector, TLR_Matrix mortonMatrix, H2Opus_Real* d_A, H2Opus_Real* d_B, int* new_ranks, int* old_active_tiles, int row, int col){
+    unsigned int i = threadIdx.x + blockIdx.x*blockDim.x;
+    if(i < num_ops){
+        if(bit_vector[i] == 1){
+            // TODO: fix the address to where the function will copy
+            // TODO: use multiple streams
+            cudaMemcpyAsync(&mortonMatrix.U[mortonMatrix.blockOffsets[old_active_tiles[i*4]]*32], &d_A[row*col*i], new_ranks[i]*32*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice, 0);
+            cudaMemcpyAsync(&mortonMatrix.V[mortonMatrix.blockOffsets[old_active_tiles[i*4]]*32], &d_B[row*col*i], new_ranks[i]*32*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice, 0);
+        }
+    }
+}
+
+static __global__ void calcNumOps(int num_existing_tiles, int* num_ops, int* availableTiles){
+    unsigned int i = threadIdx.x + blockIdx.x*blockDim.x;
+    if(i < num_existing_tiles){
+        if(availableTiles[i]%4 == 0){
+            bool flag = true;
+            for(int j=1; j<4; ++j){
+                if(availableTiles[i+j] != availableTiles[i]+j){
+                    flag = false;
+                    break;
+                }
+            }
+            if(flag){
+                atomicAdd(num_ops, 1);
+            }
+        }
+    }
+}
+
+static __global__ void expandHMatrixLevel(int num_ops, int max_rows, int max_cols, H2Opus_Real* d_A, H2Opus_Real* d_B, int* d_ranks, H2Opus_Real* expandedMatrix){
+    int col = threadIdx.x + blockIdx.x*(max_cols/2);
+    int row = threadIdx.y + (blockIdx.y%2)*(max_rows/2);
+    int block = blockIdx.y/2;
+    H2Opus_Real sum = 0;
+
+    for(unsigned int i=0; i<d_ranks[block]; ++i){
+        sum += d_A[max_rows*max_cols*block + i*max_rows + row]*d_B[max_rows*max_cols*block + i*max_rows + col];
+    }
+    expandedMatrix[block*max_rows*max_cols + col*max_rows + row] = sum;
+}
+
+static __global__ void errorInHMatrix(int num_segments, int maxSegmentSize, int num_ops, int max_rows, int max_cols, H2Opus_Real* expandedMatrix, H2Opus_Real* d_denseMatrix, int* activeTiles, H2Opus_Real* d_error, H2Opus_Real* d_tmp){
+    int col = threadIdx.x + blockIdx.x*(max_cols/2);
+    int row = threadIdx.y + (blockIdx.y%2)*(max_rows/2);
+    int block = blockIdx.y/2;
+
+    int MOIndex = activeTiles[block*4]/4;
+    int i = morton1(MOIndex);
+    int j = morton1(MOIndex >> 1);
+
+    H2Opus_Real x = d_denseMatrix[(col + i*max_cols)*num_segments*maxSegmentSize + j*max_rows + row];
+    H2Opus_Real y = expandedMatrix[block*max_rows*max_cols + col*max_rows + row];
+    atomicAdd(d_tmp, x*x);
+    atomicAdd(d_error, (x-y)*(x-y));
+}
+
 void genereateHierarchicalMatrix(int n, int bucket_size, int numSegments, int maxSegmentSize, int numLevels, TLR_Matrix mortonMatrix, int** HMatrixExistingRanks, int** HMatrixExistingTiles){
     int numExistingTiles = numSegments*(numSegments-1);
 

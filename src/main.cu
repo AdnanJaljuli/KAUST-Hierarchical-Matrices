@@ -45,20 +45,19 @@ int main(int argc, char *argv[]) {
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
     createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
 
-    // Build the TLR matrix
-    printf("max segment size: %lu\n", kDTree.segmentSize);
+    printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
 
+    // Build the TLR matrix
     const int ARA_R = 10;
     TLR_Matrix matrix;
     matrix.ordering = COLUMN_MAJOR;
     uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints, matrix, kDTree, d_pointCloud, config.lowestLevelTolerance, ARA_R);
     cudaDeviceSynchronize();
-    return 0;
 
     #if EXPAND_MATRIX
-    // TODO: assert that this doesn't exceed memory limit
     H2Opus_Real* d_denseMatrix;
+    // TODO: assert that this doesn't exceed memory limit
     cudaMalloc((void**) &d_denseMatrix, kDTree.numSegments*kDTree.numSegments*kDTree.segmentSize*kDTree.segmentSize*sizeof(H2Opus_Real));
     generateDenseMatrix(config.numberOfInputPoints, kDTree.numSegments, kDTree.segmentSize, config.dimensionOfInputPoints, d_denseMatrix, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud);
     #endif
@@ -80,6 +79,7 @@ int main(int argc, char *argv[]) {
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonMatrix, d_denseMatrix);
     #endif
 
+    return 0;
     // Build hierarchical matrix
     // TODO: move declarations not used later inside the function
     #if 0

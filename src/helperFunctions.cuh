@@ -109,31 +109,4 @@ static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegment
     gpuErrchk(cudaPeekAtLastError());
 }
 
-static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
-    H2Opus_Real* d_expandedMatrix;
-    cudaMalloc((void**) &d_expandedMatrix, numSegments*maxSegmentSize*numSegments*maxSegmentSize*sizeof(H2Opus_Real));
-
-    dim3 mm_numBlocks(numSegments, numSegments);
-    dim3 mm_numThreadsPerBlock(32, 32);
-    expandMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_expandedMatrix, matrix);
-
-    H2Opus_Real* d_error;
-    H2Opus_Real* d_tmp;
-    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-    cudaMemset(d_error, 0, sizeof(H2Opus_Real));
-    cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
-
-    errorInMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
-
-    H2Opus_Real h_error;
-    H2Opus_Real h_tmp;
-    cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
-    cudaFree(d_tmp);
-    cudaFree(d_error);
-    cudaFree(d_expandedMatrix);
-}
-
 #endif
