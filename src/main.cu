@@ -79,7 +79,6 @@ int main(int argc, char *argv[]) {
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonMatrix, d_denseMatrix);
     #endif
 
-    return 0;
     // Build hierarchical matrix
     // TODO: move declarations not used later inside the function
     #if 0
