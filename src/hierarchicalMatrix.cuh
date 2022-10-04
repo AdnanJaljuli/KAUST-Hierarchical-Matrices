@@ -4,7 +4,7 @@
 
 #include "config.h"
 #include "counters.h"
-#include "helperHierarchicalMatrix.cuh"
+#include "hierarchicalMatrixHelpers.cuh"
 #include "kDTree.h"
 #include "TLRMatrix.h"
 
@@ -24,10 +24,10 @@ void genereateHierarchicalMatrix(unsigned int numberOfInputPoints, unsigned int 
     H2Opus_Real *d_A, *d_B;
     H2Opus_Real **d_APtrs, **d_BPtrs;
 
-    unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = (numSegments*numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillFirstLevel <<< numBlocks, numThreadsPerBlock >>> (numSegments, HMatrixExistingTiles[numHMatrixLevels - 2], HMatrixExistingRanks[numHMatrixLevels - 2], mortonOrderedMatrix.blockRanks);
-    cudaDeviceSynchronize();
+    // unsigned int numThreadsPerBlock = 1024;
+    // unsigned int numBlocks = (numSegments*numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    // fillFirstLevel <<< numBlocks, numThreadsPerBlock >>> (numSegments, HMatrixExistingTiles[numHMatrixLevels - 2], HMatrixExistingRanks[numHMatrixLevels - 2], mortonOrderedMatrix.blockRanks);
+    fillInitialHMatrixLevel(numSegments, HMatrixExistingTiles[numHMatrixLevels - 2], HMatrixExistingRanks[numHMatrixLevels - 2], mortonOrderedMatrix.blockRanks);
     return;
 
     int maxRows = segmentSize;
