@@ -80,15 +80,8 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Build hierarchical matrix
-    // TODO: move declarations not used later inside the function
+    // TODO: create a struct for the hierarchical matrix
     #if 0
-    int max_rows = kDTree.segmentSize;
-    int max_cols = kDTree.segmentSize;
-    int max_rank = max_cols;
-    const int numLevels = __builtin_ctz(config.numberOfInputPoints/config.bucketSize) + 1;
-    printf("numLevels: %d\n", numLevels);
-    int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));
-    int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
     genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
     #endif
 

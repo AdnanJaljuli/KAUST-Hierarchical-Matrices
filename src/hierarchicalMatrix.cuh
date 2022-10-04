@@ -63,6 +63,13 @@ static __global__ void errorInHMatrix(int num_segments, int maxSegmentSize, int 
 }
 
 void genereateHierarchicalMatrix(int n, int bucket_size, int numSegments, int maxSegmentSize, int numLevels, TLR_Matrix mortonMatrix, int** HMatrixExistingRanks, int** HMatrixExistingTiles){
+    int max_rows = kDTree.segmentSize;
+    int max_cols = kDTree.segmentSize;
+    int max_rank = max_cols;
+    const int numLevels = __builtin_ctz(config.numberOfInputPoints/config.bucketSize) + 1;
+    printf("numLevels: %d\n", numLevels);
+    int** HMatrixExistingRanks = (int**)malloc((numLevels - 1)*sizeof(int*));
+    int** HMatrixExistingTiles = (int**)malloc((numLevels - 1)*sizeof(int*));
     int numExistingTiles = numSegments*(numSegments-1);
 
     int *d_rows_batch, *d_cols_batch, *d_ranks;

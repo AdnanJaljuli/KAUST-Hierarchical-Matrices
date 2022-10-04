@@ -91,16 +91,6 @@ static __global__ void calcMemNeeded(int maxSegmentSize, unsigned int* K, H2Opus
     }
 }
 
-static __global__ void tileMatrix(int n, int num_segments, int maxSegmentSize, H2Opus_Real* S, H2Opus_Real* U, H2Opus_Real* V, H2Opus_Real* U_tiled, H2Opus_Real* V_tiled, unsigned int* K, int* K_scan, int segment){
-    if(threadIdx.x < K[blockIdx.y] && threadIdx.y < maxSegmentSize){
-        U_tiled[K_scan[blockIdx.y]*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = U[blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y]*S[blockIdx.y*maxSegmentSize + threadIdx.x];
-    }
-
-    if(threadIdx.x < K[blockIdx.y] && threadIdx.y < maxSegmentSize){
-        V_tiled[K_scan[blockIdx.y]*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = V[blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
-    }
-}
-
 static __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offsets_sort, int bucket_size){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
 
@@ -120,12 +110,6 @@ static __global__ void  fillPopCount(int num_threads, uint64_t* bit_vector, shor
     }
 }
 
-static __global__ void isWorkDone(int num_segments, uint64_t* bit_vector, bool* workDone){
-    if(bit_vector[0] == 0ULL){
-        *workDone = true;
-    }
-}
-
 static __global__ void printK(int* K, int num_segments){
     printf("ks\n");
     for(int i=0; i<num_segments; ++i){
@@ -136,48 +120,6 @@ static __global__ void printK(int* K, int num_segments){
 
 static __global__ void getTotalMem(uint64_t* totalMem, int* K, int* scan_K, int num_segments){
     *totalMem = (uint64_t)scan_K[num_segments - 1] + (uint64_t)K[num_segments - 1];
-}
-
-static __global__ void calcError(int num_segments, int maxSegmentSize, H2Opus_Real* expMatrix, H2Opus_Real* input_matrix, H2Opus_Real* error, H2Opus_Real* tmp){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i < num_segments*maxSegmentSize*maxSegmentSize){
-        H2Opus_Real x = input_matrix[i];
-        H2Opus_Real y = expMatrix[i];
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x-y)*(x-y));
-    }
-}
-
-static __global__ void fillDenseMatrix(int n, H2Opus_Real* matrix) {
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int seed = i;
-    if(i<n){
-        curandState s;
-        for(unsigned int j=0;j<n; ++j){
-            curand_init(seed, 0, 0, &s);
-            H2Opus_Real random_n = curand_uniform(&s);
-            matrix[j*n + i] = random_n;
-        }
-    }
-}
-
-static __global__ void filltmpVector(int n, H2Opus_Real* vector){
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int seed = i;
-    if(i<n){
-        curandState s;
-        curand_init(seed, 0, 0, &s);
-        H2Opus_Real random_n = curand_uniform(&s);
-        vector[i] = random_n;
-    }
-}
-
-static __global__ void fillBatch(int num_segments, int* rows_batch, int* cols_batch, int maxSegmentSize){
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i<num_segments){
-        rows_batch[i] = maxSegmentSize;
-        cols_batch[i] = maxSegmentSize;
-    }
 }
 
 static __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
