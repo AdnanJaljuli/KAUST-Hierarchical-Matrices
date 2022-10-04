@@ -246,18 +246,6 @@ static __device__ uint32_t morton1(uint32_t x)
     return x;
 }
 
-static __global__ void fillFirstLevelExistingArrays(int num_segments, int* existingArrays, int* existingRanks, int* matrixRanks){
-    int tmp = 0;
-    for(unsigned int i=0; i<num_segments*num_segments; ++i){
-        int x = morton1(i);
-        int y = morton1(i >> 1);
-        if(x != y){
-            existingRanks[tmp] = matrixRanks[i];
-            existingArrays[tmp++] = i;
-        }
-    }
-}
-
 static __global__ void fillActiveTiles(int numExistingArrays, int* activeArrays, int* existingArrays, int* activeRanks, int* existingRanks){
     int tmp = 0;
     for(int i=0; i<numExistingArrays; ++i){

@@ -2,9 +2,9 @@
 #include "config.h"
 #include "counters.h"
 #include "createLRMatrix.cuh"
-#include "expandMatrixHelpers.cuh"
+#include "expandMatrix.cuh"
 #include "helperFunctions.cuh"
-#include "hierarchicalMatrixFunctions.cuh"
+#include "hierarchicalMatrix.cuh"
 #include "kblas.h"
 #include "kDTree.h"
 #include "kDTreeConstruction.cuh"
@@ -70,23 +70,23 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Convert TLR matrix to morton order
-    TLR_Matrix mortonMatrix;
-    mortonMatrix.ordering = MORTON;
-    convertColumnMajorToMorton(kDTree.numSegments, kDTree.segmentSize, rankSum, matrix, mortonMatrix);
+    TLR_Matrix mortonOrderedMatrix;
+    mortonOrderedMatrix.ordering = MORTON;
+    convertColumnMajorToMorton(kDTree.numSegments, kDTree.segmentSize, rankSum, matrix, mortonOrderedMatrix);
     cudaFreeMatrix(matrix);
 
     #if EXPAND_MATRIX
-    checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonMatrix, d_denseMatrix);
+    checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);
     #endif
 
     // Build hierarchical matrix
     // TODO: create a struct for the hierarchical matrix
-    #if 0
-    genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, numLevels, mortonMatrix, HMatrixExistingRanks, HMatrixExistingTiles);
+    #if 1
+    genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R);
     #endif
 
     cudaFreeKDTree(kDTree);
-    cudaFreeMatrix(mortonMatrix);
+    cudaFreeMatrix(mortonOrderedMatrix);
     gpuErrchk(cudaPeekAtLastError());
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
