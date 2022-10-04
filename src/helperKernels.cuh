@@ -93,7 +93,6 @@ static __global__ void calcMemNeeded(int maxSegmentSize, unsigned int* K, H2Opus
 
 static __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offsets_sort, int bucket_size){
     unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-
     if(i < num_segments){
         unsigned int pos = i%(sizeof(uint64_t)*8);
         unsigned int sub = i/(sizeof(uint64_t)*8);
