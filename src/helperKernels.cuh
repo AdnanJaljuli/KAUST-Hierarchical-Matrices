@@ -215,9 +215,9 @@ static __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
     return z;
 }
 
-static __host__ __device__ int IndextoMOIndex_h(int num_segments, int n){
-    unsigned int i = n%num_segments;
-    unsigned int j = n/num_segments;
+static __host__ __device__ int IndextoMOIndex_h(int numSegments, int n){
+    unsigned int i = n%numSegments;
+    unsigned int j = n/numSegments;
     return getMOfromXY_h(j, i);
 }
 

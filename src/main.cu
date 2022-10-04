@@ -78,6 +78,7 @@ int main(int argc, char *argv[]) {
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);
     #endif
+    gpuErrchk(cudaPeekAtLastError());
 
     // Build hierarchical matrix
     // TODO: create a struct for the hierarchical matrix
