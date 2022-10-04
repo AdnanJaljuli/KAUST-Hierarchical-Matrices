@@ -65,10 +65,27 @@ static __global__ void fillExistingTileBits(int numSegments, uint64_t *existingT
     }
 }
 
-static __global__ void fillBitVectorPopCnt(int numSegments, uint64_t *existingTileBits, uint16_t *popCExistingTileBits) {
+static __global__ void fillBitVectorPopCnt(int numSegments, uint64_t *existingTileBits, int *popCExistingTileBits) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numSegments*numSegments) {
         popCExistingTileBits[i] = __popcll(existingTileBits[i]);
+    }
+}
+
+static __global__ void fillInitialHMatrixLevel_kernel(int numSegments, uint64_t *existingTileBits, int *popCExistingTileBitsScan, int *existingTiles, int *existingRanks, int *mortonOrderedMatrixRanks) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < numSegments*numSegments) {
+        unsigned int row = i%numSegments;
+        unsigned int col = i/numSegments;
+        if(row != col) {
+            unsigned int pos = i%(sizeof(uint64_t)*8);
+            unsigned int sub = i/(sizeof(uint64_t)*8);
+            unsigned int onesToLeft = __popcll(existingTileBits[sub] >> (sizeof(uint64_t)*8 - pos));
+            unsigned int index = popCExistingTileBitsScan[sub] + pos - onesToLeft;
+            int mortonOrderedIndex = IndextoMOIndex_h(numSegments, i);
+            existingRanks[index] = mortonOrderedMatrixRanks[mortonOrderedIndex];
+            existingTiles[index] = mortonOrderedIndex;
+        }
     }
 }
 
@@ -80,13 +97,30 @@ static void fillInitialHMatrixLevel(int numSegments, int *existingTiles, int *ex
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numSegments*numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
     fillExistingTileBits <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTileBits);
+
     // fill pop count array
-    uint16_t* d_popCExistingTileBits;
-    cudaMalloc((void**) &d_popCExistingTileBits, bitVectorSize*sizeof(uint16_t));
+    int* d_popCExistingTileBits;
+    cudaMalloc((void**) &d_popCExistingTileBits, bitVectorSize*sizeof(int));
+    numThreadsPerBlock = 1024;
     numBlocks = (bitVectorSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
     fillBitVectorPopCnt <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTileBits, d_popCExistingTileBits);
+
     // scan over pop count array
+    int* d_popCExistingTileBitsScan;
+    cudaMalloc((void**) &d_popCExistingTileBitsScan, bitVectorSize*sizeof(int));
+
+    void *d_temp_storage = NULL;
+    size_t temp_storage_bytes = 0;
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popCExistingTileBits, d_popCExistingTileBitsScan, bitVectorSize);
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popCExistingTileBits, d_popCExistingTileBitsScan, bitVectorSize);
+    cudaFree(d_temp_storage);
+
     // launch a kernel to figure out where each thread will write
+    numThreadsPerBlock = 1024;
+    numBlocks = (numSegments*numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillInitialHMatrixLevel_kernel <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTileBits, d_popCExistingTileBitsScan, existingRanks, mortonOrderedMatrixRanks, mortonOrderedMatrixRanks);
+    cudaDeviceSynchronize();
 }
 
 static __global__ void getNewLevelCount(int num_ops, int* d_new_bit_vector, int* d_new_bit_vector_scan, int* d_newLevelCount){
