@@ -4,7 +4,7 @@
 #include "createLRMatrix.cuh"
 #include "expandMatrix.cuh"
 #include "helperFunctions.cuh"
-#include "hierarchicalMatrix.cuh"
+#include "generateHierarchicalMatrix.cuh"
 #include "kblas.h"
 #include "kDTree.h"
 #include "kDTreeConstruction.cuh"
@@ -45,6 +45,7 @@ int main(int argc, char *argv[]) {
     KDTree kDTree;
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
     createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
+    gpuErrchk(cudaPeekAtLastError());
 
     printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
@@ -82,13 +83,11 @@ int main(int argc, char *argv[]) {
     gpuErrchk(cudaPeekAtLastError());
 
     // Build hierarchical matrix
-    // TODO: create a struct for the hierarchical matrix
-    genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R);
+    genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance);
     gpuErrchk(cudaPeekAtLastError());
 
     cudaFreeKDTree(kDTree);
     cudaFreeMatrix(mortonOrderedMatrix);
-    gpuErrchk(cudaPeekAtLastError());
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
     #endif

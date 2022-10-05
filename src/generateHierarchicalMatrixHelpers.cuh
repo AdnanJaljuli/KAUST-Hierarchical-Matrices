@@ -1,6 +1,6 @@
 
-#ifndef __HELPERHIERARCHICALMATRIX_H__
-#define __HELPERHIERARCHICALMATRIX_H__
+#ifndef __HELPERS_HIERARCHICALMATRIX_H__
+#define __HELPERS_HIERARCHICALMATRIX_H__
 
 // static __device__ unsigned int tileInQuarter(unsigned int row, unsigned int col, unsigned int dimension) {
 //     if(row >= dimension && col >= dimension) {
@@ -126,13 +126,31 @@ static void fillInitialHMatrixLevel(int numSegments, int* existingTiles, int* ex
     cudaDeviceSynchronize();
 }
 
-static __global__ void getNewLevelCount(int num_ops, int* d_new_bit_vector, int* d_new_bit_vector_scan, int* d_newLevelCount){
-    d_newLevelCount[0] = d_new_bit_vector_scan[num_ops - 1] + d_new_bit_vector[num_ops - 1];
+static __global__ void calcNumOps(int numExistingTiles, int* numOps, int* availableTiles) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < numExistingTiles) {
+        if(availableTiles[i]%4 == 0) {
+            bool flag = true;
+            for(int j = 1; j < 4; ++j) {
+                if(availableTiles[i + j] != availableTiles[i] + j) {
+                    flag = false;
+                    break;
+                }
+            }
+            if(flag) {
+                atomicAdd(numOps, 1);
+            }
+        }
+    }
 }
 
-static __global__ void copyTilesToNewLevel(int num_ops, int* bit_vector, TLR_Matrix mortonOrderedMatrix, H2Opus_Real* d_A, H2Opus_Real* d_B, int* new_ranks, int* old_active_tiles, int row, int col){
+static __global__ void getNewLevelCount(int numOps, int* d_new_bit_vector, int* d_new_bit_vector_scan, int* d_newLevelCount){
+    d_newLevelCount[0] = d_new_bit_vector_scan[numOps - 1] + d_new_bit_vector[numOps - 1];
+}
+
+static __global__ void copyTilesToNewLevel(int numOps, int* bit_vector, TLR_Matrix mortonOrderedMatrix, H2Opus_Real* d_A, H2Opus_Real* d_B, int* new_ranks, int* old_active_tiles, int row, int col){
     unsigned int i = threadIdx.x + blockIdx.x*blockDim.x;
-    if(i < num_ops){
+    if(i < numOps){
         if(bit_vector[i] == 1){
             // TODO: fix the address to where the function will copy
             // TODO: use multiple streams
@@ -142,25 +160,7 @@ static __global__ void copyTilesToNewLevel(int num_ops, int* bit_vector, TLR_Mat
     }
 }
 
-static __global__ void calcNumOps(int num_existing_tiles, int* num_ops, int* availableTiles){
-    unsigned int i = threadIdx.x + blockIdx.x*blockDim.x;
-    if(i < num_existing_tiles){
-        if(availableTiles[i]%4 == 0){
-            bool flag = true;
-            for(int j=1; j<4; ++j){
-                if(availableTiles[i+j] != availableTiles[i]+j){
-                    flag = false;
-                    break;
-                }
-            }
-            if(flag){
-                atomicAdd(num_ops, 1);
-            }
-        }
-    }
-}
-
-static __global__ void expandHMatrixLevel(int num_ops, int maxRows, int maxCols, H2Opus_Real* d_A, H2Opus_Real* d_B, int* d_ranks, H2Opus_Real* expandedMatrix){
+static __global__ void expandHMatrixLevel(int numOps, int maxRows, int maxCols, H2Opus_Real* d_A, H2Opus_Real* d_B, int* d_ranks, H2Opus_Real* expandedMatrix){
     int col = threadIdx.x + blockIdx.x*(maxCols/2);
     int row = threadIdx.y + (blockIdx.y%2)*(maxRows/2);
     int block = blockIdx.y/2;
@@ -172,7 +172,7 @@ static __global__ void expandHMatrixLevel(int num_ops, int maxRows, int maxCols,
     expandedMatrix[block*maxRows*maxCols + col*maxRows + row] = sum;
 }
 
-static __global__ void errorInHMatrix(int num_segments, int maxSegmentSize, int num_ops, int maxRows, int maxCols, H2Opus_Real* expandedMatrix, H2Opus_Real* d_denseMatrix, int* activeTiles, H2Opus_Real* d_error, H2Opus_Real* d_tmp){
+static __global__ void errorInHMatrix(int num_segments, int maxSegmentSize, int numOps, int maxRows, int maxCols, H2Opus_Real* expandedMatrix, H2Opus_Real* d_denseMatrix, int* activeTiles, H2Opus_Real* d_error, H2Opus_Real* d_tmp){
     int col = threadIdx.x + blockIdx.x*(maxCols/2);
     int row = threadIdx.y + (blockIdx.y%2)*(maxRows/2);
     int block = blockIdx.y/2;

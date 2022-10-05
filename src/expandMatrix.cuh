@@ -16,7 +16,7 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-static __global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix matrix){
+static __global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix matrix) {
     if(blockIdx.x == blockIdx.y) {
         expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = matrix.diagonal[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     }
@@ -37,15 +37,15 @@ static __global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus
     }
 }
 
-static __global__ void errorInMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp){
+static __global__ void errorInMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp) {
     H2Opus_Real x = denseMatrix[(blockIdx.x*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y];
     H2Opus_Real y = expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     
     atomicAdd(tmp, x*x);
-    atomicAdd(error, (x-y)*(x-y));
+    atomicAdd(error, (x - y)*(x - y));
 }
 
-static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix){
+static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix) {
     H2Opus_Real* d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, numSegments*maxSegmentSize*numSegments*maxSegmentSize*sizeof(H2Opus_Real));
 
@@ -72,7 +72,7 @@ static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, 
     cudaFree(d_expandedMatrix);
 }
 
-static __global__ void generateDenseMatrix_kernel(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* denseMatrix, int* indexMap, int* offsetsSort, H2Opus_Real* pointCloud ){
+static __global__ void generateDenseMatrix_kernel(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* denseMatrix, int* indexMap, int* offsetsSort, H2Opus_Real* pointCloud) {
     for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i){
         for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j){
             
@@ -83,7 +83,7 @@ static __global__ void generateDenseMatrix_kernel(uint64_t numberOfInputPoints, 
             int yDim = offsetsSort[blockIdx.y + 1] - offsetsSort[blockIdx.y];
             unsigned int matrixIndex = col*maxSegmentSize*numSegments + row;
 
-            if (blockIdx.y == blockIdx.x) {
+            if(blockIdx.y == blockIdx.x) {
                     denseMatrix[matrixIndex] = interaction(numberOfInputPoints, dimensionOfInputPoints, indexMap[offsetsSort[blockIdx.x] + blockDim.x*j + threadIdx.x], indexMap[offsetsSort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
             }
             else {
