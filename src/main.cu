@@ -22,6 +22,7 @@
 #include <utility>
 using namespace std;
 
+// TODO: debug dealing with non-powers of two
 int main(int argc, char *argv[]) {
 
     cudaDeviceSynchronize();
@@ -82,9 +83,8 @@ int main(int argc, char *argv[]) {
 
     // Build hierarchical matrix
     // TODO: create a struct for the hierarchical matrix
-    #if 1
     genereateHierarchicalMatrix(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R);
-    #endif
+    gpuErrchk(cudaPeekAtLastError());
 
     cudaFreeKDTree(kDTree);
     cudaFreeMatrix(mortonOrderedMatrix);

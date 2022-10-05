@@ -52,74 +52,77 @@
 //     }
 // }
 
-static __global__ void fillExistingTileBits(int numSegments, uint64_t *existingTileBits) {
+static __global__ void fillExistingTilesBitVector(int numSegments, uint64_t *existingTileBits) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numSegments*numSegments) {
         unsigned int row = i%numSegments;
         unsigned int col = i/numSegments;
+        int mortonOrderedIndex = IndextoMOIndex_h(numSegments, i);
         if(row != col) {
-            unsigned int pos = i%(sizeof(uint64_t)*8);
-            unsigned int sub = i/(sizeof(uint64_t)*8);
-            atomicOr((unsigned long long*)&existingTileBits[sub], 1ULL << (sizeof(uint64_t)*8 - 1 - pos));
+            unsigned int pos = mortonOrderedIndex%(sizeof(uint64_t)*8);
+            unsigned int sub = mortonOrderedIndex/(sizeof(uint64_t)*8);
+            atomicOr((unsigned long long*)&existingTileBits[sub], 1ULL<<(sizeof(uint64_t)*8 - 1 - pos));
         }
     }
 }
 
-static __global__ void fillBitVectorPopCnt(int numSegments, uint64_t *existingTileBits, int *popCExistingTileBits) {
+static __global__ void fillBitVectorPopCnt(int bitVectorSize, uint64_t* existingTileBits, int *popCExistingTileBits) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < numSegments*numSegments) {
+    if(i < bitVectorSize) {
         popCExistingTileBits[i] = __popcll(existingTileBits[i]);
     }
 }
 
-static __global__ void fillInitialHMatrixLevel_kernel(int numSegments, uint64_t *existingTileBits, int *popCExistingTileBitsScan, int *existingTiles, int *existingRanks, int *mortonOrderedMatrixRanks) {
+static __global__ void fillInitialHMatrixLevel_kernel(int numSegments, uint64_t* existingTileBits, int* popCExistingTilesBitScan, int* existingTiles, int* existingRanks, int *mortonOrderedMatrixRanks) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numSegments*numSegments) {
         unsigned int row = i%numSegments;
         unsigned int col = i/numSegments;
         if(row != col) {
-            unsigned int pos = i%(sizeof(uint64_t)*8);
-            unsigned int sub = i/(sizeof(uint64_t)*8);
-            unsigned int onesToLeft = __popcll(existingTileBits[sub] >> (sizeof(uint64_t)*8 - pos));
-            unsigned int index = popCExistingTileBitsScan[sub] + pos - onesToLeft;
             int mortonOrderedIndex = IndextoMOIndex_h(numSegments, i);
+            unsigned int pos = mortonOrderedIndex%(sizeof(uint64_t)*8);
+            unsigned int sub = mortonOrderedIndex/(sizeof(uint64_t)*8);
+            unsigned int onesToLeft = pos - __popcll(existingTileBits[sub]>>(sizeof(uint64_t)*8 - pos));
+            unsigned int index = popCExistingTilesBitScan[sub] + pos - onesToLeft;
+            assert(index < numSegments*(numSegments - 1));
             existingRanks[index] = mortonOrderedMatrixRanks[mortonOrderedIndex];
             existingTiles[index] = mortonOrderedIndex;
         }
     }
 }
 
-static void fillInitialHMatrixLevel(int numSegments, int *existingTiles, int *existingRanks, int *mortonOrderedMatrixRanks) {
+static void fillInitialHMatrixLevel(int numSegments, int* existingTiles, int* existingRanks, int *mortonOrderedMatrixRanks) {
     // fill bit vector
-    uint64_t* d_existingTileBits;
+    uint64_t* d_existingTilesBitVector;
     unsigned int bitVectorSize = (numSegments*numSegments + sizeof(uint64_t)*8 - 1)/(sizeof(uint64_t)*8);
-    cudaMalloc((void**) &d_existingTileBits, bitVectorSize*sizeof(uint64_t));
+    printf("bit vector size: %d\n", bitVectorSize);
+    cudaMalloc((void**) &d_existingTilesBitVector, bitVectorSize*sizeof(uint64_t));
+    cudaMemset(d_existingTilesBitVector, 0, bitVectorSize*sizeof(uint64_t));
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numSegments*numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillExistingTileBits <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTileBits);
+    fillExistingTilesBitVector <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTilesBitVector);
 
     // fill pop count array
-    int* d_popCExistingTileBits;
-    cudaMalloc((void**) &d_popCExistingTileBits, bitVectorSize*sizeof(int));
+    int* d_popCExistingTilesBitVector;
+    cudaMalloc((void**) &d_popCExistingTilesBitVector, bitVectorSize*sizeof(int));
     numThreadsPerBlock = 1024;
     numBlocks = (bitVectorSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillBitVectorPopCnt <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTileBits, d_popCExistingTileBits);
+    fillBitVectorPopCnt <<< numBlocks, numThreadsPerBlock >>> (bitVectorSize, d_existingTilesBitVector, d_popCExistingTilesBitVector);
 
     // scan over pop count array
-    int* d_popCExistingTileBitsScan;
-    cudaMalloc((void**) &d_popCExistingTileBitsScan, bitVectorSize*sizeof(int));
-
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
-    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popCExistingTileBits, d_popCExistingTileBitsScan, bitVectorSize);
+    int* d_popCExistingTileBitVectorScan;
+    cudaMalloc((void**) &d_popCExistingTileBitVectorScan, bitVectorSize*sizeof(int));
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popCExistingTilesBitVector, d_popCExistingTileBitVectorScan, bitVectorSize);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popCExistingTileBits, d_popCExistingTileBitsScan, bitVectorSize);
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_popCExistingTilesBitVector, d_popCExistingTileBitVectorScan, bitVectorSize);
     cudaFree(d_temp_storage);
 
     // launch a kernel to figure out where each thread will write
     numThreadsPerBlock = 1024;
     numBlocks = (numSegments*numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillInitialHMatrixLevel_kernel <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTileBits, d_popCExistingTileBitsScan, existingRanks, mortonOrderedMatrixRanks, mortonOrderedMatrixRanks);
+    fillInitialHMatrixLevel_kernel <<< numBlocks, numThreadsPerBlock >>> (numSegments, d_existingTilesBitVector, d_popCExistingTileBitVectorScan, existingTiles, existingRanks, mortonOrderedMatrixRanks);
     cudaDeviceSynchronize();
 }
 

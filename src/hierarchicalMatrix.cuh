@@ -34,19 +34,11 @@ void genereateHierarchicalMatrix(unsigned int numberOfInputPoints, unsigned int 
     int maxCols = segmentSize;
     int maxRank = maxCols; // this is taken as is from the kblas_ARA repo
 
-    unsigned int tile_size = bucketSize;
+    unsigned int tileSize = bucketSize;
     bool stop = false;
 
-    H2Opus_Real h_error;
-    H2Opus_Real h_tmp;
-    H2Opus_Real* d_error;
-    H2Opus_Real* d_tmp;
-    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-
-    #if 0
     // TODO: fix the number of iterations.
-    for(unsigned int level = numHMatrixLevels - 1; level > 0; --level){
+    for(unsigned int level = numHMatrixLevels - 2; level > 0; --level) {
         // TODO: set cudaMalloc and cudaFrees to outside the loop
         int* d_num_ops;
         cudaMalloc((void**) &d_num_ops, sizeof(int));
@@ -152,9 +144,9 @@ void genereateHierarchicalMatrix(unsigned int numberOfInputPoints, unsigned int 
 
         numThreadsPerBlock = 1024;
         numBlocks = (num_ops + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillBitVector<<<numBlocks, numThreadsPerBlock>>>(num_ops, tile_size, d_ranks, d_activeRanks, d_new_bit_vector, d_old_bit_vector);
+        fillBitVector<<<numBlocks, numThreadsPerBlock>>>(num_ops, tileSize, d_ranks, d_activeRanks, d_new_bit_vector, d_old_bit_vector);
         cudaDeviceSynchronize();
-        tile_size <<= 1;
+        tileSize <<= 1;
 
         void* d_temp_storage = NULL;
         size_t temp_storage_bytes = 0;
@@ -215,6 +207,5 @@ void genereateHierarchicalMatrix(unsigned int numberOfInputPoints, unsigned int 
         }
         break;
     }
-    #endif
 }
 #endif
