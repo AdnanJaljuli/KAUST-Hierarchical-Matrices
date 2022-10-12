@@ -83,8 +83,14 @@ int main(int argc, char *argv[]) {
     gpuErrchk(cudaPeekAtLastError());
 
     // Build hierarchical matrix
-    // TODO: pass h matrix struct into this matrix
-    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance);
+    HMatrix hierarchicalMatrix;
+    allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
+    printf("numHMatrixLevels: %d\n", hierarchicalMatrix.numLevels);
+
+    WeakAdmissibility WAStruct;
+    allocateWeakAdmissibilityStruct(WAStruct);
+
+    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct);
     gpuErrchk(cudaPeekAtLastError());
 
     cudaFreeKDTree(kDTree);
