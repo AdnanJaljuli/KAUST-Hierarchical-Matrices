@@ -2,56 +2,6 @@
 #ifndef __HELPERS_HIERARCHICALMATRIX_H__
 #define __HELPERS_HIERARCHICALMATRIX_H__
 
-// static __device__ unsigned int tileInQuarter(unsigned int row, unsigned int col, unsigned int dimension) {
-//     if(row >= dimension && col >= dimension) {
-//         return 3;
-//     }
-//     else if(row >= dimension) {
-//         return 2;
-//     }
-//     else if(col >= dimension) {
-//         return 1;
-//     }
-//     else {
-//         return 0;
-//     }
-// }
-
-// static __device__ unsigned int numPrecedingDiagonalTiles(unsigned int row, unsigned int col, int numSegments) {
-//     unsigned int answer = 0;
-//     while(true) {
-//         numSegments /= 2;
-//         unsigned int quarter = tileInQuarter(row, col, numSegments);
-//         if(quarter != 0) {
-//             answer += numSegments;
-//         }
-//         if(quarter == 1 || quarter == 2) {
-//             break;
-//         }
-//         if(quarter == 3) {
-//             row -= numSegments;
-//             col -= numSegments;
-//         }
-//     }
-//     return answer;
-// }
-
-// static __global__ void fillFirstLevel(int numSegments, int* existingTiles, int* existingRanks, int* mortonOrderedMatrixRanks) {
-//     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-//     if(i < numSegments*numSegments) {
-//         unsigned int row = i%numSegments;
-//         unsigned int col = i/numSegments;
-//         if(col != row) {
-//             int mortonOrderedIndex = IndextoMOIndex_h(numSegments, i);
-//             unsigned int tmp = numPrecedingDiagonalTiles(row, col, numSegments);
-//             unsigned int writeIndex = mortonOrderedIndex - tmp;
-//             printf("i: %d.   precedingdiag: %d.   write index: %d\n", i, tmp, writeIndex);
-//             existingTiles[writeIndex] = mortonOrderedIndex;
-//             existingRanks[writeIndex] = mortonOrderedMatrixRanks[i];
-//         }
-//     }
-// }
-
 static __global__ void fillExistingTilesBitVector(int numSegments, uint64_t *existingTileBits) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numSegments*numSegments) {

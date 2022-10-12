@@ -9,15 +9,16 @@
 #include "TLRMatrix.h"
 
 void genereateHierarchicalMatrix(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance) {
-
     const int numHMatrixLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
     printf("numHMatrixLevels: %d\n", numHMatrixLevels);
     // TODO: make this into a struct
     int** HMatrixExistingRanks = (int**)malloc((numHMatrixLevels - 1)*sizeof(int*));
     int** HMatrixExistingTiles = (int**)malloc((numHMatrixLevels - 1)*sizeof(int*));
-    int numExistingTiles = numSegments*(numSegments - 1);
+    unsigned int numExistingTiles = numSegments*(numSegments - 1);
+
     cudaMalloc((void**) &HMatrixExistingRanks[numHMatrixLevels - 2], numExistingTiles*sizeof(int));
     cudaMalloc((void**) &HMatrixExistingTiles[numHMatrixLevels - 2], numExistingTiles*sizeof(int));
+    // TODO: read about thrust::copy_if and check if we should replace this with it
     fillInitialHMatrixLevel(numSegments, HMatrixExistingTiles[numHMatrixLevels - 2], HMatrixExistingRanks[numHMatrixLevels - 2], mortonOrderedMatrix.blockRanks);
 
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
