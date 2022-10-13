@@ -109,4 +109,40 @@ static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegment
     gpuErrchk(cudaPeekAtLastError());
 }
 
+void printMatrix(int numberOfInputPoints, int numSegments, int segmentSize, TLR_Matrix matrix, int level, int rankSum) {
+    // n=512, numLevels=5, level=2, batchSize=4, numTilesInBatch=4
+    int* ranks = (int*)malloc(numSegments*numSegments*sizeof(int));
+    int* offsets = (int*)malloc(numSegments*numSegments*sizeof(int));
+    cudaMemcpy(ranks, matrix.blockRanks, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(offsets, matrix.blockOffsets, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
+
+    H2Opus_Real* U = (H2Opus_Real*)malloc(rankSum*segmentSize*sizeof(H2Opus_Real));
+    H2Opus_Real* V = (H2Opus_Real*)malloc(rankSum*segmentSize*sizeof(H2Opus_Real));
+    cudaMemcpy(U, matrix.U, rankSum*segmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(V, matrix.V, rankSum*segmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+
+    char fileName[100] = "batchedMatrix.txt";
+    FILE *outputFile = fopen(fileName, "w");
+    int batchSize = 4;
+    int batchDimension = 4;
+    int tilesToPrint[64] = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239};
+    fprintf(outputFile, "%d %d %d\n", batchDimension, segmentSize, batchSize);
+    int cnt = 0;
+    for(unsigned int i = 0; i < numSegments*numSegments; ++i) {
+        if(i == tilesToPrint[cnt]) {
+            ++cnt;
+            fprintf(outputFile, "%d\n", ranks[i]);
+            for(unsigned int j = 0; j < ranks[i]*segmentSize; ++j) {
+                fprintf(outputFile, "%lf ", U[offsets[i]*segmentSize + j]);
+            }
+            fprintf(outputFile, "\n");
+            for(unsigned int j = 0; j < ranks[i]*segmentSize; ++j) {
+                fprintf(outputFile, "%lf ", V[offsets[i]*segmentSize + j]);
+            }
+            fprintf(outputFile, "\n");
+        }
+    }
+    fclose(outputFile);
+}
+
 #endif

@@ -7,7 +7,7 @@ struct WeakAdmissibility {
 };
 
 void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct) {
-    // TODO: generalize
+    // TODO: generalize on any n size
     WAStruct.numTiles = (int*)malloc(2*sizeof(int));
     WAStruct.numTiles[0] = 2;
     WAStruct.numTiles[1] = 8;
@@ -36,6 +36,14 @@ struct HMatrixLevel {
     H2Opus_Real* V;
 };
 
+void allocateHMatrixLevel(HMatrixLevel matrixLevel) {
+    // TODO
+}
+
+void freeHMatrixLevel(){
+    // TODO
+}
+
 struct HMatrix {
     int numLevels;
     H2Opus_Real* diagonalBlocks;
@@ -48,14 +56,9 @@ void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned
     matrix.levels = (HMatrixLevel*)malloc(matrix.numLevels*sizeof(HMatrixLevel));
 }
 
-void allocateHMatrixLevel(HMatrixLevel matrixLevel) {
-}
 
 void freeHMatrix(HMatrix &matrix) {
     // TODO
 }
 
-void freeHMatrixLevel(){
-    // TODO
-}
 #endif

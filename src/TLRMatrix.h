@@ -9,6 +9,7 @@ struct TLR_Matrix{
     unsigned int n;
     unsigned int blockSize;
     unsigned int numBlocks;
+    // TODO: stop storing blockRanks because it is redundant with blockOffsets
     int *blockRanks;
     int *blockOffsets;
     H2Opus_Real *U;
