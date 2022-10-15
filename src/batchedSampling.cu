@@ -5,11 +5,22 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+#include <curand_kernel.h>
 #include <time.h>
 #include <typeinfo>
 #include <utility>
 #include <bits/stdc++.h>
 using namespace std;
+
+__global__ void generateSamplingVectors(double *samplingVectors, int size) {
+    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i < size) {
+        unsigned int seed = i;
+        curandState s;
+        curand_init(seed, 0, 0, &s);
+        samplingVectors[i] = curand_uniform(&s);
+    }
+}
 
 int main() {
     // TODO: read a batch of n*n TLR matrices from a file
@@ -29,8 +40,8 @@ int main() {
             int index = i*unitSize*unitSize + j;
             myFile >> ranks[index];
             rankSum += ranks[index];
-            U = (double*)realloc(ranksSum*segmentSize*sizeof(double));
-            V = (double*)realloc(ranksSum*segmentSize*sizeof(double));
+            U = (double*)realloc(U, rankSum*segmentSize*sizeof(double));
+            V = (double*)realloc(V, rankSum*segmentSize*sizeof(double));
 
             for(int k = 0; k < ranks[index]*segmentSize; ++k) {
                 myFile >> U[rankSum - ranks[index] + k];
@@ -50,7 +61,13 @@ int main() {
     cudaMemcpy(d_V, V, rankSum*segmentSize*sizeof(double), cudaMemcpyHostToDevice);
 
     // TODO: generate random sampling vectors
-    
+    unsigned int samplingVectorsWidth = 16;
+    double *d_samplingVectors;
+    cudaMalloc((void**) &d_samplingVectors, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
+    unsigned int numThreadsPerBlock = 1024;
+    unsigned int numBlocks = (samplingVectorsWidth*batchSize*segmentSize*unitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    generateSamplingVectors <<< numBlocks, numThreadsPerBlock >>> (d_samplingVectors, samplingVectorsWidth*batchSize*segmentSize*unitSize);
+
     // TODO: launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
     // TODO: launch a kernel that checks the correctness of the multiplication
 }

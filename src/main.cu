@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 
     // Generate the points
     H2Opus_Real* d_pointCloud;
-    gpuErrchk(cudaMalloc((void**) &d_pointCloud, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real)));
+    cudaMalloc((void**) &d_pointCloud, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real));
     generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
 
     // Build the KD-tree
