@@ -124,9 +124,9 @@ void printMatrix(int numberOfInputPoints, int numSegments, int segmentSize, TLR_
     char fileName[100] = "batchedMatrix.txt";
     FILE *outputFile = fopen(fileName, "w");
     int batchSize = 4;
-    int batchDimension = 4;
+    int unitSize = 4;
     int tilesToPrint[64] = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239};
-    fprintf(outputFile, "%d %d %d\n", batchDimension, segmentSize, batchSize);
+    fprintf(outputFile, "%d %d %d\n", unitSize, segmentSize, batchSize);
     int cnt = 0;
     for(unsigned int i = 0; i < numSegments*numSegments; ++i) {
         if(i == tilesToPrint[cnt]) {
