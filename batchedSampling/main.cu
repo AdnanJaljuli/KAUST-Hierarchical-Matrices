@@ -26,7 +26,7 @@ int main() {
     // TODO: read a batch of n*n TLR matrices from a file
     fstream myFile("batchedMatrix.txt", ios_base::in);
 
-    int unitSize, segmentSize, batchSize, rank;
+    int unitSize, segmentSize, batchSize;
     myFile >> unitSize >> segmentSize >> batchSize;
     printf("%d %d %d\n", unitSize, segmentSize, batchSize);
     int *ranks = (int*)malloc(batchSize*unitSize*unitSize*sizeof(int));
@@ -51,14 +51,27 @@ int main() {
             }
         }
     }
-    int *d_ranks;
+    int *d_ranks, *d_scanRanks;
     double *d_U, *d_V;
     cudaMalloc((void**) &d_ranks, batchSize*unitSize*unitSize*sizeof(int));
+    cudaMalloc((void**) &d_scanRanks, batchSize*unitSize*unitSize*sizeof(int));
     cudaMalloc((void**) &d_U, rankSum*segmentSize*sizeof(double));
     cudaMalloc((void**) &d_V, rankSum*segmentSize*sizeof(double));
     cudaMemcpy(d_ranks, ranks, batchSize*unitSize*unitSize*sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_U, U, rankSum*segmentSize*sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_V, V, rankSum*segmentSize*sizeof(double), cudaMemcpyHostToDevice);
+
+    void *d_temp_storage = NULL;
+    size_t temp_storage_bytes = 0;
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_ranks, d_scanRanks, batchSize*unitSize*unitSize);
+    cudaMalloc(&d_temp_storage, temp_storage_bytes);
+    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_ranks, d_scanRanks, batchSize*unitSize*unitSize);
+
+    double **d_UBatchPtrs, **d_VBatchPtrs;
+    cudaMalloc((void**) &d_UBatchPtrs, batchSize*sizeof(double*));
+    cudaMalloc((void**) &d_VBatchPtrs, batchSize*sizeof(double*));
+
+    fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UBatchPtrs, d_VBatchPtrs, d_U, d_V, batchSize, segmentSize, unitSize, rankSum);
 
     // TODO: generate random sampling vectors
     unsigned int samplingVectorsWidth = 16;
@@ -68,6 +81,9 @@ int main() {
     unsigned int numBlocks = (samplingVectorsWidth*batchSize*segmentSize*unitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
     generateSamplingVectors <<< numBlocks, numThreadsPerBlock >>> (d_samplingVectors, samplingVectorsWidth*batchSize*segmentSize*unitSize);
 
+
     // TODO: launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
+
+
     // TODO: launch a kernel that checks the correctness of the multiplication
 }
