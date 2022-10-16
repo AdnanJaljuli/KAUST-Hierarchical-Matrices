@@ -21,7 +21,8 @@ __global__ void generateSamplingVectors(double *samplingVectors, int size) {
         unsigned int seed = i;
         curandState s;
         curand_init(seed, 0, 0, &s);
-        samplingVectors[i] = curand_uniform(&s);
+        // samplingVectors[i] = curand_uniform(&s);
+        samplingVectors[i] = 1;
     }
 }
 

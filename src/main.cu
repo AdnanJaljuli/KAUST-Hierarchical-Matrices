@@ -85,6 +85,7 @@ int main(int argc, char *argv[]) {
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct);
     printMatrix(config.numberOfInputPoints, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, 2, rankSum);
+    printDenseMatrix(d_denseMatrix, kDTree.numSegments*kDTree.numSegments*kDTree.segmentSize*kDTree.segmentSize);
     return 0;
 
     // Build hierarchical matrix
