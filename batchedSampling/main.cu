@@ -26,9 +26,24 @@ __global__ void generateSamplingVectors(double *samplingVectors, int size) {
 }
 
 __global__ void fillBatchedPtrs(double** d_UBatchPtrs, double** d_VBatchPtrs, double* d_U, double* d_V, int* d_scanRanks, int batchSize, int segmentSize, int unitSize) {
+    int sumRanks = 0;
     for(int i = 0; i < batchSize; ++i) {
-        d_UBatchPtrs[i] = &d_U[d_scanRanks[i*unitSize*unitSize]*segmentSize];
+        d_UBatchPtrs[i] = &d_U[sumRanks*segmentSize];
         d_VBatchPtrs[i] = &d_U[d_scanRanks[i*unitSize*unitSize]*segmentSize];
+        sumRanks += d_scanRanks[(i + 1)*unitSize*unitSize - 1];
+    }
+}
+
+__global__ void fillBatchSegments(int *batchSegments, int unitSize, int batchSize) {
+    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i < batchSize*unitSize*unitSize) {
+        batchSegments[i] = i/(unitSize*unitSize);
+    }
+}
+
+__global__ void printOutput(int* output, int size) {
+    for(int i = 0; i < size; ++i) {
+        printf("%d\n", output[i]);
     }
 }
 
@@ -61,7 +76,6 @@ int main() {
         }
     }
 
-    // TODO: make scanRanks a double pointer. make the scan of each batch unit independent of the other batches
     int *d_ranks, *d_scanRanks;
     double *d_U, *d_V;
     cudaMalloc((void**) &d_ranks, batchSize*unitSize*unitSize*sizeof(int));
@@ -72,25 +86,35 @@ int main() {
     cudaMemcpy(d_U, U, rankSum*segmentSize*sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_V, V, rankSum*segmentSize*sizeof(double), cudaMemcpyHostToDevice);
 
+    int *d_batchSegments;
+    cudaMalloc((void**) &d_batchSegments, batchSize*unitSize*unitSize*sizeof(int));
+    unsigned int numThreadsPerBlock = 1024;
+    unsigned int numBlocks = (batchSize*unitSize*unitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillBatchSegments <<< numBlocks, numThreadsPerBlock >>> (d_batchSegments, unitSize, batchSize);
+
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_ranks, d_scanRanks, batchSize*unitSize*unitSize);
+    cub::DeviceScan::InclusiveSumByKey(d_temp_storage, temp_storage_bytes, d_batchSegments, d_ranks, d_scanRanks, batchSize*unitSize*unitSize);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_ranks, d_scanRanks, batchSize*unitSize*unitSize);
+    cub::DeviceScan::InclusiveSumByKey(d_temp_storage, temp_storage_bytes, d_batchSegments, d_ranks, d_scanRanks, batchSize*unitSize*unitSize);
+
+    printOutput <<< 1, 1 >>> (d_scanRanks, batchSize*unitSize*unitSize);
 
     double **d_UBatchPtrs, **d_VBatchPtrs;
     cudaMalloc((void**) &d_UBatchPtrs, batchSize*sizeof(double*));
     cudaMalloc((void**) &d_VBatchPtrs, batchSize*sizeof(double*));
 
-    unsigned int numBlocks = 1;
-    unsigned int numThreadsPerBlock = 1;
+    numBlocks = 1;
+    numThreadsPerBlock = 1;
     fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UBatchPtrs, d_VBatchPtrs, d_U, d_V, d_scanRanks, batchSize, segmentSize, unitSize);
 
     // generate random sampling vectors
     unsigned int samplingVectorsWidth = 16;
     double *d_output;
+    double *d_bufferMemory;
     double *d_samplingVectors;
     cudaMalloc((void**) &d_output, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
+    cudaMalloc((void**) &d_bufferMemory, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
     cudaMalloc((void**) &d_samplingVectors, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
     numThreadsPerBlock = 1024;
     numBlocks = (samplingVectorsWidth*batchSize*segmentSize*unitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
@@ -99,8 +123,10 @@ int main() {
     // launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
     numThreadsPerBlock = 1024;
     numBlocks = batchSize*unitSize;
-    batchedSampling <<< numBlocks, numThreadsPerBlock >>> (segmentSize, batchSize, unitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorsWidth);
-    cudaDeviceSynchronize();
+    batchedSampling <<< numBlocks, numThreadsPerBlock >>> (segmentSize, batchSize, unitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorsWidth, d_output, d_bufferMemory);
 
+    printf("done\n");
+    cudaDeviceSynchronize();
     // TODO: launch a kernel that checks the correctness of the multiplication
+
 }
