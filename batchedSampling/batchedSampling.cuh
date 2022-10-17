@@ -12,11 +12,11 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
     __syncthreads();
 
     for(unsigned int tile = 0; tile < batchUnitSize; ++tile) {
-        int rank = (blockInBatch == 0) ? scanRanks[batch*batchUnitSize*batchUnitSize + tile*batchUnitSize + blockInBatch] : scanRanks[batch*batchUnitSize*batchUnitSize + tile*batchUnitSize + blockInBatch] - scanRanks[batch*batchUnitSize*batchUnitSize + tile*batchUnitSize + blockInBatch - 1];
         // TODO: think about loading U, V and scanRanks into shared memory
         // multiply V by the sampling vector and store it in buffer memory
         double sum = 0;
-        int scanRankVal = (blockInBatch == 0) ? 0 : scanRanks[batch*batchUnitSize*batchUnitSize + tile*batchUnitSize + blockInBatch - 1];
+        int rank = (blockInBatch == 0 && tile == 0) ? scanRanks[batch*batchUnitSize*batchUnitSize] : scanRanks[batch*batchUnitSize*batchUnitSize + tile*batchUnitSize + blockInBatch] - scanRanks[batch*batchUnitSize*batchUnitSize + tile*batchUnitSize + blockInBatch - 1];
+        int scanRankVal = (blockInBatch == 0 && tile == 0) ? 0 : scanRanks[batch*batchUnitSize*batchUnitSize + tile*batchUnitSize + blockInBatch - 1];
 
         if(threadIdx.x < samplingVectorsWidth && threadIdx.y < rank) {
             for(unsigned int j = 0; j < tileSize; ++j) {

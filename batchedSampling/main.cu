@@ -31,7 +31,7 @@ __global__ void fillBatchedPtrs(double** d_UBatchPtrs, double** d_VBatchPtrs, do
     for(int i = 0; i < batchSize; ++i) {
         d_UBatchPtrs[i] = &d_U[sumRanks*segmentSize];
         d_VBatchPtrs[i] = &d_V[sumRanks*segmentSize];
-        sumRanks += d_scanRanks[(i + 1)*unitSize*unitSize - 1];
+        sumRanks = d_scanRanks[(i + 1)*unitSize*unitSize - 1];
     }
 }
 
@@ -39,6 +39,12 @@ __global__ void fillBatchSegments(int *batchSegments, int unitSize, int batchSiz
     unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i < batchSize*unitSize*unitSize) {
         batchSegments[i] = i/(unitSize*unitSize);
+    }
+}
+
+__global__ void printArray(int* output, int size) {
+    for(int i = 0; i < size; ++i) {
+        printf("%d\n", output[i]);
     }
 }
 
@@ -99,6 +105,7 @@ int main() {
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     cub::DeviceScan::InclusiveSumByKey(d_temp_storage, temp_storage_bytes, d_batchSegments, d_ranks, d_scanRanks, batchSize*unitSize*unitSize);
 
+    printArray <<< 1, 1 >>> (d_scanRanks, batchSize*unitSize*unitSize);
     double **d_UBatchPtrs, **d_VBatchPtrs;
     cudaMalloc((void**) &d_UBatchPtrs, batchSize*sizeof(double*));
     cudaMalloc((void**) &d_VBatchPtrs, batchSize*sizeof(double*));
@@ -115,6 +122,7 @@ int main() {
     cudaMalloc((void**) &d_output, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
     cudaMalloc((void**) &d_bufferMemory, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
     cudaMalloc((void**) &d_samplingVectors, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
+    
     numThreadsPerBlock = 1024;
     numBlocks = (samplingVectorsWidth*batchSize*segmentSize*unitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
     generateSamplingVectors <<< numBlocks, numThreadsPerBlock >>> (d_samplingVectors, samplingVectorsWidth*batchSize*segmentSize*unitSize);
@@ -124,8 +132,6 @@ int main() {
     dim3 m_numBlocks(batchSize*unitSize, 1);
     batchedSampling <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, unitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorsWidth, d_output, d_bufferMemory);
 
-    cudaDeviceSynchronize();
-    // printOutput <<< 1, 1 >>> (d_output, samplingVectorsWidth*batchSize*segmentSize*unitSize);
     double* output = (double*)malloc(samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double));
     cudaMemcpy(output, d_output, samplingVectorsWidth*batchSize*segmentSize*unitSize*sizeof(double), cudaMemcpyDeviceToHost);
     char fileName[100] = "output.txt";
@@ -136,5 +142,5 @@ int main() {
     printf("done\n");
 
     // TODO: launch a kernel that checks the correctness of the multiplication
-
+    
 }
