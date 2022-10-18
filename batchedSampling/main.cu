@@ -149,7 +149,7 @@ int main() {
     // launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
     dim3 m_numThreadsPerBlock(samplingVectorWidth, 32);
     dim3 m_numBlocks(batchUnitSize, batchSize);
-    batchedSampling <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output, d_bufferMemory);
+    batchedSampling < double > <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output, d_bufferMemory);
 
     // read the batched dense tiles form the txt file
     fstream denseMatrixFile("denseMatrix.txt", ios_base::in);

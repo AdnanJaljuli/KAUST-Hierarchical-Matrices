@@ -25,25 +25,33 @@ static __host__ __device__ int IndextoMOIndex(int numSegments, int n){
     return getMOIndexfromXY(j, i);
 }
 
-static __global__ void batchedSampling(int tileSize, int batchSize, int batchUnitSize, double** U, double** V, int* scanRanks, double* samplingVectors, int samplingVectorsWidth, double* output, double* bufferMemory) {
+template <typename T>
+static __global__ void batchedSampling(int tileSize, int batchSize, int batchUnitSize, T** U, T** V, int* scanRanks, T* samplingVectors, int samplingVectorsWidth, T* output, T* bufferMemory) {
     unsigned int batch = blockIdx.y;
     unsigned int blockInBatch = blockIdx.x;
-    double outputValue = 0;
+    T outputValue = 0;
+    T sum = 0;
 
     for(unsigned int tile = 0; tile < batchUnitSize; ++tile) {
-        // TODO: think about loading U, V and scanRanks into shared memory
-        // multiply V by the sampling vector and store it in buffer memory
+        // multiply V by the sampling vector and store it in buffer
         int MOIndex = IndextoMOIndex(batchUnitSize, tile*batchUnitSize + blockInBatch);
-        double sum = 0;
-        int rank = (blockInBatch == 0 && tile == 0) ? (scanRanks[batch*batchUnitSize*batchUnitSize]) : (scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex] - scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1]);
-        int scanRankVal = (blockInBatch == 0 && tile == 0) ? 0 : (scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1]);
+        int rank, scanRankVal;
+        if(blockInBatch == 0 && tile == 0) {
+            rank = scanRanks[batch*batchUnitSize*batchUnitSize];
+            scanRankVal = 0;
+        }
+        else {
+            rank = scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex] - scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1];
+            scanRankVal = scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1];
+        }
 
+        sum = 0;
         if(threadIdx.y < rank) {
             // TODO: use warp shuffling: allocate multiple threadblocks per output element and let each do a part of the multiplication and then use shuffling
             // TODO: load U and V into shared memory: if k < half of 16, we can load both U and V with the same threadBlock
             for(unsigned int j = 0; j < tileSize; ++j) {
-                double x = V[batch][scanRankVal*tileSize + threadIdx.y*tileSize + j];
-                double y = samplingVectors[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + tile*tileSize + j];
+                T x = V[batch][scanRankVal*tileSize + threadIdx.y*tileSize + j];
+                T y = samplingVectors[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + tile*tileSize + j];
                 sum += x*y;
             }
             bufferMemory[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + blockInBatch*tileSize + threadIdx.y] = sum;
@@ -54,8 +62,8 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
         sum = 0;
         if(threadIdx.x < samplingVectorsWidth) {
             for(unsigned int j = 0; j < rank; ++j) {
-                double x = U[batch][scanRankVal*tileSize + j*tileSize + threadIdx.y];
-                double y = bufferMemory[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + blockInBatch*tileSize + j];
+                T x = U[batch][scanRankVal*tileSize + j*tileSize + threadIdx.y];
+                T y = bufferMemory[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + blockInBatch*tileSize + j];
                 sum += x*y;
             }
             outputValue += sum;
