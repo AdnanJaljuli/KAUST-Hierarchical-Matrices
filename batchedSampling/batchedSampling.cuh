@@ -28,10 +28,7 @@ static __host__ __device__ int IndextoMOIndex_h(int numSegments, int n){
 static __global__ void batchedSampling(int tileSize, int batchSize, int batchUnitSize, double** U, double** V, int* scanRanks, double* samplingVectors, int samplingVectorsWidth, double* output, double* bufferMemory) {
     unsigned int batch = blockIdx.x/batchUnitSize;
     unsigned int blockInBatch = blockIdx.x%batchUnitSize;
-    if(threadIdx.x < samplingVectorsWidth) {
-        output[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + blockInBatch*tileSize + threadIdx.y] = 0.0f;
-    }
-    __syncthreads();
+    output[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + blockInBatch*tileSize + threadIdx.y] = 0;
 
     for(unsigned int tile = 0; tile < batchUnitSize; ++tile) {
         // TODO: think about loading U, V and scanRanks into shared memory
@@ -41,7 +38,9 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
         int rank = (blockInBatch == 0 && tile == 0) ? (scanRanks[batch*batchUnitSize*batchUnitSize]) : (scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex] - scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1]);
         int scanRankVal = (blockInBatch == 0 && tile == 0) ? 0 : (scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1]);
 
-        if(threadIdx.x < samplingVectorsWidth && threadIdx.y < rank) {
+        if(threadIdx.y < rank) {
+            // TODO: use warp shuffling: allocate multiple threadblocks per output element and let each do a part of the multiplication and then use shuffling
+            // TODO: load U and V into shared memory: if k < half of 16, we can load both U and V with the same threadBlock
             for(unsigned int j = 0; j < tileSize; ++j) {
                 double x = V[batch][scanRankVal*tileSize + threadIdx.y*tileSize + j];
                 double y = samplingVectors[batch*batchUnitSize*tileSize*samplingVectorsWidth + threadIdx.x*batchUnitSize*tileSize + tile*tileSize + j];
