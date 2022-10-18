@@ -141,15 +141,14 @@ int main() {
     cudaMalloc((void**) &d_output, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
     cudaMalloc((void**) &d_bufferMemory, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
     cudaMalloc((void**) &d_samplingVectors, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
-    
+
     numThreadsPerBlock = 1024;
     numBlocks = (samplingVectorWidth*batchSize*segmentSize*batchUnitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
     generateSamplingVectors <<< numBlocks, numThreadsPerBlock >>> (d_samplingVectors, samplingVectorWidth*batchSize*segmentSize*batchUnitSize);
 
     // launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
     dim3 m_numThreadsPerBlock(samplingVectorWidth, 32);
-    // fix grid launch: make it (n, batchSize)
-    dim3 m_numBlocks(batchSize*batchUnitSize, 1);
+    dim3 m_numBlocks(batchUnitSize, batchSize);
     batchedSampling <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output, d_bufferMemory);
 
     // read the batched dense tiles form the txt file
