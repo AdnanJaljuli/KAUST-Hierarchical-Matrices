@@ -1,8 +1,6 @@
 #ifndef __BATCHED_SAMPLING__
 #define __BATCHED_SAMPLING__
 
-#include <bits/stdc++.h>
-
 static __host__ __device__ int getMOIndexfromXY(unsigned int x, unsigned int y){
     static const unsigned int B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF};
     static const unsigned int S[] = {1, 2, 4, 8};
@@ -26,8 +24,7 @@ static __host__ __device__ int IndextoMOIndex(int numSegments, int n){
 }
 
 template <typename T>
-static __global__ void batchedSampling(int tileSize, int batchSize, int batchUnitSize, T** U, T** V, int* scanRanks, T* samplingVectors, int samplingVectorWidth, T* output, T* bufferMemory) {
-    
+static __global__ void batchedSampling(int tileSize, int batchSize, int batchUnitSize, T** UPtrs, T** VPtrs, int* scanRanks, T* samplingVectors, int samplingVectorWidth, T* output) {
     __shared__ T shmemArray1[32][16];
     __shared__ T shmemArray2[32][16];
     unsigned int batch = blockIdx.y;
@@ -49,15 +46,15 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
         }
 
         // load V and Omega into shared memory
+        // TODO: if k < half of 16, we can load both U and V with the same threadBlock
         if(threadIdx.x < rank) {
-            shmemArray1[threadIdx.y][threadIdx.x] = V[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
+            shmemArray1[threadIdx.y][threadIdx.x] = VPtrs[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
         }
         shmemArray2[threadIdx.y][threadIdx.x] = samplingVectors[batch*batchUnitSize*tileSize*samplingVectorWidth + threadIdx.x*batchUnitSize*tileSize + tile*tileSize + threadIdx.y];
         __syncthreads();
 
         if(threadIdx.y < rank) {
             // TODO: use warp shuffling: allocate multiple threadblocks per output element and let each do a part of the multiplication and then use shuffling
-            // TODO: if k < half of 16, we can load both U and V with the same threadBlock
             sum = 0;
             for(unsigned int j = 0; j < tileSize; ++j) {
                 sum += shmemArray1[j][threadIdx.y]*shmemArray2[j][threadIdx.x];
@@ -68,7 +65,7 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
         if(threadIdx.y < rank) {
             shmemArray2[threadIdx.y][threadIdx.x] = sum;
         }
-        shmemArray1[threadIdx.y][threadIdx.x] = U[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
+        shmemArray1[threadIdx.y][threadIdx.x] = UPtrs[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
         __syncthreads();
 
         // multiply U by the result and add it to output

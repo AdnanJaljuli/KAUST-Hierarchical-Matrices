@@ -136,10 +136,8 @@ int main() {
     // generate random sampling vectors
     unsigned int samplingVectorWidth = 16;
     double *d_output;
-    double *d_bufferMemory;
     double *d_samplingVectors;
     cudaMalloc((void**) &d_output, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
-    cudaMalloc((void**) &d_bufferMemory, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
     cudaMalloc((void**) &d_samplingVectors, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
 
     numThreadsPerBlock = 1024;
@@ -149,7 +147,7 @@ int main() {
     // launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
     dim3 m_numThreadsPerBlock(samplingVectorWidth, 32);
     dim3 m_numBlocks(batchUnitSize, batchSize);
-    batchedSampling < double > <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output, d_bufferMemory);
+    batchedSampling <double> <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output);
 
     // read the batched dense tiles form the txt file
     fstream denseMatrixFile("denseMatrix.txt", ios_base::in);
