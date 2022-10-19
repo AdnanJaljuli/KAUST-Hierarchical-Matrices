@@ -23,6 +23,7 @@ static __host__ __device__ int IndextoMOIndex(int numSegments, int n){
     return getMOIndexfromXY(j, i);
 }
 
+// TODO: have one array for scanRanks, or an array of pointers similar to U and V?
 template <typename T>
 static __global__ void batchedSampling(int tileSize, int batchSize, int batchUnitSize, T** UPtrs, T** VPtrs, int* scanRanks, T* samplingVectors, int samplingVectorWidth, T* output) {
     __shared__ T shmemArray1[32][16];
@@ -46,9 +47,13 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
         }
 
         // load V and Omega into shared memory
-        // TODO: if k < half of 16, we can load both U and V with the same threadBlock
         if(threadIdx.x < rank) {
             shmemArray1[threadIdx.y][threadIdx.x] = VPtrs[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
+        }
+        if(rank*2 <= samplingVectorWidth) {
+            if(threadIdx.x >= samplingVectorWidth - rank) {
+                shmemArray1[threadIdx.y][threadIdx.x] = UPtrs[batch][scanRankVal*tileSize + (threadIdx.x + rank - samplingVectorWidth)*tileSize + threadIdx.y];
+            }
         }
         shmemArray2[threadIdx.y][threadIdx.x] = samplingVectors[batch*batchUnitSize*tileSize*samplingVectorWidth + threadIdx.x*batchUnitSize*tileSize + tile*tileSize + threadIdx.y];
         __syncthreads();
@@ -65,13 +70,17 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
         if(threadIdx.y < rank) {
             shmemArray2[threadIdx.y][threadIdx.x] = sum;
         }
-        shmemArray1[threadIdx.y][threadIdx.x] = UPtrs[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
+        if(rank*2 > samplingVectorWidth) {
+            if(threadIdx.x >= samplingVectorWidth - rank) {
+                shmemArray1[threadIdx.y][threadIdx.x] = UPtrs[batch][scanRankVal*tileSize + (threadIdx.x + rank - samplingVectorWidth)*tileSize + threadIdx.y];
+            }
+        }
         __syncthreads();
 
         // multiply U by the result and add it to output
         sum = 0;
         for(unsigned int j = 0; j < rank; ++j) {
-            sum += shmemArray1[threadIdx.y][j]*shmemArray2[j][threadIdx.x];
+            sum += shmemArray1[threadIdx.y][samplingVectorWidth - rank + j]*shmemArray2[j][threadIdx.x];
         }
         outputValue += sum;
         __syncthreads();
