@@ -25,7 +25,7 @@ static __host__ __device__ int IndextoMOIndex(int numSegments, int n){
 
 // TODO: have one array for scanRanks, or an array of pointers similar to U and V?
 template <typename T>
-static __global__ void batchedSampling(int tileSize, int batchSize, int batchUnitSize, T** UPtrs, T** VPtrs, int* scanRanks, T* samplingVectors, int samplingVectorWidth, T* output, int transpose) {
+static __global__ void batchedSampling(int tile_size, int batch_unit_size, T** U_ptrs, T** V_ptrs, int* scan_ranks, int batchSize, T** samplingVectors, int samplingVectorWidth, T** output, int transpose) {
     __shared__ T shmemArray1[32][16];
     __shared__ T shmemArray2[32][16];
     unsigned int batch = blockIdx.y;
@@ -34,35 +34,35 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
     T sum = 0;
 
     if(transpose == 0) {
-        for(unsigned int tile = 0; tile < batchUnitSize; ++tile) {
+        for(unsigned int tile = 0; tile < batch_unit_size; ++tile) {
             // multiply V by the sampling vector and store it in buffer
-            int MOIndex = IndextoMOIndex(batchUnitSize, tile*batchUnitSize + blockInBatch);
+            int MOIndex = IndextoMOIndex(batch_unit_size, tile*batch_unit_size + blockInBatch);
             int rank, scanRankVal;
             if(blockInBatch == 0 && tile == 0) {
-                rank = scanRanks[batch*batchUnitSize*batchUnitSize];
+                rank = scan_ranks[batch*batch_unit_size*batch_unit_size];
                 scanRankVal = 0;
             }
             else {
-                rank = scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex] - scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1];
-                scanRankVal = scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1];
+                rank = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex] - scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
+                scanRankVal = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
             }
 
             // load V and Omega into shared memory
             if(threadIdx.x < rank) {
-                shmemArray1[threadIdx.y][threadIdx.x] = VPtrs[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
+                shmemArray1[threadIdx.y][threadIdx.x] = V_ptrs[batch][scanRankVal*tile_size + threadIdx.x*tile_size + threadIdx.y];
             }
             if(rank*2 <= samplingVectorWidth) {
                 if(threadIdx.x >= samplingVectorWidth - rank) {
-                    shmemArray1[threadIdx.y][threadIdx.x] = UPtrs[batch][scanRankVal*tileSize + (threadIdx.x + rank - samplingVectorWidth)*tileSize + threadIdx.y];
+                    shmemArray1[threadIdx.y][threadIdx.x] = U_ptrs[batch][scanRankVal*tile_size + (threadIdx.x + rank - samplingVectorWidth)*tile_size + threadIdx.y];
                 }
             }
-            shmemArray2[threadIdx.y][threadIdx.x] = samplingVectors[batch*batchUnitSize*tileSize*samplingVectorWidth + threadIdx.x*batchUnitSize*tileSize + tile*tileSize + threadIdx.y];
+            shmemArray2[threadIdx.y][threadIdx.x] = samplingVectors[batch][threadIdx.x*batch_unit_size*tile_size + tile*tile_size + threadIdx.y];
             __syncthreads();
 
             if(threadIdx.y < rank) {
                 // TODO: use warp shuffling: allocate multiple threadblocks per output element and let each do a part of the multiplication and then use shuffling
                 sum = 0;
-                for(unsigned int j = 0; j < tileSize; ++j) {
+                for(unsigned int j = 0; j < tile_size; ++j) {
                     sum += shmemArray1[j][threadIdx.y]*shmemArray2[j][threadIdx.x];
                 }
             }
@@ -73,7 +73,7 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
             }
             if(2*rank > samplingVectorWidth) {
                 if(threadIdx.x >= samplingVectorWidth - rank) {
-                    shmemArray1[threadIdx.y][threadIdx.x] = UPtrs[batch][scanRankVal*tileSize + (threadIdx.x + rank - samplingVectorWidth)*tileSize + threadIdx.y];
+                    shmemArray1[threadIdx.y][threadIdx.x] = U_ptrs[batch][scanRankVal*tile_size + (threadIdx.x + rank - samplingVectorWidth)*tile_size + threadIdx.y];
                 }
             }
             __syncthreads();
@@ -88,34 +88,34 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
         }
     }
     else {
-        for(unsigned int tile = 0; tile < batchUnitSize; ++tile) {
+        for(unsigned int tile = 0; tile < batch_unit_size; ++tile) {
             // multiply V by the sampling vector and store it in buffer
-            int MOIndex = IndextoMOIndex(batchUnitSize, blockInBatch*batchUnitSize + tile);
+            int MOIndex = IndextoMOIndex(batch_unit_size, blockInBatch*batch_unit_size + tile);
             int rank, scanRankVal;
             if(blockInBatch == 0 && tile == 0) {
-                rank = scanRanks[batch*batchUnitSize*batchUnitSize];
+                rank = scan_ranks[batch*batch_unit_size*batch_unit_size];
                 scanRankVal = 0;
             }
             else {
-                rank = scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex] - scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1];
-                scanRankVal = scanRanks[batch*batchUnitSize*batchUnitSize + MOIndex - 1];
+                rank = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex] - scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
+                scanRankVal = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
             }
 
             // load U transpose and Omega into shared memory
             if(threadIdx.x < rank) {
-                shmemArray1[threadIdx.y][threadIdx.x] = UPtrs[batch][scanRankVal*tileSize + threadIdx.x*tileSize + threadIdx.y];
+                shmemArray1[threadIdx.y][threadIdx.x] = U_ptrs[batch][scanRankVal*tile_size + threadIdx.x*tile_size + threadIdx.y];
             }
             if(rank*2 <= samplingVectorWidth) {
                 if(threadIdx.x >= samplingVectorWidth - rank) {
-                    shmemArray1[threadIdx.y][threadIdx.x] = VPtrs[batch][scanRankVal*tileSize + (threadIdx.x + rank - samplingVectorWidth)*tileSize + threadIdx.y];
+                    shmemArray1[threadIdx.y][threadIdx.x] = V_ptrs[batch][scanRankVal*tile_size + (threadIdx.x + rank - samplingVectorWidth)*tile_size + threadIdx.y];
                 }
             }
-            shmemArray2[threadIdx.y][threadIdx.x] = samplingVectors[batch*batchUnitSize*tileSize*samplingVectorWidth + threadIdx.x*batchUnitSize*tileSize + tile*tileSize + threadIdx.y];
+            shmemArray2[threadIdx.y][threadIdx.x] = samplingVectors[batch][threadIdx.x*batch_unit_size*tile_size + tile*tile_size + threadIdx.y];
             __syncthreads();
 
             if(threadIdx.y < rank) {
                 sum = 0;
-                for(unsigned int j = 0; j < tileSize; ++j) {
+                for(unsigned int j = 0; j < tile_size; ++j) {
                     sum += shmemArray1[j][threadIdx.y]*shmemArray2[j][threadIdx.x];
                 }
             }
@@ -126,7 +126,7 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
             }
             if(2*rank > samplingVectorWidth) {
                 if(threadIdx.x >= samplingVectorWidth - rank) {
-                    shmemArray1[threadIdx.y][threadIdx.x] = VPtrs[batch][scanRankVal*tileSize + (threadIdx.x + rank - samplingVectorWidth)*tileSize + threadIdx.y];
+                    shmemArray1[threadIdx.y][threadIdx.x] = V_ptrs[batch][scanRankVal*tile_size + (threadIdx.x + rank - samplingVectorWidth)*tile_size + threadIdx.y];
                 }
             }
             __syncthreads();
@@ -140,7 +140,7 @@ static __global__ void batchedSampling(int tileSize, int batchSize, int batchUni
             __syncthreads();
         }
     }
-    output[batch*batchUnitSize*tileSize*samplingVectorWidth + threadIdx.x*batchUnitSize*tileSize + blockInBatch*tileSize + threadIdx.y] = outputValue;
+    output[batch][threadIdx.x*batch_unit_size*tile_size + blockInBatch*tile_size + threadIdx.y] = outputValue;
 }
 
 #endif
