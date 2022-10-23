@@ -54,13 +54,20 @@ __global__ void printOutput(double* output, int size) {
     }
 }
 
-__global__ void denseMatrixSampling(int batchSize, int matrixDim, double* denseMatrix, double* denseMatrixOutput, double* samplingVectors, int samplingVectorDim) {
+__global__ void denseMatrixSampling(int batchSize, int matrixDim, double* denseMatrix, double* denseMatrixOutput, double* samplingVectors, int samplingVectorDim, int transpose) {
     unsigned int batch = blockIdx.y/(matrixDim/32);
     unsigned int blockInBatch = blockIdx.y%(matrixDim/32);
     double sum = 0;
 
-    for(unsigned int i = 0; i < matrixDim; ++i) {
-        sum += denseMatrix[batch*matrixDim*matrixDim + i*matrixDim + blockInBatch*32 + threadIdx.y]*samplingVectors[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + i];
+    if(transpose == 0) {
+        for(unsigned int i = 0; i < matrixDim; ++i) {
+            sum += denseMatrix[batch*matrixDim*matrixDim + i*matrixDim + blockInBatch*32 + threadIdx.y]*samplingVectors[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + i];
+        }
+    }
+    else {
+        for(unsigned int i = 0; i < matrixDim; ++i) {
+            sum += denseMatrix[batch*matrixDim*matrixDim + (blockInBatch*32 + threadIdx.y)*matrixDim + i]*samplingVectors[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + i];
+        }
     }
     denseMatrixOutput[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + blockInBatch*32 + threadIdx.y] = sum;
 }
@@ -75,6 +82,7 @@ __global__ void compareResults(double* denseMatrixOutput, double* output, int si
 }
 
 int main() {
+    int transpose = 1;
     // read a batch of n*n TLR matrices from a file
     fstream myFile("batchedMatrix.txt", ios_base::in);
     int batchUnitSize, segmentSize, batchSize;
@@ -147,7 +155,7 @@ int main() {
     // launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
     dim3 m_numThreadsPerBlock(samplingVectorWidth, 32);
     dim3 m_numBlocks(batchUnitSize, batchSize);
-    batchedSampling <double> <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output);
+    batchedSampling <double> <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output, transpose);
 
     // read the batched dense tiles form the txt file
     fstream denseMatrixFile("denseMatrix.txt", ios_base::in);
@@ -169,7 +177,7 @@ int main() {
     // multiply the dense matrix by the sampling vectors
     dim3 dm_numThreadsPerBlock(samplingVectorWidth, 32);
     dim3 dm_numBlocks(1, (batchSize*batchUnitSize*segmentSize)/32);
-    denseMatrixSampling <<< dm_numBlocks, dm_numThreadsPerBlock >>> (batchSize, batchUnitSize*segmentSize, d_denseMatrix, d_denseMatrixOutput, d_samplingVectors, samplingVectorWidth);
+    denseMatrixSampling <<< dm_numBlocks, dm_numThreadsPerBlock >>> (batchSize, batchUnitSize*segmentSize, d_denseMatrix, d_denseMatrixOutput, d_samplingVectors, samplingVectorWidth, transpose);
 
     // compare the results
     double *d_error, *d_tmp;
