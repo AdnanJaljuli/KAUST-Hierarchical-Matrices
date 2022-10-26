@@ -2,6 +2,39 @@
 #ifndef __HELPERS_HIERARCHICALMATRIX_H__
 #define __HELPERS_HIERARCHICALMATRIX_H__
 
+__global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize) {
+    d_UPtrs[0] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[64]*segmentSize];
+    d_VPtrs[0] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[64]*segmentSize];
+    d_UPtrs[1] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[128]*segmentSize];
+    d_VPtrs[1] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[128]*segmentSize];
+}
+
+__global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize) {
+    d_scanRanksPtrs[0] = &d_scanRanks[0];
+    d_scanRanksPtrs[1] = &d_scanRanks[batchUnitSize*batchUnitSize];
+}
+
+__global__ void fillLRARAArrays(int batchSize, int maxRows, int maxCols, int* d_rowsBatch, int* d_colsBatch, int* d_LDABatch, int* d_LDBBatch){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < batchSize){
+        d_rowsBatch[i] = maxRows;
+        d_colsBatch[i] = maxRows;
+        d_LDABatch[i] = maxRows;
+        d_LDBBatch[i] = maxRows;
+    }
+}
+
+__global__ void fillTempScanRanksPtr(int* d_ranksStartingPtr, int* blockRanks) {
+    d_ranksStartingPtr[0] = blockRanks[64];
+}
+
+__global__ void fillBatchSegments(int *batchSegments, int batchUnitSize, int batchSize) {
+    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i < batchSize*batchUnitSize*batchUnitSize) {
+        batchSegments[i] = i/(batchUnitSize*batchUnitSize);
+    }
+}
+
 static __global__ void fillExistingTilesBitVector(int numSegments, uint64_t *existingTileBits) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numSegments*numSegments) {

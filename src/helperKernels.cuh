@@ -132,16 +132,6 @@ static __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_
     }
 }
 
-static __global__ void fillLRARAArrays(int batchCount, int max_rows, int max_cols, int* d_rows_batch, int* d_cols_batch, int* d_lda_batch, int* d_ldb_batch){
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < batchCount){
-        d_rows_batch[i] = max_rows;
-        d_cols_batch[i] = max_rows;
-        d_lda_batch[i] = max_rows;
-        d_ldb_batch[i] = max_rows;
-    }
-}
-
 template<class T>
 struct UnaryAoAAssign : public thrust::unary_function<int, T*>
 {

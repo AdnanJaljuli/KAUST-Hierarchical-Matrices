@@ -30,7 +30,7 @@ void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct) {
 struct HMatrixLevel {
     int numTiles;
     int* tileIndices;
-    int* tileRanks;
+    int* tileScanRanks;
     int* tileOffsets;
     H2Opus_Real* U;
     H2Opus_Real* V;
@@ -55,7 +55,6 @@ void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned
     cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
     matrix.levels = (HMatrixLevel*)malloc(matrix.numLevels*sizeof(HMatrixLevel));
 }
-
 
 void freeHMatrix(HMatrix &matrix) {
     // TODO

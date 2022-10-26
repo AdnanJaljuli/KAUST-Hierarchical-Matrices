@@ -25,7 +25,7 @@ static __host__ __device__ int IndextoMOIndex(int numSegments, int n){
 
 // TODO: have one array for scanRanks, or an array of pointers similar to U and V?
 template <typename T>
-static __global__ void batchedSampling(int tile_size, int batch_unit_size, T** U_ptrs, T** V_ptrs, int* scan_ranks, int batchSize, T** samplingVectors, int samplingVectorWidth, T** output, int transpose) {
+static __global__ void batchedSampling(int tile_size, int batch_unit_size, T** U_ptrs, T** V_ptrs, int** scan_ranks, int batchSize, T** samplingVectors, int samplingVectorWidth, T** output, int transpose) {
     __shared__ T shmemArray1[32][16];
     __shared__ T shmemArray2[32][16];
     unsigned int batch = blockIdx.y;
@@ -39,12 +39,12 @@ static __global__ void batchedSampling(int tile_size, int batch_unit_size, T** U
             int MOIndex = IndextoMOIndex(batch_unit_size, tile*batch_unit_size + blockInBatch);
             int rank, scanRankVal;
             if(blockInBatch == 0 && tile == 0) {
-                rank = scan_ranks[batch*batch_unit_size*batch_unit_size];
+                rank = scan_ranks[batch][0];
                 scanRankVal = 0;
             }
             else {
-                rank = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex] - scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
-                scanRankVal = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
+                rank = scan_ranks[batch][MOIndex] - scan_ranks[batch][MOIndex - 1];
+                scanRankVal = scan_ranks[batch][MOIndex - 1];
             }
 
             // load V and Omega into shared memory
@@ -93,12 +93,12 @@ static __global__ void batchedSampling(int tile_size, int batch_unit_size, T** U
             int MOIndex = IndextoMOIndex(batch_unit_size, blockInBatch*batch_unit_size + tile);
             int rank, scanRankVal;
             if(blockInBatch == 0 && tile == 0) {
-                rank = scan_ranks[batch*batch_unit_size*batch_unit_size];
+                rank = scan_ranks[batch][0];
                 scanRankVal = 0;
             }
             else {
-                rank = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex] - scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
-                scanRankVal = scan_ranks[batch*batch_unit_size*batch_unit_size + MOIndex - 1];
+                rank = scan_ranks[batch][MOIndex] - scan_ranks[batch][MOIndex - 1];
+                scanRankVal = scan_ranks[batch][MOIndex - 1];
             }
 
             // load U transpose and Omega into shared memory

@@ -123,10 +123,10 @@ void printMatrix(int numberOfInputPoints, int numSegments, int segmentSize, TLR_
 
     char fileName[100] = "batchedMatrix.txt";
     FILE *outputFile = fopen(fileName, "w");
-    int batchSize = 1;
-    int unitSize = 2;
+    int batchSize = 2;
+    int unitSize = 4;
     // int tilesToPrint[64] = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239};
-    int tilesToPrint[4] = {4, 5, 6, 7};
+    int tilesToPrint[32] = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47};
     fprintf(outputFile, "%d %d %d\n", unitSize, segmentSize, batchSize);
     int cnt = 0;
     for(unsigned int i = 0; i < numSegments*numSegments; ++i) {
@@ -151,11 +151,15 @@ static void printDenseMatrix(H2Opus_Real* d_denseMatrix, int size) {
     cudaMemcpy(denseMatrix, d_denseMatrix, size*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     char fileName[100] = "denseMatrix.txt";
     FILE *outputFile = fopen(fileName, "w");
-    for(unsigned int row = 0; row < 64; ++row) {
+    for(unsigned int row = 0; row < 128; ++row) {
+        for(unsigned int col = 128; col < 256; ++col) {
+            fprintf(outputFile, "%lf ", denseMatrix[col*512 + row]);
+        }
+        fprintf(outputFile, "\n");
+    }
+    for(unsigned int row = 128; row < 256; ++row) {
         for(unsigned int col = 0; col < 128; ++col) {
-            if(col >= 64) {
-                fprintf(outputFile, "%lf ", denseMatrix[col*128 + row]);
-            }
+            fprintf(outputFile, "%lf ", denseMatrix[col*512 + row]);
         }
         fprintf(outputFile, "\n");
     }
