@@ -42,9 +42,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     fillScanRankPtrs <<< 1, 1 >>> (d_scanRanksPtrs, d_scanRanks, batchUnitSize);
     gpuErrchk(cudaPeekAtLastError());
 
-    int maxRows = segmentSize;
-    int maxCols = segmentSize;
-    int maxRank = segmentSize/2;
+    int maxRows = 256;
+    int maxCols = 256;
+    int maxRank = maxRows/2;
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
@@ -73,17 +73,21 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     kblasInitRandState(kblasHandle, &randState, 1<<15, 0);
     kblasEnableMagma(kblasHandle);
     kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, maxCols, batchSize);
-    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, bucketSize, batchSize);
+    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
     kblasAllocateWorkspace(kblasHandle);
     gpuErrchk(cudaPeekAtLastError());
-
+    
     int lr_ARA_return = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, d_UPtrs, d_VPtrs, d_scanRanksPtrs,
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks,
-            tolerance, maxRows, maxCols, maxRank, 32, ARA_R, randState, 0, batchSize
+            tolerance, maxRows, maxCols, maxRank, 16, ARA_R, randState, 0, batchSize
     );
     assert(lr_ARA_return == 1);
+    printK <<< 1, 1 >>> (d_ranks, batchSize);
     cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
+
+    // TODO: error checking
+    
 }
 
 #endif

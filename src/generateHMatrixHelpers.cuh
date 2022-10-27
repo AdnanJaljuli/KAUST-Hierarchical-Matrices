@@ -4,9 +4,9 @@
 
 __global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize) {
     d_UPtrs[0] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[64]*segmentSize];
-    d_VPtrs[0] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[64]*segmentSize];
+    d_VPtrs[0] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[64]*segmentSize];
     d_UPtrs[1] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[128]*segmentSize];
-    d_VPtrs[1] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[128]*segmentSize];
+    d_VPtrs[1] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[128]*segmentSize];
 }
 
 __global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize) {
