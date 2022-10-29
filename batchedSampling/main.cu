@@ -21,8 +21,8 @@ __global__ void generateSamplingVectors(double *samplingVectors, int size) {
         unsigned int seed = i;
         curandState s;
         curand_init(seed, 0, 0, &s);
-        // samplingVectors[i] = curand_uniform(&s);
-        samplingVectors[i] = 1;
+        samplingVectors[i] = curand_uniform(&s);
+        // samplingVectors[i] = 1;
     }
 }
 
@@ -42,6 +42,24 @@ __global__ void fillBatchSegments(int *batchSegments, int batchUnitSize, int bat
     }
 }
 
+__global__ void fillSamplesBatch(int* samplesBatch, int batchSize) {
+    samplesBatch[0] = 57;
+    samplesBatch[1] = 24;
+}
+
+__global__ void fillScanRanksPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchSize, int batchUnitSize) {
+    for(int i = 0; i < batchSize; ++i) {
+        d_scanRanksPtrs[i] = &d_scanRanks[i*batchUnitSize*batchUnitSize];
+    }
+}
+
+__global__ void fillSamplingVectorsPtrs(double **d_samplingVectorsPtrs, double *d_samplingVectors, double **d_outputPtrs, double *d_output, int batchSize, int batchUnitSize, int segmentSize, int maxSamples) {
+    for(int i = 0; i < batchSize; ++i) {
+        d_samplingVectorsPtrs[i] = &d_samplingVectors[i*batchUnitSize*segmentSize*maxSamples];
+        d_outputPtrs[i] = &d_output[i*batchUnitSize*segmentSize*maxSamples];
+    }
+}
+
 __global__ void printArray(int* output, int size) {
     for(int i = 0; i < size; ++i) {
         printf("%d\n", output[i]);
@@ -54,30 +72,61 @@ __global__ void printOutput(double* output, int size) {
     }
 }
 
-__global__ void denseMatrixSampling(int batchSize, int matrixDim, double* denseMatrix, double* denseMatrixOutput, double* samplingVectors, int samplingVectorDim, int transpose) {
-    unsigned int batch = blockIdx.y/(matrixDim/32);
-    unsigned int blockInBatch = blockIdx.y%(matrixDim/32);
+__global__ void denseMatrixSampling(int batchSize, int matrixDim, double* denseMatrix, double* denseMatrixOutput, double* samplingVectors, int samplingVectorDim, int *samplesBatch, int transpose) {
     double sum = 0;
 
     if(transpose == 0) {
-        for(unsigned int i = 0; i < matrixDim; ++i) {
-            sum += denseMatrix[batch*matrixDim*matrixDim + i*matrixDim + blockInBatch*32 + threadIdx.y]*samplingVectors[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + i];
+        unsigned int batch = blockIdx.y;
+        unsigned int blockInBatch = blockIdx.x;
+        if(threadIdx.x < samplesBatch[batch]) {
+            for(unsigned int i = 0; i < matrixDim; ++i) {
+                sum += denseMatrix[batch*matrixDim*matrixDim + i*matrixDim + blockInBatch*32 + threadIdx.y]*samplingVectors[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + i];
+            }
+        }
+        if(threadIdx.x < samplesBatch[batch]) {
+            denseMatrixOutput[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + blockInBatch*32 + threadIdx.y] = sum;
         }
     }
     else {
-        for(unsigned int i = 0; i < matrixDim; ++i) {
-            sum += denseMatrix[batch*matrixDim*matrixDim + (blockInBatch*32 + threadIdx.y)*matrixDim + i]*samplingVectors[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + i];
+        unsigned int batch = blockIdx.z;
+        unsigned int blockInBatch = blockIdx.y;
+        unsigned int colInBatch = blockIdx.x*blockDim.x + threadIdx.x;
+        unsigned int rowInBatch = blockIdx.y*blockDim.y + threadIdx.y;
+        if(colInBatch < samplesBatch[batch]) {
+            for(unsigned int i = 0; i < matrixDim; ++i) {
+                sum += denseMatrix[batch*matrixDim*matrixDim + rowInBatch*matrixDim + i]*samplingVectors[batch*matrixDim*samplingVectorDim + colInBatch*matrixDim + i];
+            }
+        }
+        if(colInBatch < samplesBatch[batch]) {
+            denseMatrixOutput[batch*matrixDim*samplingVectorDim + colInBatch*matrixDim + rowInBatch] = sum;
         }
     }
-    denseMatrixOutput[batch*matrixDim*samplingVectorDim + threadIdx.x*matrixDim + blockInBatch*32 + threadIdx.y] = sum;
 }
 
-__global__ void compareResults(double* denseMatrixOutput, double* output, int size, double* error, double* tmp) {
-    for(unsigned int i = 0; i < size; ++ i) {
-        double x = denseMatrixOutput[i];
-        double y = output[i];
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x - y)*(x - y));
+__global__ void compareResults(double* denseMatrixOutput, double* output, int batchSize, int batchUnitSize, int segmentSize, int maxSamples, int* samplesBatch, double* error, double* tmp, int transpose) {
+    if(transpose == 0) {
+        unsigned int batch = blockIdx.y;
+        unsigned int blockInBatch = blockIdx.x;
+        if(threadIdx.x < samplesBatch[batch]) {
+            double x = denseMatrixOutput[batch*batchUnitSize*segmentSize*maxSamples + threadIdx.x*batchUnitSize*segmentSize + blockInBatch*segmentSize + threadIdx.y];
+            double y = output[batch*batchUnitSize*segmentSize*maxSamples + threadIdx.x*batchUnitSize*segmentSize + blockInBatch*segmentSize + threadIdx.y];
+            printf("%lf      %lf\n", x, y);
+            atomicAdd(tmp, x*x);
+            atomicAdd(error, (x - y)*(x - y));
+        }
+    }
+    else {
+        unsigned int batch = blockIdx.z;
+        unsigned int blockInBatch = blockIdx.y;
+        unsigned int colInBatch = blockIdx.x*blockDim.x + threadIdx.x;
+        unsigned int rowInBatch = blockIdx.y*blockDim.y + threadIdx.y;
+        if(colInBatch < samplesBatch[batch]) {
+            double x = denseMatrixOutput[batch*batchUnitSize*segmentSize*maxSamples + colInBatch*batchUnitSize*segmentSize + rowInBatch];
+            double y = output[batch*batchUnitSize*segmentSize*maxSamples + colInBatch*batchUnitSize*segmentSize + rowInBatch];
+            printf("%lf      %lf\n", x, y);
+            atomicAdd(tmp, x*x);
+            atomicAdd(error, (x - y)*(x - y));
+        }
     }
 }
 
@@ -142,20 +191,43 @@ int main() {
     fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UBatchPtrs, d_VBatchPtrs, d_U, d_V, d_scanRanks, batchSize, segmentSize, batchUnitSize);
 
     // generate random sampling vectors
-    unsigned int samplingVectorWidth = 16;
+    int* d_samplesBatch;
+    cudaMalloc((void**) &d_samplesBatch, batchSize*sizeof(int));
+    fillSamplesBatch <<< 1, 1 >>> (d_samplesBatch, batchSize);
+
+    unsigned int maxSamples = 64;
+    int maxRows = batchUnitSize*segmentSize/2, maxCols = batchUnitSize*segmentSize/2;
     double *d_output;
     double *d_samplingVectors;
-    cudaMalloc((void**) &d_output, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
-    cudaMalloc((void**) &d_samplingVectors, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
+    cudaMalloc((void**) &d_output, maxSamples*batchSize*segmentSize*batchUnitSize*sizeof(double));
+    cudaMalloc((void**) &d_samplingVectors, maxSamples*batchSize*segmentSize*batchUnitSize*sizeof(double));
 
     numThreadsPerBlock = 1024;
-    numBlocks = (samplingVectorWidth*batchSize*segmentSize*batchUnitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    generateSamplingVectors <<< numBlocks, numThreadsPerBlock >>> (d_samplingVectors, samplingVectorWidth*batchSize*segmentSize*batchUnitSize);
+    numBlocks = (maxSamples*batchSize*segmentSize*batchUnitSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    generateSamplingVectors <<< numBlocks, numThreadsPerBlock >>> (d_samplingVectors, maxSamples*batchSize*segmentSize*batchUnitSize);
+
+    int **d_scanRanksPtrs;
+    cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
+    fillScanRanksPtrs <<< 1, 1>>> (d_scanRanksPtrs, d_scanRanks, batchSize, batchUnitSize);
+
+    double **d_samplingVectorsPtrs;
+    cudaMalloc((void**) &d_samplingVectorsPtrs, batchSize*sizeof(double*));
+    double **d_outputPtrs;
+    cudaMalloc((void**) &d_outputPtrs, batchSize*sizeof(double*));
+    fillSamplingVectorsPtrs <<< 1, 1 >>> (d_samplingVectorsPtrs, d_samplingVectors, d_outputPtrs, d_output, batchSize, batchUnitSize, segmentSize, maxSamples);
 
     // launch a kernel that takes as input the TLR matrices, sampling function and multiplies them and stores them in a matrix
-    dim3 m_numThreadsPerBlock(samplingVectorWidth, 32);
-    dim3 m_numBlocks(batchUnitSize, batchSize);
-    batchedSampling <double> <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanks, d_samplingVectors, samplingVectorWidth, d_output, transpose);
+    if(transpose == 0) {
+        dim3 m_numThreadsPerBlock(maxSamples, 32);
+        dim3 m_numBlocks(batchUnitSize, batchSize);
+        batchedSampling <double> <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanksPtrs, d_samplingVectorsPtrs, d_outputPtrs, d_samplesBatch, maxRows, maxCols, maxSamples, transpose);
+    }
+    else {
+        dim3 m_numThreadsPerBlock(min(32, maxSamples), 32);
+        dim3 m_numBlocks((maxSamples + 31)/32, batchUnitSize, batchSize);
+        batchedSampling <double> <<< m_numBlocks, m_numThreadsPerBlock >>> (segmentSize, batchUnitSize, d_UBatchPtrs, d_VBatchPtrs, d_scanRanksPtrs, d_samplingVectorsPtrs, d_outputPtrs, d_samplesBatch, maxRows, maxCols, maxSamples, transpose);
+    }
+    cudaDeviceSynchronize();
 
     // read the batched dense tiles form the txt file
     fstream denseMatrixFile("denseMatrix.txt", ios_base::in);
@@ -172,12 +244,19 @@ int main() {
     cudaMalloc((void**) &d_denseMatrix, batchSize*batchUnitSize*segmentSize*batchUnitSize*segmentSize*sizeof(double));    
     cudaMemcpy(d_denseMatrix, denseMatrix, batchSize*batchUnitSize*segmentSize*batchUnitSize*segmentSize*sizeof(double), cudaMemcpyHostToDevice);
     double *d_denseMatrixOutput;
-    cudaMalloc((void**) &d_denseMatrixOutput, samplingVectorWidth*batchSize*segmentSize*batchUnitSize*sizeof(double));
+    cudaMalloc((void**) &d_denseMatrixOutput, maxSamples*batchSize*segmentSize*batchUnitSize*sizeof(double));
 
     // multiply the dense matrix by the sampling vectors
-    dim3 dm_numThreadsPerBlock(samplingVectorWidth, 32);
-    dim3 dm_numBlocks(1, (batchSize*batchUnitSize*segmentSize)/32);
-    denseMatrixSampling <<< dm_numBlocks, dm_numThreadsPerBlock >>> (batchSize, batchUnitSize*segmentSize, d_denseMatrix, d_denseMatrixOutput, d_samplingVectors, samplingVectorWidth, transpose);
+    if(transpose == 0) {
+        dim3 dm_numThreadsPerBlock(maxSamples, 32);
+        dim3 dm_numBlocks(batchUnitSize, batchSize);
+        denseMatrixSampling <<< dm_numBlocks, dm_numThreadsPerBlock >>> (batchSize, batchUnitSize*segmentSize, d_denseMatrix, d_denseMatrixOutput, d_samplingVectors, maxSamples, d_samplesBatch, transpose);
+    }
+    else {
+        dim3 dm_numThreadsPerBlock(min(32, maxSamples), 32);
+        dim3 dm_numBlocks((maxSamples + 31)/32, batchUnitSize, batchSize);
+        denseMatrixSampling <<< dm_numBlocks, dm_numThreadsPerBlock >>> (batchSize, batchUnitSize*segmentSize, d_denseMatrix, d_denseMatrixOutput, d_samplingVectors, maxSamples, d_samplesBatch, transpose);
+    }
 
     // compare the results
     double *d_error, *d_tmp;
@@ -185,7 +264,16 @@ int main() {
     cudaMalloc((void**) &d_tmp, sizeof(double));
     cudaMemset(d_error, 0, sizeof(double));
     cudaMemset(d_tmp, 0, sizeof(double));
-    compareResults <<< 1, 1 >>> (d_denseMatrixOutput, d_output, samplingVectorWidth*batchSize*segmentSize*batchUnitSize, d_error, d_tmp);
+    if(transpose == 0) {
+        dim3 dm_numThreadsPerBlock(maxSamples, 32);
+        dim3 dm_numBlocks(batchUnitSize, batchSize);
+        compareResults <<< dm_numBlocks, dm_numThreadsPerBlock >>> (d_denseMatrixOutput, d_output, batchSize, batchUnitSize, segmentSize, maxSamples, d_samplesBatch, d_error, d_tmp, transpose);
+    }
+    else {
+        dim3 dm_numThreadsPerBlock(min(32, maxSamples), 32);
+        dim3 dm_numBlocks((maxSamples + 31)/32, batchUnitSize, batchSize);
+        compareResults <<< dm_numBlocks, dm_numThreadsPerBlock >>> (d_denseMatrixOutput, d_output, batchSize, batchUnitSize, segmentSize, maxSamples, d_samplesBatch, d_error, d_tmp, transpose);
+    }
     double h_error;
     double h_tmp;
     cudaMemcpy(&h_error, d_error, sizeof(double), cudaMemcpyDeviceToHost);
