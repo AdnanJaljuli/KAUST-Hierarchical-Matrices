@@ -79,16 +79,16 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     cudaMalloc((void**) &d_LDBBatch, batchSize*sizeof(int));
     cudaMalloc((void**) &d_APtrs, batchSize*sizeof(H2Opus_Real*));
     cudaMalloc((void**) &d_BPtrs, batchSize*sizeof(H2Opus_Real*));
-    cudaMalloc((void**) &d_A, batchSize*maxRows*maxCols*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_B, batchSize*maxRows*maxCols*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_A, batchSize*maxRows*maxRank*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_B, batchSize*maxRows*maxRank*sizeof(H2Opus_Real));
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
     fillLRARAArrays <<< numBlocks, numThreadsPerBlock >>> (batchSize, maxRows, maxCols, d_rowsBatch, d_colsBatch, d_LDABatch, d_LDBBatch);
     gpuErrchk(cudaPeekAtLastError());
 
-    generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxCols, batchSize, 0);
-    generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxCols, batchSize, 0);
+    generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxRank, batchSize, 0);
+    generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxRank, batchSize, 0);
     magma_init();
     kblasHandle_t kblasHandle;
     kblasRandState_t randState;
@@ -96,7 +96,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     kblasInitRandState(kblasHandle, &randState, 1<<15, 0);
     kblasEnableMagma(kblasHandle);
     kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, maxCols, batchSize);
-    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
+    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, 32, batchSize);
     kblasAllocateWorkspace(kblasHandle);
     gpuErrchk(cudaPeekAtLastError());
     
@@ -113,8 +113,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     #if EXPAND_MATRIX
     // launch a kernel that multiplies U by V
     H2Opus_Real *d_expandedMatrix;
-    cudaMalloc((void**) &d_expandedMatrix, 128*128*sizeof(H2Opus_Real));
-    dim3 m_numBlocks(4, 4);
+    cudaMalloc((void**) &d_expandedMatrix, 64*64*sizeof(H2Opus_Real));
+    dim3 m_numBlocks(2, 2);
     dim3 m_numThreadsPerBlock(32, 32);
     expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_A, d_B, 64, d_expandedMatrix, d_ranks);
     cudaDeviceSynchronize();
