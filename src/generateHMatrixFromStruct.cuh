@@ -22,19 +22,19 @@ __global__ void expandMatrix(H2Opus_Real *A, H2Opus_Real *B, int size, H2Opus_Re
 }
 
 __global__ void compareResults(double* denseMatrix, double* output, int size, double* error, double* tmp) {
-    for(unsigned int i = 0; i < size; ++ i) {
-        double x = denseMatrix[i + 256*256];
-        double y = output[i];
-        printf("%lf    %lf\n", x, y);
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x - y)*(x - y));
-    }
+    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+    double x = denseMatrix[(col+64)*128 + row];
+    double y = output[col*64 + row];
+    printf("%lf    %lf\n", x, y);
+    atomicAdd(tmp, x*x);
+    atomicAdd(error, (x - y)*(x - y));
 }
 
 
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct, H2Opus_Real* d_denseMatrix) {
     // n = 128, level = 1, tileSize = 32, batchUnitSize = 4, batchSize = 2
-    int level = 1, batchUnitSize = 1, batchSize = 1;
+    int level = 1, batchUnitSize = 2, batchSize = 1;
 
     // fill UPtrs and VPtrs
     H2Opus_Real **d_UPtrs, **d_VPtrs;
@@ -45,23 +45,23 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
 
     // fill scan ranks
     int *d_scanRanks;
-    cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
     cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 4, d_scanRanks, batchUnitSize*batchUnitSize);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 4, d_scanRanks, batchUnitSize*batchUnitSize);
-    d_temp_storage = NULL;
-    temp_storage_bytes = 0;
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 8, d_scanRanks + 4, batchUnitSize*batchUnitSize);
-    cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 8, d_scanRanks + 4, batchUnitSize*batchUnitSize);
+    // d_temp_storage = NULL;
+    // temp_storage_bytes = 0;
+    // cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 8, d_scanRanks + 4, batchUnitSize*batchUnitSize);
+    // cudaMalloc(&d_temp_storage, temp_storage_bytes);
+    // cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 8, d_scanRanks + 4, batchUnitSize*batchUnitSize);
     gpuErrchk(cudaPeekAtLastError());
 
     printK <<< 1, 1 >>> (d_scanRanks, batchSize*batchUnitSize*batchUnitSize);
 
     int **d_scanRanksPtrs;
-    cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(H2Opus_Real*));
+    cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
     fillScanRankPtrs <<< 1, 1 >>> (d_scanRanksPtrs, d_scanRanks, batchUnitSize);
     gpuErrchk(cudaPeekAtLastError());
 
@@ -109,16 +109,15 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     printK <<< 1, 1 >>> (d_ranks, batchSize);
     cudaDeviceSynchronize();
     gpuErrchk(cudaPeekAtLastError());
-    return;
 
     // TODO: error checking
     #if EXPAND_MATRIX
     // launch a kernel that multiplies U by V
     H2Opus_Real *d_expandedMatrix;
-    cudaMalloc((void**) &d_expandedMatrix, 256*256*sizeof(H2Opus_Real));
-    dim3 m_numBlocks(8, 8);
+    cudaMalloc((void**) &d_expandedMatrix, 64*64*sizeof(H2Opus_Real));
+    dim3 m_numBlocks(2, 2);
     dim3 m_numThreadsPerBlock(32, 32);
-    expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_A, d_B, 256, d_expandedMatrix, d_ranks);
+    expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_A, d_B, 64, d_expandedMatrix, d_ranks);
     cudaDeviceSynchronize();
     // lanch a kernel that checks the error
     double *d_error, *d_tmp;
@@ -126,12 +125,11 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     cudaMalloc((void**) &d_tmp, sizeof(double));
     cudaMemset(d_error, 0, sizeof(double));
     cudaMemset(d_tmp, 0, sizeof(double));
-    compareResults <<< 1, 1 >>> (d_denseMatrix, d_expandedMatrix, 256*256, d_error, d_tmp);
+    compareResults <<< m_numBlocks, m_numThreadsPerBlock >>> (d_denseMatrix, d_expandedMatrix, 64*64, d_error, d_tmp);
     double h_error;
     double h_tmp;
     cudaMemcpy(&h_error, d_error, sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(&h_tmp, d_tmp, sizeof(double), cudaMemcpyDeviceToHost);
-    printf("%lf:   %lf\n", h_error, h_tmp);
     printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
     cudaFree(d_tmp);
     cudaFree(d_error);

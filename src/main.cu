@@ -82,14 +82,14 @@ int main(int argc, char *argv[]) {
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);
     #endif
     gpuErrchk(cudaPeekAtLastError());
-    return 0;
-    
+
     // Build hierarchical matrix
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
     printf("numHMatrixLevels: %d\n", hierarchicalMatrix.numLevels);
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct);
+    gpuErrchk(cudaPeekAtLastError());
 
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct, d_denseMatrix);
     gpuErrchk(cudaPeekAtLastError());
