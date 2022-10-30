@@ -40,6 +40,7 @@ int main(int argc, char *argv[]) {
     H2Opus_Real* d_pointCloud;
     cudaMalloc((void**) &d_pointCloud, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real));
     generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
+    gpuErrchk(cudaPeekAtLastError());
 
     // Build the KD-tree
     KDTree kDTree;
@@ -81,7 +82,8 @@ int main(int argc, char *argv[]) {
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);
     #endif
     gpuErrchk(cudaPeekAtLastError());
-
+    return 0;
+    
     // Build hierarchical matrix
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
@@ -89,7 +91,7 @@ int main(int argc, char *argv[]) {
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct);
 
-    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct);
+    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct, d_denseMatrix);
     gpuErrchk(cudaPeekAtLastError());
 
     cudaFreeKDTree(kDTree);

@@ -151,14 +151,8 @@ static void printDenseMatrix(H2Opus_Real* d_denseMatrix, int size) {
     cudaMemcpy(denseMatrix, d_denseMatrix, size*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     char fileName[100] = "denseMatrix.txt";
     FILE *outputFile = fopen(fileName, "w");
-    for(unsigned int row = 0; row < 128; ++row) {
-        for(unsigned int col = 128; col < 256; ++col) {
-            fprintf(outputFile, "%lf ", denseMatrix[col*512 + row]);
-        }
-        fprintf(outputFile, "\n");
-    }
-    for(unsigned int row = 128; row < 256; ++row) {
-        for(unsigned int col = 0; col < 128; ++col) {
+    for(unsigned int row = 0; row < 256; ++row) {
+        for(unsigned int col = 256; col < 512; ++col) {
             fprintf(outputFile, "%lf ", denseMatrix[col*512 + row]);
         }
         fprintf(outputFile, "\n");
