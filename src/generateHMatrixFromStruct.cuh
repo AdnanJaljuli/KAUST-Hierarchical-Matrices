@@ -9,31 +9,40 @@
 #include "kDTree.h"
 #include "TLRMatrix.h"
 
-__global__ void expandMatrix(H2Opus_Real *A, H2Opus_Real *B, int size, H2Opus_Real* output, int* ranks) {
+__global__ void expandMatrix(H2Opus_Real **A, H2Opus_Real **B, int size, H2Opus_Real* output, int* ranks) {
+    unsigned int batch = blockIdx.z;
     unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
     if(col < size && row < size) {
         H2Opus_Real sum = 0;
         for(unsigned int i = 0; i < ranks[0]; ++i) {
-            sum += A[i*size + row]*B[i*size + col];
+            sum += A[batch][i*size + row]*B[batch][i*size + col];
         }
-        output[col*size + row] = sum;
+        output[batch*size*size + col*size + row] = sum;
     }
 }
 
 __global__ void compareResults(double* denseMatrix, double* output, int size, double* error, double* tmp) {
+    unsigned int batch = blockIdx.z;
     unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
-    double x = denseMatrix[(col+64)*128 + row];
-    double y = output[col*64 + row];
-    // printf("%lf    %lf\n", x, y);
-    atomicAdd(tmp, x*x);
-    atomicAdd(error, (x - y)*(x - y));
+    if(batch == 0) {
+        double x = denseMatrix[(col+128)*256 + row];
+        double y = output[col*128 + row];
+        atomicAdd(tmp, x*x);
+        atomicAdd(error, (x - y)*(x - y));
+    }
+    else {
+        double x = denseMatrix[col*256 + 128 + row];
+        double y = output[batch*128*128 + col*128 + row];
+        atomicAdd(tmp, x*x);
+        atomicAdd(error, (x - y)*(x - y));
+    }
 }
 
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct, H2Opus_Real* d_denseMatrix) {
     // n = 128, level = 1, tileSize = 32, batchUnitSize = 4, batchSize = 2
-    int level = 1, batchUnitSize = 2, batchSize = 2;
+    int level = 1, batchUnitSize = 4, batchSize = 2;
 
     // fill UPtrs and VPtrs
     H2Opus_Real **d_UPtrs, **d_VPtrs;
@@ -47,14 +56,14 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 4, d_scanRanks, batchUnitSize*batchUnitSize);
+    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 16, d_scanRanks, batchUnitSize*batchUnitSize);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 4, d_scanRanks, batchUnitSize*batchUnitSize);
+    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 16, d_scanRanks, batchUnitSize*batchUnitSize);
     d_temp_storage = NULL;
     temp_storage_bytes = 0;
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 8, d_scanRanks + 4, batchUnitSize*batchUnitSize);
+    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 32, d_scanRanks + 16, batchUnitSize*batchUnitSize);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 8, d_scanRanks + 4, batchUnitSize*batchUnitSize);
+    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + 32, d_scanRanks + 16, batchUnitSize*batchUnitSize);
     gpuErrchk(cudaPeekAtLastError());
 
     printK <<< 1, 1 >>> (d_scanRanks, batchSize*batchUnitSize*batchUnitSize);
@@ -64,9 +73,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     fillScanRankPtrs <<< 1, 1 >>> (d_scanRanksPtrs, d_scanRanks, batchUnitSize);
     gpuErrchk(cudaPeekAtLastError());
 
-    int maxRows = 64;
-    int maxCols = 64;
-    int maxRank = 32;
+    int maxRows = 128;
+    int maxCols = 128;
+    int maxRank = 64;
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
@@ -99,7 +108,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, 32, batchSize);
     kblasAllocateWorkspace(kblasHandle);
     gpuErrchk(cudaPeekAtLastError());
-    
+
     int lr_ARA_return = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, d_UPtrs, d_VPtrs, d_scanRanksPtrs,
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks,
             tolerance, maxRows, maxCols, maxRank, 16, ARA_R, randState, 0, batchSize
@@ -113,10 +122,10 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     #if EXPAND_MATRIX
     // launch a kernel that multiplies U by V
     H2Opus_Real *d_expandedMatrix;
-    cudaMalloc((void**) &d_expandedMatrix, 64*64*sizeof(H2Opus_Real));
-    dim3 m_numBlocks(2, 2);
+    cudaMalloc((void**) &d_expandedMatrix, 2*128*128*sizeof(H2Opus_Real));
+    dim3 m_numBlocks(4, 4, 2);
     dim3 m_numThreadsPerBlock(32, 32);
-    expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_A, d_B, 64, d_expandedMatrix, d_ranks);
+    expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_APtrs, d_BPtrs, 128, d_expandedMatrix, d_ranks);
     cudaDeviceSynchronize();
     // lanch a kernel that checks the error
     double *d_error, *d_tmp;
@@ -124,7 +133,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     cudaMalloc((void**) &d_tmp, sizeof(double));
     cudaMemset(d_error, 0, sizeof(double));
     cudaMemset(d_tmp, 0, sizeof(double));
-    compareResults <<< m_numBlocks, m_numThreadsPerBlock >>> (d_denseMatrix, d_expandedMatrix, 64, d_error, d_tmp);
+    compareResults <<< m_numBlocks, m_numThreadsPerBlock >>> (d_denseMatrix, d_expandedMatrix, 128, d_error, d_tmp);
     double h_error;
     double h_tmp;
     cudaMemcpy(&h_error, d_error, sizeof(double), cudaMemcpyDeviceToHost);
