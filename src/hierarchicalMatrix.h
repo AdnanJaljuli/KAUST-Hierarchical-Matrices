@@ -2,18 +2,19 @@
 #define __HIERARCHICALMATRIX__
 
 struct WeakAdmissibility {
+    int numLevels;
     int* numTiles;
     int** tileIndices;
 };
 
 void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int numberOfInputPoints, unsigned int bucketSize) {
     // TODO: generalize on any n size
-    int numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
-    WAStruct.numTiles = (int*)malloc((numLevels - 1)*sizeof(int));
-    WAStruct.tileIndices = (int**)malloc((numLevels - 1)*sizeof(int*));
-    
+    WAStruct.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+    WAStruct.numTiles = (int*)malloc((WAStruct.numLevels - 1)*sizeof(int));
+    WAStruct.tileIndices = (int**)malloc((WAStruct.numLevels - 1)*sizeof(int*));
+
     int dim = 2;
-    for(unsigned int level = 0; level < numLevels - 1; ++level) {
+    for(unsigned int level = 0; level < WAStruct.numLevels - 1; ++level) {
         unsigned int numTiles = 1 << (level + 1);
         WAStruct.numTiles[level] = numTiles;
         
@@ -62,9 +63,9 @@ struct HMatrix {
 };
 
 void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned int numberOfInputPoints, unsigned int bucketSize) {
-    
     cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
-    matrix.levels = (HMatrixLevel*)malloc(matrix.numLevels*sizeof(HMatrixLevel));
+    matrix.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+    matrix.levels = (HMatrixLevel*)malloc((matrix.numLevels - 2)*sizeof(HMatrixLevel));
 }
 
 void freeHMatrix(HMatrix &matrix) {

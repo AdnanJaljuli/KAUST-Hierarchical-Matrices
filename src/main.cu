@@ -87,11 +87,10 @@ int main(int argc, char *argv[]) {
     HMatrix hierarchicalMatrix;
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct, config.numberOfInputPoints, config.bucketSize);
-    return 0;
-
-    allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
-    printf("numHMatrixLevels: %d\n", hierarchicalMatrix.numLevels);
     gpuErrchk(cudaPeekAtLastError());
+
+    // allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
+    // printf("numHMatrixLevels: %d\n", hierarchicalMatrix.numLevels);
 
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct, d_denseMatrix);
     gpuErrchk(cudaPeekAtLastError());

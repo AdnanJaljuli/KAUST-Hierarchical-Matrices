@@ -2,19 +2,29 @@
 #ifndef __HELPERS_HIERARCHICALMATRIX_H__
 #define __HELPERS_HIERARCHICALMATRIX_H__
 
-__global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize) {
-    d_UPtrs[0] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[4]*segmentSize];
-    d_VPtrs[0] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[4]*segmentSize];
-    d_UPtrs[1] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[8]*segmentSize];
-    d_VPtrs[1] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[8]*segmentSize];
+#include "hierarchicalMatrix.h"
+
+__global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize, int* tileIndices, int level) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < batchSize) {
+        if(blockIdx.y == 0) {
+            d_UPtrs[i] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[tileIndices[i]*4]*segmentSize];
+            printf("%d   %d\n", i, tileIndices[i]);
+        }
+        else {
+            d_VPtrs[i] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[tileIndices[i]*4]*segmentSize];
+        }
+    }
 }
 
-__global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize) {
-    d_scanRanksPtrs[0] = &d_scanRanks[0];
-    d_scanRanksPtrs[1] = &d_scanRanks[batchUnitSize*batchUnitSize];
+__global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize, int batchSize) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < batchSize) {
+        d_scanRanksPtrs[i] = &d_scanRanks[i*batchUnitSize*batchUnitSize];
+    }
 }
 
-__global__ void fillLRARAArrays(int batchSize, int maxRows, int maxCols, int* d_rowsBatch, int* d_colsBatch, int* d_LDABatch, int* d_LDBBatch){
+__global__ void fillLRARAArrays(int batchSize, int maxRows, int* d_rowsBatch, int* d_colsBatch, int* d_LDABatch, int* d_LDBBatch){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchSize){
         d_rowsBatch[i] = maxRows;
