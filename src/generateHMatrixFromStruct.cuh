@@ -42,6 +42,7 @@ __global__ void compareResults(double* denseMatrix, double* output, int size, do
 
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct, H2Opus_Real* d_denseMatrix) {
     for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
+        tolerance *= 2;
         // TODO: allocate outside the loop
         int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
         int batchSize = WAStruct.numTiles[level - 1];
@@ -73,7 +74,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
             cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + WAStruct.tileIndices[level - 1][batch]*batchUnitSize*batchUnitSize, d_scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
         }
         gpuErrchk(cudaPeekAtLastError());
-        printK <<< 1, 1 >>> (d_scanRanks, batchSize*batchUnitSize*batchUnitSize);
 
         int **d_scanRanksPtrs;
         cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
