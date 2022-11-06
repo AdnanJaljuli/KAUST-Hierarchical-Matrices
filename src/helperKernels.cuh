@@ -204,6 +204,7 @@ static __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
     return z;
 }
 
+// TODO: don't capitalize first letter
 static __host__ __device__ int IndextoMOIndex_h(int numSegments, int n){
     unsigned int i = n%numSegments;
     unsigned int j = n/numSegments;

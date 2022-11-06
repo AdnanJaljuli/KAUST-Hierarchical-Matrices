@@ -6,25 +6,36 @@ struct WeakAdmissibility {
     int** tileIndices;
 };
 
-void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct) {
+void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int numberOfInputPoints, unsigned int bucketSize) {
     // TODO: generalize on any n size
-    WAStruct.numTiles = (int*)malloc(2*sizeof(int));
-    WAStruct.numTiles[0] = 2;
-    WAStruct.numTiles[1] = 8;
-    WAStruct.tileIndices = (int**)malloc(2*sizeof(int*));
-    WAStruct.tileIndices[0] = (int*)malloc(2*sizeof(int));
-    WAStruct.tileIndices[1] = (int*)malloc(8*sizeof(int));
-    WAStruct.tileIndices[0][0] = 1;
-    WAStruct.tileIndices[0][1] = 2;
+    int numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+    WAStruct.numTiles = (int*)malloc((numLevels - 1)*sizeof(int));
+    WAStruct.tileIndices = (int**)malloc((numLevels - 1)*sizeof(int*));
+    
+    int dim = 2;
+    for(unsigned int level = 0; level < numLevels - 1; ++level) {
+        unsigned int numTiles = 1 << (level + 1);
+        WAStruct.numTiles[level] = numTiles;
+        
+        WAStruct.tileIndices[level] = (int*)malloc(numTiles*sizeof(int));
+        for(unsigned int j = 0; j < numTiles; ++j) {
+            int x;
+            if(j%2 == 0){
+                x = 1;
+            }
+            else{
+                x = -1;
+            }
+            unsigned int tileIndex = j*dim + j + x;
+            WAStruct.tileIndices[level][j + x] = IndextoMOIndex_h(dim, tileIndex);
+        }
+        for(unsigned int j = 0; j < numTiles; ++j) {
+            printf("%d ", WAStruct.tileIndices[level][j]);
+        }
+        printf("\n");
+        dim *= 2;
 
-    WAStruct.tileIndices[1][0] = 0;
-    WAStruct.tileIndices[1][1] = 1;
-    WAStruct.tileIndices[1][2] = 2;
-    WAStruct.tileIndices[1][3] = 3;
-    WAStruct.tileIndices[1][4] = 12;
-    WAStruct.tileIndices[1][5] = 13;
-    WAStruct.tileIndices[1][6] = 14;
-    WAStruct.tileIndices[1][7] = 15;
+    }
 }
 
 struct HMatrixLevel {
@@ -51,7 +62,7 @@ struct HMatrix {
 };
 
 void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned int numberOfInputPoints, unsigned int bucketSize) {
-    matrix.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+    
     cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
     matrix.levels = (HMatrixLevel*)malloc(matrix.numLevels*sizeof(HMatrixLevel));
 }
