@@ -9,7 +9,6 @@ __global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TL
     if(i < batchSize) {
         if(blockIdx.y == 0) {
             d_UPtrs[i] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*segmentSize];
-            printf("i: %d   tileIndex: %d\n", i, tileIndices[i]);
         }
         else {
             d_VPtrs[i] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*segmentSize];

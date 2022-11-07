@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
     #endif
+    // TODO: free H Matrix
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);
