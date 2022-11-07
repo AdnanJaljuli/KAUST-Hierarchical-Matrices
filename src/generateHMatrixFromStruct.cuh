@@ -9,9 +9,12 @@
 #include "kDTree.h"
 #include "TLRMatrix.h"
 
-void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct, H2Opus_Real* d_denseMatrix) {
+void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
+    WeakAdmissibility WAStruct;
+    allocateWeakAdmissibilityStruct(WAStruct, config.numberOfInputPoints, config.bucketSize);
     // TODO: break this code into smaller pieces and make it more readable
-    // TODO: allocate outside the loop
+    // TODO: allocate memory outside the loop
+    // TODO: use multistreaming
     for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
         tolerance *= 2;
         int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
@@ -34,7 +37,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         int *d_scanRanks;
         cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
 
-        // TODO: replace for loop with inclusiveSumByKey
+        // TODO: replace for loop with inclusiveSumByKey when using cuda/11
         for(unsigned int batch = 0; batch < batchSize; ++batch) {
             printf("batch index: %d\n", WAStruct.tileIndices[level - 1][batch]*batchUnitSize*batchUnitSize);
             void *d_temp_storage = NULL;
@@ -100,8 +103,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         // allocate HMatrix level
         allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
         gpuErrchk(cudaPeekAtLastError());
-
-        // TODO: free memory allocated OR allocate maximum memory outside loop
+        
+        // free memory
         cudaFree(d_UPtrs);
         cudaFree(d_VPtrs);
         cudaFree(d_tileIndices);
@@ -117,37 +120,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_A);
         cudaFree(d_B);
 
-        // TODO: check error in hierarchical matrix level
-
+        // TODO: check error in hierarchical matrix
     }
-
-    #if 0
-    // TODO: error checking
-    #if EXPAND_MATRIX
-    // launch a kernel that multiplies U by V
-    H2Opus_Real *d_expandedMatrix;
-    cudaMalloc((void**) &d_expandedMatrix, 2*64*64*sizeof(H2Opus_Real));
-    dim3 m_numBlocks(2, 2, 2);
-    dim3 m_numThreadsPerBlock(32, 32);
-    expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_APtrs, d_BPtrs, 64, d_expandedMatrix, d_ranks);
-    cudaDeviceSynchronize();
-    // lanch a kernel that checks the error
-    double *d_error, *d_tmp;
-    cudaMalloc((void**) &d_error, sizeof(double));
-    cudaMalloc((void**) &d_tmp, sizeof(double));
-    cudaMemset(d_error, 0, sizeof(double));
-    cudaMemset(d_tmp, 0, sizeof(double));
-    compareResults <<< m_numBlocks, m_numThreadsPerBlock >>> (d_denseMatrix, d_expandedMatrix, 128, d_error, d_tmp);
-    double h_error;
-    double h_tmp;
-    cudaMemcpy(&h_error, d_error, sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&h_tmp, d_tmp, sizeof(double), cudaMemcpyDeviceToHost);
-    printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
-    cudaFree(d_tmp);
-    cudaFree(d_error);
-    cudaDeviceSynchronize();
-    #endif
-    #endif
 }
 
 #endif
