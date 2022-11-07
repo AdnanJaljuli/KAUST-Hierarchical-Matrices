@@ -4,46 +4,16 @@
 
 #include "config.h"
 #include "counters.h"
-#include "generateHMatrixHelpers.cuh"
+#include "HMatrixHelpers.cuh"
 #include "hierarchicalMatrix.h"
 #include "kDTree.h"
 #include "TLRMatrix.h"
 
-__global__ void expandMatrix(H2Opus_Real **A, H2Opus_Real **B, int size, H2Opus_Real* output, int* ranks) {
-    unsigned int batch = blockIdx.z;
-    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
-    if(col < size && row < size) {
-        H2Opus_Real sum = 0;
-        for(unsigned int i = 0; i < ranks[0]; ++i) {
-            sum += A[batch][i*size + row]*B[batch][i*size + col];
-        }
-        output[batch*size*size + col*size + row] = sum;
-    }
-}
-
-__global__ void compareResults(double* denseMatrix, double* output, int size, double* error, double* tmp) {
-    unsigned int batch = blockIdx.z;
-    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
-    if(batch == 0) {
-        double x = denseMatrix[(col+64)*128 + row];
-        double y = output[col*64 + row];
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x - y)*(x - y));
-    }
-    else {
-        double x = denseMatrix[col*128 + 64 + row];
-        double y = output[batch*64*64 + col*64 + row];
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x - y)*(x - y));
-    }
-}
-
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct, H2Opus_Real* d_denseMatrix) {
+    // TODO: break this code into smaller pieces and make it more readable
+    // TODO: allocate outside the loop
     for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
         tolerance *= 2;
-        // TODO: allocate outside the loop
         int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
         int batchSize = WAStruct.numTiles[level - 1];
         printf("level: %d   batchSize: %d   bathcUnitSize: %d\n", level, batchSize, batchUnitSize);
@@ -51,11 +21,11 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         H2Opus_Real **d_UPtrs, **d_VPtrs;
         cudaMalloc((void**) &d_UPtrs, batchSize*sizeof(H2Opus_Real*));
         cudaMalloc((void**) &d_VPtrs, batchSize*sizeof(H2Opus_Real*));
-        
+
         int* d_tileIndices;
         cudaMalloc((void**) &d_tileIndices, WAStruct.numTiles[level - 1]*sizeof(int));
         cudaMemcpy(d_tileIndices, WAStruct.tileIndices[level], WAStruct.numTiles[level - 1]*sizeof(int), cudaMemcpyHostToDevice);
-        
+
         dim3 numThreadsPerBlock(1024);
         dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
         fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UPtrs, d_VPtrs, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, d_tileIndices, level);
@@ -66,12 +36,13 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
 
         // TODO: replace for loop with inclusiveSumByKey
         for(unsigned int batch = 0; batch < batchSize; ++batch) {
+            printf("batch index: %d\n", WAStruct.tileIndices[level - 1][batch]*batchUnitSize*batchUnitSize);
             void *d_temp_storage = NULL;
             size_t temp_storage_bytes = 0;
-            printf("batch index: %d\n", WAStruct.tileIndices[level - 1][batch]*4);
             cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + WAStruct.tileIndices[level - 1][batch]*batchUnitSize*batchUnitSize, d_scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
             cudaMalloc(&d_temp_storage, temp_storage_bytes);
             cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + WAStruct.tileIndices[level - 1][batch]*batchUnitSize*batchUnitSize, d_scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
+            cudaFree(d_temp_storage);
         }
         gpuErrchk(cudaPeekAtLastError());
 
@@ -124,11 +95,30 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
             tolerance, maxRows, maxCols, maxRank, 16, ARA_R, randState, 0, batchSize
         );
         assert(lr_ARA_return == 1);
-        printK <<< 1, 1 >>> (d_ranks, batchSize);
         gpuErrchk(cudaPeekAtLastError());
-        cudaDeviceSynchronize();
 
-        // TODO: copy back tiles to H matrix
+        // allocate HMatrix level
+        allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
+        gpuErrchk(cudaPeekAtLastError());
+
+        // TODO: free memory allocated OR allocate maximum memory outside loop
+        cudaFree(d_UPtrs);
+        cudaFree(d_VPtrs);
+        cudaFree(d_tileIndices);
+        cudaFree(d_scanRanks);
+        cudaFree(d_scanRanksPtrs);
+        cudaFree(d_ranks);
+        cudaFree(d_rowsBatch);
+        cudaFree(d_colsBatch);
+        cudaFree(d_LDABatch);
+        cudaFree(d_LDBBatch);
+        cudaFree(d_APtrs);
+        cudaFree(d_BPtrs);
+        cudaFree(d_A);
+        cudaFree(d_B);
+
+        // TODO: check error in hierarchical matrix level
+
     }
 
     #if 0
