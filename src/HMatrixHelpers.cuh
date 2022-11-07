@@ -2,7 +2,7 @@
 #ifndef __HELPERS_HIERARCHICALMATRIX_H__
 #define __HELPERS_HIERARCHICALMATRIX_H__
 
-#include "hierarchicalMatrix.h"
+#include "HMatrix.h"
 
 __global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize, int* tileIndices, int level) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
