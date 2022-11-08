@@ -37,8 +37,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaMalloc((void**) &d_VPtrs, batchSize*sizeof(H2Opus_Real*));
 
         int* d_tileIndices;
-        cudaMalloc((void**) &d_tileIndices, WAStruct.numTiles[level - 1]*sizeof(int));
-        cudaMemcpy(d_tileIndices, WAStruct.tileIndices[level], WAStruct.numTiles[level - 1]*sizeof(int), cudaMemcpyHostToDevice);
+        cudaMalloc((void**) &d_tileIndices, batchSize*sizeof(int));
+        cudaMemcpy(d_tileIndices, WAStruct.tileIndices[level], batchSize*sizeof(int), cudaMemcpyHostToDevice);
 
         dim3 numThreadsPerBlock(1024);
         dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
