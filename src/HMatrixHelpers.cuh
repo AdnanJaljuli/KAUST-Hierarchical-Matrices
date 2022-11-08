@@ -33,6 +33,40 @@ __global__ void fillLRARAArrays(int batchSize, int maxRows, int* d_rowsBatch, in
     }
 }
 
+__global__ void expandMatrix(H2Opus_Real **A, H2Opus_Real **B, int size, H2Opus_Real* output, int* ranks) {
+    unsigned int batch = blockIdx.z;
+    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+    if(col < size && row < size) {
+        H2Opus_Real sum = 0;
+        for(unsigned int i = 0; i < ranks[batch]; ++i) {
+            sum += A[batch][i*size + row]*B[batch][i*size + col];
+        }
+        output[batch*size*size + col*size + row] = sum;
+    }
+}
+
+__global__ void compareResults(unsigned int numberOfInputPoints, double* denseMatrix, double* output, int* tileIndices, int batchSize, int batchUnitSize, double* error, double* tmp) {
+    unsigned int batch = blockIdx.z;
+    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+
+    int diff;
+    if(batch%2 == 0) {
+        diff = 1;
+    }
+    else {
+        diff = -1;
+    }
+
+    if(col < batchUnitSize*32 && row < batchUnitSize*32) {
+        double x = denseMatrix[(col + batchUnitSize*32*(batch + diff))*numberOfInputPoints + batchUnitSize*32*batch + row];
+        double y = output[batch*batchUnitSize*32*batchUnitSize*32 + col*batchUnitSize*32 + row];
+        atomicAdd(tmp, x*x);
+        atomicAdd(error, (x - y)*(x - y));
+    }
+}
+
 __global__ void fillBatchSegments(int *batchSegments, int batchUnitSize, int batchSize) {
     unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i < batchSize*batchUnitSize*batchUnitSize) {
@@ -174,37 +208,6 @@ static __global__ void errorInHMatrix(int num_segments, int maxSegmentSize, int 
     H2Opus_Real y = expandedMatrix[block*maxRows*maxCols + col*maxRows + row];
     atomicAdd(d_tmp, x*x);
     atomicAdd(d_error, (x-y)*(x-y));
-}
-
-__global__ void expandMatrix(H2Opus_Real **A, H2Opus_Real **B, int size, H2Opus_Real* output, int* ranks) {
-    unsigned int batch = blockIdx.z;
-    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
-    if(col < size && row < size) {
-        H2Opus_Real sum = 0;
-        for(unsigned int i = 0; i < ranks[0]; ++i) {
-            sum += A[batch][i*size + row]*B[batch][i*size + col];
-        }
-        output[batch*size*size + col*size + row] = sum;
-    }
-}
-
-__global__ void compareResults(double* denseMatrix, double* output, int size, double* error, double* tmp) {
-    unsigned int batch = blockIdx.z;
-    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
-    if(batch == 0) {
-        double x = denseMatrix[(col+64)*128 + row];
-        double y = output[col*64 + row];
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x - y)*(x - y));
-    }
-    else {
-        double x = denseMatrix[col*128 + 64 + row];
-        double y = output[batch*64*64 + col*64 + row];
-        atomicAdd(tmp, x*x);
-        atomicAdd(error, (x - y)*(x - y));
-    }
 }
 
 #endif

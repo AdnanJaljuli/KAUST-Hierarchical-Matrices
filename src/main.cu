@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 
     #if EXPAND_MATRIX
     H2Opus_Real* d_denseMatrix;
-    // TODO: assert that this doesn't exceed memory limit
+    // TODO: assert that dense matrix doesn't exceed memory limit
     cudaMalloc((void**) &d_denseMatrix, kDTree.numSegments*kDTree.numSegments*kDTree.segmentSize*kDTree.segmentSize*sizeof(H2Opus_Real));
     generateDenseMatrix(config.numberOfInputPoints, kDTree.numSegments, kDTree.segmentSize, config.dimensionOfInputPoints, d_denseMatrix, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud);
     #endif
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     // Build hierarchical matrix
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
-
+    gpuErrchk(cudaPeekAtLastError())
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, d_denseMatrix);
     gpuErrchk(cudaPeekAtLastError());
 
@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
     #endif
+    
     // TODO: free H Matrix
 
     #if USE_COUNTERS

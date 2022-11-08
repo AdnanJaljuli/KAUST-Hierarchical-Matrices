@@ -205,6 +205,7 @@ static __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
 }
 
 // TODO: don't capitalize first letter
+// TODO: rename
 static __host__ __device__ int IndextoMOIndex_h(int numSegments, int n){
     unsigned int i = n%numSegments;
     unsigned int j = n/numSegments;
@@ -226,6 +227,7 @@ static __global__ void copyTilestoMO(int n, H2Opus_Real* toArray, H2Opus_Real* f
     }
 }
 
+// TODO: rename
 static __device__ uint32_t morton1(uint32_t x)
 {
     x = x & 0x55555555;

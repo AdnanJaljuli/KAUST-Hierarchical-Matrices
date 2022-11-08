@@ -14,6 +14,11 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     allocateWeakAdmissibilityStruct(WAStruct, numberOfInputPoints, bucketSize);
     
     magma_init();
+    kblasHandle_t kblasHandle;
+    kblasRandState_t randState;
+    kblasCreate(&kblasHandle);
+    kblasInitRandState(kblasHandle, &randState, 1<<15, 0);
+    kblasEnableMagma(kblasHandle);
     // TODO: break this code into smaller pieces and make it more readable
     // TODO: allocate memory outside the loop
     // TODO: use multistreaming
@@ -65,7 +70,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         int *d_LDABatch, *d_LDBBatch;
         H2Opus_Real *d_A, *d_B;
         H2Opus_Real **d_APtrs, **d_BPtrs;
-
         cudaMalloc((void**) &d_ranks, batchSize*sizeof(int));
         cudaMalloc((void**) &d_rowsBatch, batchSize*sizeof(int));
         cudaMalloc((void**) &d_colsBatch, batchSize*sizeof(int));
@@ -83,12 +87,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
 
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxRank, batchSize, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxRank, batchSize, 0);
-
-        kblasHandle_t kblasHandle;
-        kblasRandState_t randState;
-        kblasCreate(&kblasHandle);
-        kblasInitRandState(kblasHandle, &randState, 1<<15, 0);
-        kblasEnableMagma(kblasHandle);
         kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, maxCols, batchSize);
         kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, 32, batchSize);
         kblasAllocateWorkspace(kblasHandle);
@@ -105,7 +103,34 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
         gpuErrchk(cudaPeekAtLastError());
 
-        // free memory
+        // TODO: check error in hierarchical matrix
+        #if EXPAND_MATRIX
+        // expand H matrix level
+        H2Opus_Real *d_expandedMatrix;
+        cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
+        dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
+        dim3 m_numThreadsPerBlock(32, 32);
+        expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_APtrs, d_BPtrs, batchUnitSize*bucketSize, d_expandedMatrix, d_ranks);
+        cudaDeviceSynchronize();
+
+        // compare expanded H matrix level with dense matrix
+        double *d_error, *d_tmp;
+        cudaMalloc((void**) &d_error, sizeof(double));
+        cudaMalloc((void**) &d_tmp, sizeof(double));
+        cudaMemset(d_error, 0, sizeof(double));
+        cudaMemset(d_tmp, 0, sizeof(double));
+        compareResults <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, d_denseMatrix, d_expandedMatrix, WAStruct.tileIndices[level - 1], batchSize, batchUnitSize, d_error, d_tmp);
+        double h_error;
+        double h_tmp;
+        cudaMemcpy(&h_error, d_error, sizeof(double), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&h_tmp, d_tmp, sizeof(double), cudaMemcpyDeviceToHost);
+        printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+        cudaFree(d_tmp);
+        cudaFree(d_error);
+        cudaDeviceSynchronize();
+        #endif
+
+                // free memory
         cudaFree(d_UPtrs);
         cudaFree(d_VPtrs);
         cudaFree(d_tileIndices);
@@ -121,7 +146,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_A);
         cudaFree(d_B);
 
-        // TODO: check error in hierarchical matrix
     }
     // TODO: free WAStruct
 }
