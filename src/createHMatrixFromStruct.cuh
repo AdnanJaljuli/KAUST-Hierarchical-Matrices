@@ -26,6 +26,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
 
     for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
         int batchSize = WAStruct.numTiles[level - 1];
+        // int batchSize = 1;
         if(batchSize == 0) {
             continue;
         }
@@ -88,7 +89,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxRank, batchSize, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxRank, batchSize, 0);
         kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, maxCols, batchSize);
-        kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, 32, batchSize);
+        kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
         kblasAllocateWorkspace(kblasHandle);
 
         int lr_ARA_return = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, d_UPtrs, d_VPtrs, d_scanRanksPtrs,
@@ -100,7 +101,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         printK <<< 1, 1 >>> (d_ranks, batchSize);
 
         // allocate HMatrix level
-        allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
+        // allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
         gpuErrchk(cudaPeekAtLastError());
 
         // TODO: check error in hierarchical matrix
@@ -129,8 +130,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_error);
         cudaDeviceSynchronize();
         #endif
+        gpuErrchk(cudaPeekAtLastError());
 
-                // free memory
+        // free memory
         cudaFree(d_UPtrs);
         cudaFree(d_VPtrs);
         cudaFree(d_tileIndices);
@@ -145,6 +147,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_BPtrs);
         cudaFree(d_A);
         cudaFree(d_B);
+        gpuErrchk(cudaPeekAtLastError());
 
     }
     // TODO: free WAStruct

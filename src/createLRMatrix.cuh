@@ -90,7 +90,7 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
         int kblas_ara_return = kblas_ara_batch(
             kblasHandle, d_rowsBatch, d_colsBatch, d_MPtrs, d_LDMBatch, 
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks + segment*(kDTree.numSegments - 1),
-            tolerance, kDTree.segmentSize, kDTree.segmentSize, kDTree.segmentSize/2, 32, ARA_R, randState, 0, kDTree.numSegments - 1
+            tolerance, kDTree.segmentSize, kDTree.segmentSize, 16, 16, ARA_R, randState, 0, kDTree.numSegments - 1
         );
         assert(kblas_ara_return == 1);
         cudaDeviceSynchronize();
