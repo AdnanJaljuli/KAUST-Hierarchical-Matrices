@@ -50,26 +50,30 @@ struct HMatrixLevel {
     H2Opus_Real* V;
 };
 
-void allocateHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAdmissibility WAStruct, unsigned int level, H2Opus_Real* A, H2Opus_Real* B, int maxRows, int maxRank) {
-    // TODO: dont copy all of A and B to U and V. Instead, copy only rank*maxRows of each tile
+void allocateHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAdmissibility WAStruct, unsigned int level, H2Opus_Real *A, H2Opus_Real *B, int maxRows,int maxRank) {
     // TODO: make a double pointer array to U and V
     matrixLevel.numTiles = WAStruct.numTiles[level - 1];
-    // allocate U and V
-    cudaMalloc((void**) &matrixLevel.U, maxRows*maxRank*matrixLevel.numTiles*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &matrixLevel.V, maxRows*maxRank*matrixLevel.numTiles*sizeof(H2Opus_Real));
-
-    // copy A and B to U and V
-    cudaMemcpy(matrixLevel.U, A, maxRows*maxRank*matrixLevel.numTiles*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(matrixLevel.V, B, maxRows*maxRank*matrixLevel.numTiles*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-
-    //  do a scan of the ranks
+    // scan ranks array
     cudaMalloc((void**) &matrixLevel.tileScanRanks, matrixLevel.numTiles*sizeof(int));
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
     cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks, matrixLevel.tileScanRanks, matrixLevel.numTiles);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks, matrixLevel.tileScanRanks, matrixLevel.numTiles);
-    
+
+    int *scanRanks = (int*)malloc(matrixLevel.numTiles*sizeof(int));
+    cudaMemcpy(scanRanks, matrixLevel.tileScanRanks, matrixLevel.numTiles*sizeof(int), cudaMemcpyDeviceToHost);
+    // allocate U and V
+    cudaMalloc((void**) &matrixLevel.U, scanRanks[matrixLevel.numTiles - 1]*maxRows*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &matrixLevel.V, scanRanks[matrixLevel.numTiles - 1]*maxRows*sizeof(H2Opus_Real));
+    // copy A and B to U and V
+
+    for(unsigned int tile = 0; tile < matrixLevel.numTiles; ++tile) {
+        int tileRank = (tile == 0) ? scanRanks[tile] : scanRanks[tile] - scanRanks[tile - 1];
+        cudaMemcpy(&matrixLevel.U[scanRanks[tile] - tileRank], &A[tile*maxRows*maxRank], tileRank*maxRows*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+        cudaMemcpy(&matrixLevel.V[scanRanks[tile] - tileRank], &B[tile*maxRows*maxRank], tileRank*maxRows*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+    }
+
     // copy tile indices from WAStruct to here
     cudaMalloc((void**) &matrixLevel.tileIndices, matrixLevel.numTiles*sizeof(int));
     cudaMemcpy(matrixLevel.tileIndices, WAStruct.tileIndices[level - 1], matrixLevel.numTiles*sizeof(int), cudaMemcpyHostToDevice);

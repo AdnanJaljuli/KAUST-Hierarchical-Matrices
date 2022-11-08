@@ -101,10 +101,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         printK <<< 1, 1 >>> (d_ranks, batchSize);
 
         // allocate HMatrix level
-        // allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
+        allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
         gpuErrchk(cudaPeekAtLastError());
 
-        // TODO: check error in hierarchical matrix
         #if EXPAND_MATRIX
         // expand H matrix level
         H2Opus_Real *d_expandedMatrix;
@@ -113,7 +112,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         dim3 m_numThreadsPerBlock(32, 32);
         expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_APtrs, d_BPtrs, batchUnitSize*bucketSize, d_expandedMatrix, d_ranks);
         cudaDeviceSynchronize();
-
         // compare expanded H matrix level with dense matrix
         double *d_error, *d_tmp;
         cudaMalloc((void**) &d_error, sizeof(double));
