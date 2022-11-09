@@ -4,7 +4,7 @@
 #include "createLRMatrix.cuh"
 #include "expandMatrix.cuh"
 #include "helperFunctions.cuh"
-// #include "createHMatrixFromStruct.cuh"
+#include "createHMatrixFromStruct.cuh"
 #include "kblas.h"
 #include "kDTree.h"
 #include "kDTreeConstruction.cuh"
@@ -23,6 +23,7 @@
 using namespace std;
 
 // TODO: debug dealing with non-powers of two
+// TODO: add counters for functions in main
 int main(int argc, char *argv[]) {
 
     cudaDeviceSynchronize();
@@ -83,7 +84,7 @@ int main(int argc, char *argv[]) {
     #endif
     gpuErrchk(cudaPeekAtLastError());
 
-    #if 0
+    #if 1
     // Build hierarchical matrix
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);

@@ -9,28 +9,28 @@
 #include "kDTree.h"
 #include "TLRMatrix.h"
 
+// TODO: break this code into smaller pieces and make it more readable
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
+    
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct, numberOfInputPoints, bucketSize);
-    
+
     magma_init();
     kblasHandle_t kblasHandle;
     kblasRandState_t randState;
     kblasCreate(&kblasHandle);
     kblasInitRandState(kblasHandle, &randState, 1<<15, 0);
     kblasEnableMagma(kblasHandle);
-    // TODO: break this code into smaller pieces and make it more readable
     // TODO: allocate memory outside the loop
     // TODO: use multistreaming
-    // TODO: ask what to do with tolerance as we go up the hierarchy?
 
     for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
         int batchSize = WAStruct.numTiles[level - 1];
-        // int batchSize = 1;
         if(batchSize == 0) {
             continue;
         }
         int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
+        tolerance *= 2;
 
         // preprocessing
         H2Opus_Real **d_UPtrs, **d_VPtrs;
