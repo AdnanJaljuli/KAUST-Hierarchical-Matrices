@@ -1,16 +1,49 @@
 
-USE_COUNTERS=0
-EXPAND_MATRIX=0 # //TODO: rename
-DEFS = -DUSE_COUNTERS=$(USE_COUNTERS)
-DEFS += -DEXPAND_MATRIX=$(EXPAND_MATRIX)
+CC = nvcc
 
-NVCC_FLAGS = -O3 -G -g -maxrregcount=32 -w -rdc=true -gencode arch=compute_70,code=sm_70 -std=c++11 -I/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1/include -I"/apps/sw/cub-1.8.0" -I/scratch/7701501-aaj35/lr-kblas-gpu/include -L /apps/sw/cuda/cuda_10.1.168_418.67/lib64 -lcuda -lcurand -lcusolver -L /apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1/lib/ -lmagma_sparse -lmagma /scratch/7701501-aaj35/lr-kblas-gpu/lib/libkblas-gpu.a -L /apps/sw/openblas-0.3.13-gcc-7.2.0-dynamic-arch/lib64 -lopenblas -lcublas -L"../../thrust" -lcudadevrt
+# specify the gpu architecture (volta, ampere)
+GPU_ARCH = ampere
+ifeq (${GPU_ARCH}, volta)
+	NVOPTS = arch=compute_70,code=sm_70
+else ifeq (${GPU_ARCH}, ampere)
+	NVOPTS = arch=compute_75,code=sm_75
+endif
 
-output: main.o
-	nvcc $(NVCC_FLAGS) main.o -o output
+NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
+DEBUG_FLAGS = -g -G -lineinfo
+
+INC = -I/opt/ecrc/spack-modules/spack/opt/spack/linux-ubuntu18.04-sandybridge/gcc-7.5.0/magma-2.6.1-q7xz6egxrpucofghryjerq743sv2oeff/include
+# INC += -I/apps/sw/cub-1.8.0
+INC += -I/home/jaljula/kblas-gpu/include
+
+LINK = -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/cuda/11.5.0/gcc-7.5.0/syen6pj6ss3cw66zlj4wkfhtixh5i4ei/lib64
+LINK += -L/opt/ecrc/spack-modules/spack/opt/spack/linux-ubuntu18.04-sandybridge/gcc-7.5.0/magma-2.6.1-q7xz6egxrpucofghryjerq743sv2oeff/lib
+LINK += -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/openblas/0.3.12/gcc-7.5.0/t2ymetzabwriavmrtcwpsc5vd77xe4bg/lib
+LINK += -L/home/jaljula/kblas-gpu/lib
+# LINK += -L/home/jaljula/thrust
+
+LIB = -lcublas 
+LIB += -lcudadevrt
+LIB += -lcuda
+LIB += -lcurand
+LIB += -lcusolver 
+LIB += -lkblas-gpu
+LIB += -lmagma_sparse
+LIB += -lmagma
+LIB += -lopenblas
+
+OBJS = main.o
+
+USE_COUNTERS = 0
+EXPAND_MATRIX = 0
+DEFS = -DUSE_COUNTERS = $(USE_COUNTERS)
+DEFS += -DEXPAND_MATRIX = $(EXPAND_MATRIX)
+
+output: $(OBJS)
+	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LINK) $(LIB) main.o -o output
 
 main.o: main.cu
-	nvcc -c $(NVCC_FLAGS) $(DEFS) main.cu
+	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) main.cu
 
 clean:
-	rm -fv *.o output
+	rm -fv *.o output *.csv

@@ -4,7 +4,7 @@
 #include "createLRMatrix.cuh"
 #include "expandMatrix.cuh"
 #include "helperFunctions.cuh"
-#include "createHMatrixFromStruct.cuh"
+// #include "createHMatrixFromStruct.cuh"
 #include "kblas.h"
 #include "kDTree.h"
 #include "kDTreeConstruction.cuh"
@@ -83,12 +83,14 @@ int main(int argc, char *argv[]) {
     #endif
     gpuErrchk(cudaPeekAtLastError());
 
+    #if 0
     // Build hierarchical matrix
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
     gpuErrchk(cudaPeekAtLastError())
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, d_denseMatrix);
     gpuErrchk(cudaPeekAtLastError());
+    #endif
 
     cudaFreeKDTree(kDTree);
     cudaFreeMatrix(mortonOrderedMatrix);
