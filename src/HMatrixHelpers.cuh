@@ -33,6 +33,24 @@ __global__ void fillLRARAArrays(int batchSize, int maxRows, int* d_rowsBatch, in
     }
 }
 
+void generateScanRanks(int batchSize, int batchUnitSize, int *ranks, int *scanRanks, int **scanRanksPtrs, int *levelTileIndices) {
+    // loop over and do inclusiveSum
+    // TODO: think about replacing this with a single inclusiveSumByKey thats called before the for loop
+    for(unsigned int batch = 0; batch < batchSize; ++batch) {
+        void *d_temp_storage = NULL;
+        size_t temp_storage_bytes = 0;
+        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks + levelTileIndices[batch]*batchUnitSize*batchUnitSize, scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
+        cudaMalloc(&d_temp_storage, temp_storage_bytes);
+        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks + levelTileIndices[batch]*batchUnitSize*batchUnitSize, scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
+        cudaFree(d_temp_storage);
+    }
+
+    // fillScanRanksPtrs
+    unsigned int numThreadsPerBlock = 1024;
+    unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillScanRankPtrs <<< numBlocks, numThreadsPerBlock >>> (scanRanksPtrs, scanRanks, batchUnitSize, batchSize);
+}
+
 __global__ void expandMatrix(H2Opus_Real **A, H2Opus_Real **B, int size, H2Opus_Real* output, int* ranks) {
     unsigned int batch = blockIdx.z;
     unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;

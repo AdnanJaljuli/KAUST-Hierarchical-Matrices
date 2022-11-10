@@ -30,9 +30,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
             continue;
         }
         int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
-        // tolerance *= 2;
 
         // preprocessing
+        // TODO: combine d_UPtrs and d_VPtrs into one struct
         H2Opus_Real **d_UPtrs, **d_VPtrs;
         cudaMalloc((void**) &d_UPtrs, batchSize*sizeof(H2Opus_Real*));
         cudaMalloc((void**) &d_VPtrs, batchSize*sizeof(H2Opus_Real*));
@@ -45,24 +45,12 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
         fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UPtrs, d_VPtrs, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, d_tileIndices, level);
 
-        // TODO: replace for loop with inclusiveSumByKey when using cuda/11
+        // scan the ranks array
         int *d_scanRanks;
         cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
-        for(unsigned int batch = 0; batch < batchSize; ++batch) {
-            void *d_temp_storage = NULL;
-            size_t temp_storage_bytes = 0;
-            cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + WAStruct.tileIndices[level - 1][batch]*batchUnitSize*batchUnitSize, d_scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
-            cudaMalloc(&d_temp_storage, temp_storage_bytes);
-            cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, mortonOrderedMatrix.blockRanks + WAStruct.tileIndices[level - 1][batch]*batchUnitSize*batchUnitSize, d_scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
-            cudaFree(d_temp_storage);
-        }
-
         int **d_scanRanksPtrs;
         cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
-        numThreadsPerBlock.x = 1024;
-        numBlocks.x = (batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x;
-        numBlocks.y = 1;
-        fillScanRankPtrs <<< numBlocks, numThreadsPerBlock >>> (d_scanRanksPtrs, d_scanRanks, batchUnitSize, batchSize);
+        generateScanRanks(batchSize, batchUnitSize, mortonOrderedMatrix.blockRanks, d_scanRanks, d_scanRanksPtrs, WAStruct.tileIndices[level - 1]);
 
         int maxRows = batchUnitSize*bucketSize;
         int maxCols = maxRows;
@@ -99,7 +87,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         assert(lr_ARA_return == 1);
 
         // allocate HMatrix level
-        allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
+        allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
 
         #if EXPAND_MATRIX
         // expand H matrix level

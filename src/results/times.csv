@@ -1,1 +1,4 @@
 n, bucket size, dimension, epsilon, index map construction time, k sum, input matrix generation time, GEMV time, Dense GEMV time, GEMM time, dense GEMM time, total time
+312230.406250, 
+315632.718750, 
+310845.281250, 
