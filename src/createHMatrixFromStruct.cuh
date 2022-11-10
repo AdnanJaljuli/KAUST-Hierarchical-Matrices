@@ -36,21 +36,14 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaMalloc((void**) &d_tileIndices, batchSize*sizeof(int));
         cudaMemcpy(d_tileIndices, WAStruct.tileIndices[level], batchSize*sizeof(int), cudaMemcpyHostToDevice);
 
-        // TODO: combine d_UPtrs and d_VPtrs into one struct
-        // H2Opus_Real **d_UPtrs, **d_VPtrs;
-        // cudaMalloc((void**) &d_UPtrs, batchSize*sizeof(H2Opus_Real*));
-        // cudaMalloc((void**) &d_VPtrs, batchSize*sizeof(H2Opus_Real*));
-
-        // dim3 numThreadsPerBlock(1024);
-        // dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
-        // fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UPtrs, d_VPtrs, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, d_tileIndices, level);
+        // pointers to level tiles in U and V
         LevelTilesPtrs tilePtrs;
         allocateAndFillLevelTilesPtrs(batchSize, batchUnitSize, segmentSize, level, d_tileIndices, tilePtrs, mortonOrderedMatrix);
 
         // scan the ranks array
         int *d_scanRanks;
-        cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
         int **d_scanRanksPtrs;
+        cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
         cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
         generateScanRanks(batchSize, batchUnitSize, mortonOrderedMatrix.blockRanks, d_scanRanks, d_scanRanksPtrs, WAStruct.tileIndices[level - 1]);
 
@@ -82,11 +75,11 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
         kblasAllocateWorkspace(kblasHandle);
 
-        int lr_ARA_return = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, tilePtrs.U, tilePtrs.V, d_scanRanksPtrs,
+        int LRARAReturnVal = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, tilePtrs.U, tilePtrs.V, d_scanRanksPtrs,
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks,
             tolerance, maxRows, maxCols, maxRank, 16, ARA_R, randState, 0, batchSize
         );
-        assert(lr_ARA_return == 1);
+        assert(LRARAReturnVal == 1);
 
         // allocate HMatrix level
         allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
@@ -118,8 +111,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         gpuErrchk(cudaPeekAtLastError());
 
         // free memory
-        // cudaFree(d_UPtrs);
-        // cudaFree(d_VPtrs);
+        freeLevelTilesPtrs(tilePtrs);
         cudaFree(d_tileIndices);
         cudaFree(d_scanRanks);
         cudaFree(d_scanRanksPtrs);

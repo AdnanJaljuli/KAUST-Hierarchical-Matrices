@@ -30,6 +30,11 @@ void allocateAndFillLevelTilesPtrs(int batchSize, int batchUnitSize, int segment
     fillBatchPtrs <<< numBlocks, numThreadsPerBlock >>> (tilePtrs.U, tilePtrs.V, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, tileIndices, level);
 }
 
+void freeLevelTilesPtrs(LevelTilesPtrs tilePtrs) {
+    cudaFree(tilePtrs.U);
+    cudaFree(tilePtrs.V);
+}
+
 __global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize, int batchSize) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchSize) {
