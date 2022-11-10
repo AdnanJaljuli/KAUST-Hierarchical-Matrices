@@ -38,8 +38,12 @@ void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int n
     }
 }
 
-void freeWeakAdmissbilityStruct() {
-    // TODO
+void freeWeakAdmissbilityStruct(WeakAdmissibility WAStruct) {
+    free(WAStruct.numTiles);
+    for(unsigned int i = 0; i < WAStruct.numLevels - 1; ++i) {
+        free(WAStruct.tileIndices[i]);
+    }
+    free(WAStruct.tileIndices);
 }
 
 struct HMatrixLevel {

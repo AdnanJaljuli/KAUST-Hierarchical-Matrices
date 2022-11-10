@@ -4,7 +4,7 @@
 
 #include "HMatrix.h"
 
-__global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize, int* tileIndices, int level) {
+__global__ void fillBatchPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize, int* tileIndices, int level) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchSize) {
         if(blockIdx.y == 0) {
@@ -14,6 +14,20 @@ __global__ void fillBatchedPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TL
             d_VPtrs[i] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*segmentSize];
         }
     }
+}
+
+struct LevelTilesPtrs {
+    H2Opus_Real **U;
+    H2Opus_Real **V;
+};
+
+void allocateAndFillLevelTilesPtrs(int batchSize, int batchUnitSize, int segmentSize, int level, int *tileIndices, LevelTilesPtrs &tilePtrs, TLR_Matrix mortonOrderedMatrix) {
+    cudaMalloc((void**) &tilePtrs.U, batchSize*sizeof(H2Opus_Real*));
+    cudaMalloc((void**) &tilePtrs.V, batchSize*sizeof(H2Opus_Real*));
+
+    dim3 numThreadsPerBlock(1024);
+    dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
+    fillBatchPtrs <<< numBlocks, numThreadsPerBlock >>> (tilePtrs.U, tilePtrs.V, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, tileIndices, level);
 }
 
 __global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize, int batchSize) {

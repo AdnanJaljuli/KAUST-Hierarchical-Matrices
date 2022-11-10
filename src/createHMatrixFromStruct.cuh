@@ -32,18 +32,20 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
 
         // preprocessing
-        // TODO: combine d_UPtrs and d_VPtrs into one struct
-        H2Opus_Real **d_UPtrs, **d_VPtrs;
-        cudaMalloc((void**) &d_UPtrs, batchSize*sizeof(H2Opus_Real*));
-        cudaMalloc((void**) &d_VPtrs, batchSize*sizeof(H2Opus_Real*));
-
         int* d_tileIndices;
         cudaMalloc((void**) &d_tileIndices, batchSize*sizeof(int));
         cudaMemcpy(d_tileIndices, WAStruct.tileIndices[level], batchSize*sizeof(int), cudaMemcpyHostToDevice);
 
-        dim3 numThreadsPerBlock(1024);
-        dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
-        fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UPtrs, d_VPtrs, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, d_tileIndices, level);
+        // TODO: combine d_UPtrs and d_VPtrs into one struct
+        // H2Opus_Real **d_UPtrs, **d_VPtrs;
+        // cudaMalloc((void**) &d_UPtrs, batchSize*sizeof(H2Opus_Real*));
+        // cudaMalloc((void**) &d_VPtrs, batchSize*sizeof(H2Opus_Real*));
+
+        // dim3 numThreadsPerBlock(1024);
+        // dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
+        // fillBatchedPtrs <<< numBlocks, numThreadsPerBlock >>> (d_UPtrs, d_VPtrs, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, d_tileIndices, level);
+        LevelTilesPtrs tilePtrs;
+        allocateAndFillLevelTilesPtrs(batchSize, batchUnitSize, segmentSize, level, d_tileIndices, tilePtrs, mortonOrderedMatrix);
 
         // scan the ranks array
         int *d_scanRanks;
@@ -69,8 +71,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaMalloc((void**) &d_A, batchSize*maxRows*maxRank*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_B, batchSize*maxRows*maxRank*sizeof(H2Opus_Real));
 
-        numThreadsPerBlock.x = 1024;
-        numBlocks.x = (batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x;
+        unsigned int numThreadsPerBlock = 1024;
+        unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillLRARAArrays <<< numBlocks, numThreadsPerBlock >>> (batchSize, maxRows, d_rowsBatch, d_colsBatch, d_LDABatch, d_LDBBatch);
         gpuErrchk(cudaPeekAtLastError());
 
@@ -80,7 +82,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
         kblasAllocateWorkspace(kblasHandle);
 
-        int lr_ARA_return = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, d_UPtrs, d_VPtrs, d_scanRanksPtrs,
+        int lr_ARA_return = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, tilePtrs.U, tilePtrs.V, d_scanRanksPtrs,
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks,
             tolerance, maxRows, maxCols, maxRank, 16, ARA_R, randState, 0, batchSize
         );
@@ -116,8 +118,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         gpuErrchk(cudaPeekAtLastError());
 
         // free memory
-        cudaFree(d_UPtrs);
-        cudaFree(d_VPtrs);
+        // cudaFree(d_UPtrs);
+        // cudaFree(d_VPtrs);
         cudaFree(d_tileIndices);
         cudaFree(d_scanRanks);
         cudaFree(d_scanRanksPtrs);
@@ -132,6 +134,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_B);
     }
     // TODO: free WAStruct
+    freeWeakAdmissbilityStruct(WAStruct);
 }
 
 #endif
