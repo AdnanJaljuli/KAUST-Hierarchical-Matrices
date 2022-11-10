@@ -30,7 +30,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
             continue;
         }
         int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
-        tolerance *= 2;
+        // tolerance *= 2;
 
         // preprocessing
         H2Opus_Real **d_UPtrs, **d_VPtrs;
