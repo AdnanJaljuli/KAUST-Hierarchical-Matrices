@@ -15,10 +15,10 @@ DEBUG_FLAGS = -g -G -lineinfo
 INC = -I/opt/ecrc/spack-modules/spack/opt/spack/linux-ubuntu18.04-sandybridge/gcc-7.5.0/magma-2.6.1-q7xz6egxrpucofghryjerq743sv2oeff/include
 INC += -I/home/jaljula/lr-kblas-gpu/include
 
-LINK = -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/cuda/11.5.0/gcc-7.5.0/syen6pj6ss3cw66zlj4wkfhtixh5i4ei/lib64
-LINK += -L/opt/ecrc/spack-modules/spack/opt/spack/linux-ubuntu18.04-sandybridge/gcc-7.5.0/magma-2.6.1-q7xz6egxrpucofghryjerq743sv2oeff/lib
-LINK += -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/openblas/0.3.12/gcc-7.5.0/t2ymetzabwriavmrtcwpsc5vd77xe4bg/lib
-LINK += -L/home/jaljula/lr-kblas-gpu/lib
+LIB_DIR = -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/cuda/11.5.0/gcc-7.5.0/syen6pj6ss3cw66zlj4wkfhtixh5i4ei/lib64
+LIB_DIR += -L/opt/ecrc/spack-modules/spack/opt/spack/linux-ubuntu18.04-sandybridge/gcc-7.5.0/magma-2.6.1-q7xz6egxrpucofghryjerq743sv2oeff/lib
+LIB_DIR += -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/openblas/0.3.12/gcc-7.5.0/t2ymetzabwriavmrtcwpsc5vd77xe4bg/lib
+LIB_DIR += -L/home/jaljula/lr-kblas-gpu/lib
 
 LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse -lmagma -lopenblas
 
@@ -30,7 +30,7 @@ DEFS += -DEXPAND_MATRIX=$(EXPAND_MATRIX)
 OBJS = main.o
 
 output: $(OBJS)
-	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LINK) $(LIB) main.o -o output
+	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LIB_DIR) $(LIB) main.o -o output
 
 main.o: main.cu
 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) main.cu

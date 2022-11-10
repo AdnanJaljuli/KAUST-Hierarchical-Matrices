@@ -97,12 +97,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
             tolerance, maxRows, maxCols, maxRank, 16, ARA_R, randState, 0, batchSize
         );
         assert(lr_ARA_return == 1);
-        gpuErrchk(cudaPeekAtLastError());
-        printK <<< 1, 1 >>> (d_ranks, batchSize);
 
         // allocate HMatrix level
         allocateHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
-        gpuErrchk(cudaPeekAtLastError());
 
         #if EXPAND_MATRIX
         // expand H matrix level
@@ -145,8 +142,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_BPtrs);
         cudaFree(d_A);
         cudaFree(d_B);
-        gpuErrchk(cudaPeekAtLastError());
-
     }
     // TODO: free WAStruct
 }
