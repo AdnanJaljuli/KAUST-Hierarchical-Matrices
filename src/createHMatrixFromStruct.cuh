@@ -4,6 +4,7 @@
 
 #include "config.h"
 #include "counters.h"
+#include "expandMatrix.cuh"
 #include "HMatrixHelpers.cuh"
 #include "HMatrix.h"
 #include "kDTree.h"
@@ -83,8 +84,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         // allocate HMatrix level
         allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
 
+        // TODO: move the Hmatrix error checking to outside this file
         #if EXPAND_MATRIX
-        checkErrorInHMatrix(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, d_APtrs, d_BPtrs, d_ranks, d_denseMatrix, WAStruct.tileIndices[level - 1]);
+        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix.levels[level - 1], d_denseMatrix);
         #endif
 
         // free memory

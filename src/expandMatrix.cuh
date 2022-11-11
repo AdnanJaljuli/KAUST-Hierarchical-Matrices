@@ -4,11 +4,12 @@
 
 #include <assert.h>
 #include <ctype.h>
-// #include <cub/cub.cuh>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
+
+#include "HMatrix.h"
 
 #include <curand_kernel.h>
 #include <thrust/binary_search.h>
@@ -72,14 +73,19 @@ static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, 
     cudaFree(d_expandedMatrix);
 }
 
-__global__ void expandHMatrix(H2Opus_Real **A, H2Opus_Real **B, int size, H2Opus_Real* output, int* ranks) {
+__global__ void expandHMatrix(HMatrixLevel matrixLevel, int size, H2Opus_Real* output, int tileSize) {
     unsigned int batch = blockIdx.z;
     unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+    
     if(col < size && row < size) {
         H2Opus_Real sum = 0;
-        for(unsigned int i = 0; i < ranks[batch]; ++i) {
-            sum += A[batch][i*size + row]*B[batch][i*size + col];
+        int tileRank = (batch == 0) ? matrixLevel.tileScanRanks[batch] : matrixLevel.tileScanRanks[batch] - matrixLevel.tileScanRanks[batch - 1];
+        int tileOffset = (batch == 0) ? 0 : matrixLevel.tileScanRanks[batch - 1];
+        tileOffset *= tileSize;
+        for(unsigned int i = 0; i < tileRank; ++i) {
+            // sum += A[batch][i*size + row]*B[batch][i*size + col];
+            sum += matrixLevel.U[tileOffset + i*size + row]*matrixLevel.V[tileOffset + i*size + row];
         }
         output[batch*size*size + col*size + row] = sum;
     }
@@ -106,15 +112,15 @@ __global__ void errorInHMatrix(unsigned int numberOfInputPoints, double* denseMa
     }
 }
 
-static void checkErrorInHMatrix(int numberOfInputPoints, int batchSize, int batchUnitSize, int bucketSize, H2Opus_Real **APtrs, H2Opus_Real** BPtrs, int *ranks, H2Opus_Real *denseMatrix, int *tileIndices) {
+static void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchUnitSize, int bucketSize, HMatrixLevel matrixLevel, H2Opus_Real *denseMatrix) {
     // expand H matrix level
     H2Opus_Real *d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
     dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
     dim3 m_numThreadsPerBlock(32, 32);
-    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (APtrs, BPtrs, batchUnitSize*bucketSize, d_expandedMatrix, ranks);
+    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrixLevel, batchUnitSize*bucketSize, d_expandedMatrix, batchUnitSize*bucketSize);
     cudaDeviceSynchronize();
-    
+
     // compare expanded H matrix level with dense matrix
     H2Opus_Real* d_error;
     H2Opus_Real* d_tmp;
@@ -122,7 +128,7 @@ static void checkErrorInHMatrix(int numberOfInputPoints, int batchSize, int batc
     cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
     cudaMemset(d_error, 0, sizeof(H2Opus_Real));
     cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
-    errorInHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, denseMatrix, d_expandedMatrix, tileIndices, batchSize, batchUnitSize, d_error, d_tmp);
+    errorInHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, denseMatrix, d_expandedMatrix, matrixLevel.tileIndices, batchSize, batchUnitSize, d_error, d_tmp);
     H2Opus_Real h_error;
     H2Opus_Real h_tmp;
     cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);

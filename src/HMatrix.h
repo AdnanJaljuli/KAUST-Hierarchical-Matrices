@@ -4,7 +4,7 @@
 #include "HMatrixHelpers.cuh"
 
 struct HMatrixLevel {
-    int numTiles;
+    int numTiles, level;
     int* tileIndices;
     int* tileScanRanks;
     H2Opus_Real* U;
@@ -14,6 +14,8 @@ struct HMatrixLevel {
 void allocateAndCopyToHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAdmissibility WAStruct, unsigned int level, H2Opus_Real *A, H2Opus_Real *B, int maxRows,int maxRank) {
     // TODO: make a double pointer array to U and V
     matrixLevel.numTiles = WAStruct.numTiles[level - 1];
+    matrixLevel.level = level;
+    
     // scan ranks array
     cudaMalloc((void**) &matrixLevel.tileScanRanks, matrixLevel.numTiles*sizeof(int));
     void *d_temp_storage = NULL;
@@ -56,6 +58,7 @@ struct HMatrix {
 
 void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned int numberOfInputPoints, unsigned int bucketSize) {
     cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
+    // TODO: copy diagonal blocks from MOMatrix to HMatrix
     matrix.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
     matrix.levels = (HMatrixLevel*)malloc((matrix.numLevels - 2)*sizeof(HMatrixLevel));
 }
