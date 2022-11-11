@@ -71,7 +71,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
 
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxRank, batchSize, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxRank, batchSize, 0);
-        kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, maxCols, batchSize);
         kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
         kblasAllocateWorkspace(kblasHandle);
 
@@ -87,7 +86,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         #if EXPAND_MATRIX
         checkErrorInHMatrix(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, d_APtrs, d_BPtrs, d_ranks, d_denseMatrix, WAStruct.tileIndices[level - 1]);
         #endif
-        gpuErrchk(cudaPeekAtLastError());
 
         // free memory
         freeLevelTilesPtrs(tilePtrs);
