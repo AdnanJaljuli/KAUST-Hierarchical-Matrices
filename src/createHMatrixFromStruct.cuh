@@ -85,28 +85,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
 
         #if EXPAND_MATRIX
-        // expand H matrix level
-        H2Opus_Real *d_expandedMatrix;
-        cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
-        dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
-        dim3 m_numThreadsPerBlock(32, 32);
-        expandMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (d_APtrs, d_BPtrs, batchUnitSize*bucketSize, d_expandedMatrix, d_ranks);
-        cudaDeviceSynchronize();
-        // compare expanded H matrix level with dense matrix
-        double *d_error, *d_tmp;
-        cudaMalloc((void**) &d_error, sizeof(double));
-        cudaMalloc((void**) &d_tmp, sizeof(double));
-        cudaMemset(d_error, 0, sizeof(double));
-        cudaMemset(d_tmp, 0, sizeof(double));
-        compareResults <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, d_denseMatrix, d_expandedMatrix, WAStruct.tileIndices[level - 1], batchSize, batchUnitSize, d_error, d_tmp);
-        double h_error;
-        double h_tmp;
-        cudaMemcpy(&h_error, d_error, sizeof(double), cudaMemcpyDeviceToHost);
-        cudaMemcpy(&h_tmp, d_tmp, sizeof(double), cudaMemcpyDeviceToHost);
-        printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
-        cudaFree(d_tmp);
-        cudaFree(d_error);
-        cudaDeviceSynchronize();
+        checkErrorInHMatrix(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, d_APtrs, d_BPtrs, d_ranks, d_denseMatrix, WAStruct.tileIndices[level - 1]);
         #endif
         gpuErrchk(cudaPeekAtLastError());
 

@@ -16,7 +16,7 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-static __global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix matrix) {
+static __global__ void expandLRMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix matrix) {
     if(blockIdx.x == blockIdx.y) {
         expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = matrix.diagonal[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     }
@@ -37,7 +37,7 @@ static __global__ void expandMatrix(int num_segments, int maxSegmentSize, H2Opus
     }
 }
 
-static __global__ void errorInMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp) {
+static __global__ void errorInLRMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* denseMatrix, H2Opus_Real* expandedMatrix, H2Opus_Real* error, H2Opus_Real* tmp) {
     H2Opus_Real x = denseMatrix[(blockIdx.x*maxSegmentSize + threadIdx.x)*maxSegmentSize*num_segments + blockIdx.y*maxSegmentSize + threadIdx.y];
     H2Opus_Real y = expandedMatrix[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y];
     
@@ -51,7 +51,7 @@ static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, 
 
     dim3 mm_numBlocks(numSegments, numSegments);
     dim3 mm_numThreadsPerBlock(32, 32);
-    expandMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_expandedMatrix, matrix);
+    expandLRMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_expandedMatrix, matrix);
 
     H2Opus_Real* d_error;
     H2Opus_Real* d_tmp;
@@ -60,8 +60,69 @@ static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, 
     cudaMemset(d_error, 0, sizeof(H2Opus_Real));
     cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
 
-    errorInMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
+    errorInLRMatrix <<< mm_numBlocks, mm_numThreadsPerBlock >>> (numSegments, maxSegmentSize, d_denseMatrix, d_expandedMatrix, d_error, d_tmp);
 
+    H2Opus_Real h_error;
+    H2Opus_Real h_tmp;
+    cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+    cudaFree(d_tmp);
+    cudaFree(d_error);
+    cudaFree(d_expandedMatrix);
+}
+
+__global__ void expandHMatrix(H2Opus_Real **A, H2Opus_Real **B, int size, H2Opus_Real* output, int* ranks) {
+    unsigned int batch = blockIdx.z;
+    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+    if(col < size && row < size) {
+        H2Opus_Real sum = 0;
+        for(unsigned int i = 0; i < ranks[batch]; ++i) {
+            sum += A[batch][i*size + row]*B[batch][i*size + col];
+        }
+        output[batch*size*size + col*size + row] = sum;
+    }
+}
+
+__global__ void errorInHMatrix(unsigned int numberOfInputPoints, double* denseMatrix, double* output, int* tileIndices, int batchSize, int batchUnitSize, double* error, double* tmp) {
+    unsigned int batch = blockIdx.z;
+    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+
+    int diff;
+    if(batch%2 == 0) {
+        diff = 1;
+    }
+    else {
+        diff = -1;
+    }
+
+    if(col < batchUnitSize*32 && row < batchUnitSize*32) {
+        double x = denseMatrix[(col + batchUnitSize*32*(batch + diff))*numberOfInputPoints + batchUnitSize*32*batch + row];
+        double y = output[batch*batchUnitSize*32*batchUnitSize*32 + col*batchUnitSize*32 + row];
+        atomicAdd(tmp, x*x);
+        atomicAdd(error, (x - y)*(x - y));
+    }
+}
+
+static void checkErrorInHMatrix(int numberOfInputPoints, int batchSize, int batchUnitSize, int bucketSize, H2Opus_Real **APtrs, H2Opus_Real** BPtrs, int *ranks, H2Opus_Real *denseMatrix, int *tileIndices) {
+    // expand H matrix level
+    H2Opus_Real *d_expandedMatrix;
+    cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
+    dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
+    dim3 m_numThreadsPerBlock(32, 32);
+    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (APtrs, BPtrs, batchUnitSize*bucketSize, d_expandedMatrix, ranks);
+    cudaDeviceSynchronize();
+    
+    // compare expanded H matrix level with dense matrix
+    H2Opus_Real* d_error;
+    H2Opus_Real* d_tmp;
+    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
+    cudaMemset(d_error, 0, sizeof(H2Opus_Real));
+    cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
+    errorInHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, denseMatrix, d_expandedMatrix, tileIndices, batchSize, batchUnitSize, d_error, d_tmp);
     H2Opus_Real h_error;
     H2Opus_Real h_tmp;
     cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);

@@ -24,11 +24,12 @@ void allocateAndCopyToHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAd
 
     int *scanRanks = (int*)malloc(matrixLevel.numTiles*sizeof(int));
     cudaMemcpy(scanRanks, matrixLevel.tileScanRanks, matrixLevel.numTiles*sizeof(int), cudaMemcpyDeviceToHost);
+    
     // allocate U and V
     cudaMalloc((void**) &matrixLevel.U, scanRanks[matrixLevel.numTiles - 1]*maxRows*sizeof(H2Opus_Real));
     cudaMalloc((void**) &matrixLevel.V, scanRanks[matrixLevel.numTiles - 1]*maxRows*sizeof(H2Opus_Real));
+    
     // copy A and B to U and V
-
     for(unsigned int tile = 0; tile < matrixLevel.numTiles; ++tile) {
         int tileRank = (tile == 0) ? scanRanks[tile] : scanRanks[tile] - scanRanks[tile - 1];
         cudaMemcpy(&matrixLevel.U[scanRanks[tile] - tileRank], &A[tile*maxRows*maxRank], tileRank*maxRows*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
@@ -40,8 +41,11 @@ void allocateAndCopyToHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAd
     cudaMemcpy(matrixLevel.tileIndices, WAStruct.tileIndices[level - 1], matrixLevel.numTiles*sizeof(int), cudaMemcpyHostToDevice);
 }
 
-void freeHMatrixLevel(){
-    // TODO
+void freeHMatrixLevel(HMatrixLevel matrixLevel){
+    cudaFree(matrixLevel.tileIndices);
+    cudaFree(matrixLevel.tileScanRanks);
+    cudaFree(matrixLevel.U);
+    cudaFree(matrixLevel.V);
 }
 
 struct HMatrix {
@@ -57,7 +61,7 @@ void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned
 }
 
 void freeHMatrix(HMatrix &matrix) {
-    // TODO
+    // TODO: loop over hmatrix levels and free thtem
 }
 
 #endif
