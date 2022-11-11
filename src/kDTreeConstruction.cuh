@@ -14,7 +14,7 @@
 #include <string.h>
 #include <stddef.h>
 
-// TODO: continue cleaning the file
+// TODO: clean the file
 static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int bucketSize, KDTree &kDTree, H2Opus_Real* d_pointCloud) {
 
     int *d_dimxNSegmentOffsets;

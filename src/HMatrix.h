@@ -1,50 +1,7 @@
 #ifndef __HIERARCHICALMATRIX__
 #define __HIERARCHICALMATRIX__
 
-struct WeakAdmissibility {
-    int numLevels;
-    int* numTiles;
-    int** tileIndices;
-};
-
-void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int numberOfInputPoints, unsigned int bucketSize) {
-    // TODO: parallelize
-    WAStruct.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
-    WAStruct.numTiles = (int*)malloc((WAStruct.numLevels - 1)*sizeof(int));
-    WAStruct.tileIndices = (int**)malloc((WAStruct.numLevels - 1)*sizeof(int*));
-
-    unsigned int dim = 2;
-    for(unsigned int level = 0; level < WAStruct.numLevels - 1; ++level) {
-        unsigned int numTiles = 1 << (level + 1);
-        WAStruct.numTiles[level] = numTiles;
-        
-        WAStruct.tileIndices[level] = (int*)malloc(numTiles*sizeof(int));
-        for(unsigned int j = 0; j < numTiles; ++j) {
-            int x;
-            if(j%2 == 0) {
-                x = 1;
-            }
-            else {
-                x = -1;
-            }
-            unsigned int tileIndex = j*dim + j + x;
-            WAStruct.tileIndices[level][j + x] = IndextoMOIndex_h(dim, tileIndex);
-        }
-        for(unsigned int j = 0; j < numTiles; ++j) {
-            printf("%d ", WAStruct.tileIndices[level][j]);
-        }
-        printf("\n");
-        dim <<= 1;
-    }
-}
-
-void freeWeakAdmissbilityStruct(WeakAdmissibility WAStruct) {
-    free(WAStruct.numTiles);
-    for(unsigned int i = 0; i < WAStruct.numLevels - 1; ++i) {
-        free(WAStruct.tileIndices[i]);
-    }
-    free(WAStruct.tileIndices);
-}
+#include "HMatrixHelpers.cuh"
 
 struct HMatrixLevel {
     int numTiles;

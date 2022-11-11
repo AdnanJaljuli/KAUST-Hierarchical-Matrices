@@ -11,7 +11,7 @@
 
 // TODO: break this code into smaller pieces
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
-    
+
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct, numberOfInputPoints, bucketSize);
 
@@ -22,7 +22,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     kblasInitRandState(kblasHandle, &randState, 1<<15, 0);
     kblasEnableMagma(kblasHandle);
     // TODO: allocate memory outside the loop
-    // TODO: use multistreaming
+    // TODO: use multiple streams
 
     for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
         int batchSize = WAStruct.numTiles[level - 1];
@@ -125,7 +125,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_A);
         cudaFree(d_B);
     }
-    // TODO: free WAStruct
+
     freeWeakAdmissbilityStruct(WAStruct);
 }
 

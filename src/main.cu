@@ -82,16 +82,12 @@ int main(int argc, char *argv[]) {
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);
     #endif
-    gpuErrchk(cudaPeekAtLastError());
 
-    #if 1
     // Build hierarchical matrix
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
-    gpuErrchk(cudaPeekAtLastError())
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, d_denseMatrix);
     gpuErrchk(cudaPeekAtLastError());
-    #endif
 
     cudaFreeKDTree(kDTree);
     cudaFreeMatrix(mortonOrderedMatrix);
