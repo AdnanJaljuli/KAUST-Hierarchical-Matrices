@@ -86,7 +86,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
 
         // TODO: move the Hmatrix error checking to outside this file
         #if EXPAND_MATRIX
-        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix.levels[level - 1], d_denseMatrix, d_APtrs, d_BPtrs);
+        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix.levels[level - 1], d_denseMatrix);
         #endif
 
         // free memory
