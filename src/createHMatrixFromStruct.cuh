@@ -45,6 +45,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
         generateScanRanks(batchSize, batchUnitSize, mortonOrderedMatrix.blockRanks, d_scanRanks, d_scanRanksPtrs, WAStruct.tileIndices[level - 1]);
 
+        tolerance *= 2;
         int maxRows = batchUnitSize*bucketSize;
         int maxCols = maxRows;
         int maxRank = maxRows/2;
