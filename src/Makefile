@@ -7,10 +7,10 @@ else ifeq (${GPU_ARCH}, ampere)
 	NVOPTS = arch=compute_80,code=sm_80
 endif
 
-_KBLAS_ROOT_?=/scratch/7701501-aaj35/lr-kblas-gpu
-_MAGMA_ROOT_?=/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1
-_CUDA_ROOT_?=/apps/sw/cuda/cuda_10.1.168_418.67
-_OPENBLAS_ROOT_?=/apps/sw/openblas-0.3.13-gcc-7.2.0-dynamic-arch
+_KBLAS_ROOT_?=$(KBLAS_HOME)
+_MAGMA_ROOT_?=$(MAGMA_HOME)
+_CUDA_ROOT_?=$(CUDA_HOME)
+_OPENBLAS_ROOT_?=$(OPENBLAS_HOME)
 
 INC = -I$(_MAGMA_ROOT_)/include
 INC += -I$(_KBLAS_ROOT_)/include
