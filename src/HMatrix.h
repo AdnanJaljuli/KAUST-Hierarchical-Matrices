@@ -64,6 +64,10 @@ void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned
 }
 
 void freeHMatrix(HMatrix &matrix) {
+    cudaFree(matrix.diagonalBlocks);
+    for(unsigned int level = 1; level < matrix.numLevels - 1; ++level) {
+        freeHMatrixLevel(matrix.levels[level - 1]);
+    }
     // TODO: loop over hmatrix levels and free thtem
 }
 

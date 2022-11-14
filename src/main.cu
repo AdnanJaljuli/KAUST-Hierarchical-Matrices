@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     cudaFree(d_denseMatrix);
     #endif
     
-    // TODO: free H Matrix
+    freeHMatrix(hierarchicalMatrix);
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);
