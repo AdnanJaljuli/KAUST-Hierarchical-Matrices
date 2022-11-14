@@ -2,7 +2,7 @@
 CC = nvcc
 
 # specify the gpu architecture (volta, ampere)
-GPU_ARCH = ampere
+GPU_ARCH = volta
 ifeq (${GPU_ARCH}, volta)
 	NVOPTS = arch=compute_70,code=sm_70
 else ifeq (${GPU_ARCH}, ampere)
@@ -12,13 +12,14 @@ endif
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
 
-INC = -I/opt/ecrc/spack-modules/spack/opt/spack/linux-ubuntu18.04-sandybridge/gcc-7.5.0/magma-2.6.1-q7xz6egxrpucofghryjerq743sv2oeff/include
-INC += -I/home/jaljula/lr-kblas-gpu/include
+INC = -I/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1/include
+INC += -I/scratch/7701501-aaj35/lr-kblas-gpu/include
+INC += -I/apps/sw/cub-1.8.0
 
-LIB_DIR = -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/cuda/11.5.0/gcc-7.5.0/syen6pj6ss3cw66zlj4wkfhtixh5i4ei/lib64
-LIB_DIR += -L/opt/ecrc/spack-modules/spack/opt/spack/linux-ubuntu18.04-sandybridge/gcc-7.5.0/magma-2.6.1-q7xz6egxrpucofghryjerq743sv2oeff/lib
-LIB_DIR += -L/sw/workstations/apps/linux-ubuntu18.04-ivybridge/openblas/0.3.12/gcc-7.5.0/t2ymetzabwriavmrtcwpsc5vd77xe4bg/lib
-LIB_DIR += -L/home/jaljula/lr-kblas-gpu/lib
+LIB_DIR = -L/apps/sw/cuda/cuda_10.1.168_418.67/lib64
+LIB_DIR += -L/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1/lib
+LIB_DIR += -L/apps/sw/openblas-0.3.13-gcc-7.2.0-dynamic-arch/lib64
+LIB_DIR += -L/scratch/7701501-aaj35/lr-kblas-gpu/lib
 
 LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse -lmagma -lopenblas
 

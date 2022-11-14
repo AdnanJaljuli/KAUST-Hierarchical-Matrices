@@ -11,7 +11,7 @@
 #include "TLRMatrix.h"
 
 // TODO: break this code into smaller pieces
-void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
+void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix) {
 
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct, numberOfInputPoints, bucketSize);
@@ -83,11 +83,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
 
         // allocate HMatrix level
         allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
-
-        // TODO: move the Hmatrix error checking to outside this file
-        #if EXPAND_MATRIX
-        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix.levels[level - 1], d_denseMatrix);
-        #endif
 
         // free memory
         freeLevelTilesPtrs(tilePtrs);

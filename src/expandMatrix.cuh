@@ -138,6 +138,17 @@ static void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int
     cudaFree(d_expandedMatrix);
 }
 
+static void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
+    for(unsigned int level = hierarchicalMatrix.numLevels - 2; level > 0; --level) {
+        int batchSize = hierarchicalMatrix.levels[level - 1].numTiles;
+        if(batchSize == 0) {
+            continue;
+        }
+        int batchUnitSize = 1 << (hierarchicalMatrix.numLevels - (level + 1));
+        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix.levels[level - 1], d_denseMatrix);
+    }
+}
+
 static __global__ void generateDenseMatrix_kernel(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* denseMatrix, int* indexMap, int* offsetsSort, H2Opus_Real* pointCloud) {
     for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i){
         for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j){
