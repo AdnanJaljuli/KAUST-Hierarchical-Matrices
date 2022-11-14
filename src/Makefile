@@ -12,14 +12,19 @@ endif
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
 
-INC = -I/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1/include
-INC += -I/scratch/7701501-aaj35/lr-kblas-gpu/include
+_KBLAS_ROOT_?=/scratch/7701501-aaj35/lr-kblas-gpu
+_MAGMA_ROOT_?=/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1
+_CUDA_ROOT_?=/apps/sw/cuda/cuda_10.1.168_418.67
+_OPENBLAS_ROOT_?=/apps/sw/openblas-0.3.13-gcc-7.2.0-dynamic-arch
+
+INC = -I$(_MAGMA_ROOT_)/include
+INC += -I$(_KBLAS_ROOT_)/include
 INC += -I/apps/sw/cub-1.8.0
 
-LIB_DIR = -L/apps/sw/cuda/cuda_10.1.168_418.67/lib64
-LIB_DIR += -L/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1/lib
-LIB_DIR += -L/apps/sw/openblas-0.3.13-gcc-7.2.0-dynamic-arch/lib64
-LIB_DIR += -L/scratch/7701501-aaj35/lr-kblas-gpu/lib
+LIB_DIR = -L$(_CUDA_ROOT_)/lib64
+LIB_DIR += -L$(_MAGMA_ROOT_)/lib
+LIB_DIR += -L$(_OPENBLAS_ROOT_)/lib64
+LIB_DIR += -L$(_KBLAS_ROOT_)/lib
 
 LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse -lmagma -lopenblas
 
