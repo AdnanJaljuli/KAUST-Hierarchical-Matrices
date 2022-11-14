@@ -56,9 +56,9 @@ struct HMatrix {
     HMatrixLevel* levels;
 };
 
-void allocateHMatrix(HMatrix &matrix, int segmentSize, int numSegments, unsigned int numberOfInputPoints, unsigned int bucketSize) {
+void allocateHMatrix(HMatrix &matrix, TLR_Matrix mortonOrderedMatrix, int segmentSize, int numSegments, unsigned int numberOfInputPoints, unsigned int bucketSize) {
     cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
-    // TODO: copy diagonal blocks from MOMatrix to HMatrix
+    cudaMemcpy(matrix.diagonalBlocks, mortonOrderedMatrix.diagonal, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
     matrix.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
     matrix.levels = (HMatrixLevel*)malloc((matrix.numLevels - 2)*sizeof(HMatrixLevel));
 }
@@ -68,7 +68,6 @@ void freeHMatrix(HMatrix &matrix) {
     for(unsigned int level = 1; level < matrix.numLevels - 1; ++level) {
         freeHMatrixLevel(matrix.levels[level - 1]);
     }
-    // TODO: loop over hmatrix levels and free thtem
 }
 
 #endif

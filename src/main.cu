@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
 
     // Build hierarchical matrix
     HMatrix hierarchicalMatrix;
-    allocateHMatrix(hierarchicalMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
+    allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix);
 
     #if EXPAND_MATRIX
