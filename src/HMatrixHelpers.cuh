@@ -29,7 +29,7 @@ void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int n
                 x = -1;
             }
             unsigned int tileIndex = j*dim + j + x;
-            WAStruct.tileIndices[level][j + x] = IndextoMOIndex_h(dim, tileIndex);
+            WAStruct.tileIndices[level][j + x] = CMIndextoMOIndex_h(dim, tileIndex);
         }
         
         dim <<= 1;
@@ -56,12 +56,12 @@ __global__ void fillBatchPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_
     }
 }
 
-struct LevelTilesPtrs {
+struct LevelTilePtrs {
     H2Opus_Real **U;
     H2Opus_Real **V;
 };
 
-void allocateAndFillLevelTilesPtrs(int batchSize, int batchUnitSize, int segmentSize, int level, int *tileIndices, LevelTilesPtrs &tilePtrs, TLR_Matrix mortonOrderedMatrix) {
+void allocateTilePtrs(int batchSize, int batchUnitSize, int segmentSize, int level, int *tileIndices, LevelTilePtrs &tilePtrs, TLR_Matrix mortonOrderedMatrix) {
     cudaMalloc((void**) &tilePtrs.U, batchSize*sizeof(H2Opus_Real*));
     cudaMalloc((void**) &tilePtrs.V, batchSize*sizeof(H2Opus_Real*));
 
@@ -70,7 +70,7 @@ void allocateAndFillLevelTilesPtrs(int batchSize, int batchUnitSize, int segment
     fillBatchPtrs <<< numBlocks, numThreadsPerBlock >>> (tilePtrs.U, tilePtrs.V, mortonOrderedMatrix, batchSize, segmentSize, batchUnitSize, tileIndices, level);
 }
 
-void freeLevelTilesPtrs(LevelTilesPtrs tilePtrs) {
+void freeLevelTilePtrs(LevelTilePtrs tilePtrs) {
     cudaFree(tilePtrs.U);
     cudaFree(tilePtrs.V);
 }
@@ -93,7 +93,7 @@ __global__ void fillLRARAArrays(int batchSize, int maxRows, int* d_rowsBatch, in
 }
 
 void generateScanRanks(int batchSize, int batchUnitSize, int *ranks, int *scanRanks, int **scanRanksPtrs, int *levelTileIndices) {
-    // TODO: think about replacing this with a single inclusiveSumByKey thats called before the for loop
+    // TODO: we already have a scanRanks array of all the ranks in the MOMatrix. Use that one instead of this
     for(unsigned int batch = 0; batch < batchSize; ++batch) {
         void *d_temp_storage = NULL;
         size_t temp_storage_bytes = 0;

@@ -1,6 +1,4 @@
 
-CC = nvcc
-
 # specify the gpu architecture (volta, ampere)
 GPU_ARCH = volta
 ifeq (${GPU_ARCH}, volta)
@@ -8,9 +6,6 @@ ifeq (${GPU_ARCH}, volta)
 else ifeq (${GPU_ARCH}, ampere)
 	NVOPTS = arch=compute_80,code=sm_80
 endif
-
-NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
-DEBUG_FLAGS = -g -G -lineinfo
 
 _KBLAS_ROOT_?=/scratch/7701501-aaj35/lr-kblas-gpu
 _MAGMA_ROOT_?=/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1
@@ -28,13 +23,17 @@ LIB_DIR += -L$(_KBLAS_ROOT_)/lib
 
 LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse -lmagma -lopenblas
 
+CC = nvcc
+NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
+DEBUG_FLAGS = -g -G -lineinfo
+OBJS = main.o
+
 USE_COUNTERS = 0
 EXPAND_MATRIX = 0
 DEFS = -DUSE_COUNTERS=$(USE_COUNTERS)
 DEFS += -DEXPAND_MATRIX=$(EXPAND_MATRIX)
 
-OBJS = main.o
-
+# TODO: fix the compilation so that each file is compiled independently
 output: $(OBJS)
 	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LIB_DIR) $(LIB) main.o -o output
 

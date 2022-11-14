@@ -24,7 +24,7 @@ static __global__ void expandLRMatrix(int num_segments, int maxSegmentSize, H2Op
     else{
         unsigned int index;
         if(matrix.ordering == MORTON) {
-            index = IndextoMOIndex_h(num_segments, blockIdx.x*num_segments + blockIdx.y);
+            index = CMIndextoMOIndex_h(num_segments, blockIdx.x*num_segments + blockIdx.y);
         }
         else if(matrix.ordering == COLUMN_MAJOR) {
             index = blockIdx.x*num_segments + blockIdx.y;
@@ -73,20 +73,20 @@ static void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, 
     cudaFree(d_expandedMatrix);
 }
 
-__global__ void expandHMatrix(HMatrixLevel matrixLevel, int size, H2Opus_Real* output, int tileSize) {
+__global__ void expandHMatrix(HMatrixLevel matrixLevel, H2Opus_Real* output, int tileSize) {
     unsigned int batch = blockIdx.z;
     unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
     unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
 
-    if(col < size && row < size) {
+    if(col < tileSize && row < tileSize) {
         H2Opus_Real sum = 0;
         int tileRank = (batch == 0) ? matrixLevel.tileScanRanks[batch] : matrixLevel.tileScanRanks[batch] - matrixLevel.tileScanRanks[batch - 1];
         int tileOffset = (matrixLevel.tileScanRanks[batch] - tileRank)*tileSize;
 
         for(unsigned int i = 0; i < tileRank; ++i) {
-            sum += matrixLevel.U[tileOffset + i*size + row]*matrixLevel.V[tileOffset + i*size + col];
+            sum += matrixLevel.U[tileOffset + i*tileSize + row]*matrixLevel.V[tileOffset + i*tileSize + col];
         }
-        output[batch*size*size + col*size + row] = sum;
+        output[batch*tileSize*tileSize + col*tileSize + row] = sum;
     }
 }
 
@@ -117,7 +117,7 @@ static void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int
     cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
     dim3 m_numThreadsPerBlock(32, 32);
     dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
-    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrixLevel, batchUnitSize*bucketSize, d_expandedMatrix, batchUnitSize*bucketSize);
+    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrixLevel, d_expandedMatrix, batchUnitSize*bucketSize);
     cudaDeviceSynchronize();
 
     // compare expanded H matrix level with dense matrix

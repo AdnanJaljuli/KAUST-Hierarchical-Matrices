@@ -206,7 +206,7 @@ static __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
 
 // TODO: don't capitalize first letter
 // TODO: rename
-static __host__ __device__ int IndextoMOIndex_h(int numSegments, int n){
+static __host__ __device__ int CMIndextoMOIndex_h(int numSegments, int n){
     unsigned int i = n%numSegments;
     unsigned int j = n/numSegments;
     return getMOfromXY_h(j, i);
@@ -215,7 +215,7 @@ static __host__ __device__ int IndextoMOIndex_h(int numSegments, int n){
 static __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i<num_segments*num_segments){
-        int MOIndex = IndextoMOIndex_h(num_segments, i);
+        int MOIndex = CMIndextoMOIndex_h(num_segments, i);
         mortonMatrixRanks[MOIndex] = matrixRanks[i];
     }
 }
