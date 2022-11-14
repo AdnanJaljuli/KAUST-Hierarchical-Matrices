@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <ctype.h>
-// #include <cub/cub.cuh>
 #include <curand_kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +46,6 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
     fillARAArrays <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments - 1, kDTree.segmentSize, d_rowsBatch, d_colsBatch, d_LDMBatch, d_LDABatch, d_LDBBatch);
     gpuErrchk(cudaPeekAtLastError());
 
-    magma_init();
     kblasHandle_t kblasHandle;
     kblasRandState_t randState;
     kblasCreate(&kblasHandle);
@@ -115,6 +113,9 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
         copyTiles <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments - 1, kDTree.segmentSize, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, d_UTiledTemp[segment], d_A, d_VTiledTemp[segment], d_B);
         rankSum += (*totalMem);
     }
+    
+    kblasDestroy(&kblasHandle);
+    kblasDestroyRandState(randState);
 
     free(totalMem);
     cudaFree(d_totalMem);

@@ -41,13 +41,12 @@ int main(int argc, char *argv[]) {
     H2Opus_Real* d_pointCloud;
     cudaMalloc((void**) &d_pointCloud, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real));
     generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
-    gpuErrchk(cudaPeekAtLastError());
 
     // Build the KD-tree
+    magma_init();
     KDTree kDTree;
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
     constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
-    gpuErrchk(cudaPeekAtLastError());
 
     printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
@@ -99,6 +98,8 @@ int main(int argc, char *argv[]) {
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
     #endif
+
+    magma_finalize();
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);

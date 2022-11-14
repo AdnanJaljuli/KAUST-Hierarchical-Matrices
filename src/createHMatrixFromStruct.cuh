@@ -13,7 +13,6 @@
 // TODO: break this code into smaller pieces
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct) {
 
-    magma_init(); // TODO: check if there's an opposite call you need to do at the end
     kblasHandle_t kblasHandle;
     kblasRandState_t randState;
     kblasCreate(&kblasHandle);
@@ -101,6 +100,9 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_A);
         cudaFree(d_B);
     }
+
+    kblasDestroy(&kblasHandle);
+    kblasDestroyRandState(randState);
 }
 
 #endif

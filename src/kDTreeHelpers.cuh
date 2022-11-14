@@ -7,9 +7,7 @@
 #include "cublas_v2.h"
 #include "kblas.h"
 #include "kDTree.h"
-#include "TLRMatrix.h"
 #include "helperKernels.cuh"
-// #include <cub/cub.cuh>
 
 static __global__ void initIndexMap(unsigned int numberOfInputPoints, KDTree kDTree) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
