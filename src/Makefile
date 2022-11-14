@@ -5,7 +5,9 @@ ifeq (${GPU_ARCH}, volta)
 	NVOPTS = arch=compute_70,code=sm_70
 else ifeq (${GPU_ARCH}, ampere)
 	NVOPTS = arch=compute_80,code=sm_80
-endif # TODO: What if neither are true?
+else
+$(error $(GPU_ARCH) GPU architecture is not supported. Supported architectures are volta and ampere)
+endif
 
 _KBLAS_ROOT_?=$(KBLAS_HOME)
 _MAGMA_ROOT_?=$(MAGMA_HOME)
@@ -14,7 +16,7 @@ _OPENBLAS_ROOT_?=$(OPENBLAS_HOME)
 
 INC = -I$(_MAGMA_ROOT_)/include
 INC += -I$(_KBLAS_ROOT_)/include
-INC += -I/apps/sw/cub-1.8.0
+INC += -I$(CUB_HOME)
 
 LIB_DIR = -L$(_CUDA_ROOT_)/lib64
 LIB_DIR += -L$(_MAGMA_ROOT_)/lib
