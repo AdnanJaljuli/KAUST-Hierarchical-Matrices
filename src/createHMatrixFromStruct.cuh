@@ -11,10 +11,7 @@
 #include "TLRMatrix.h"
 
 // TODO: break this code into smaller pieces
-void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix) {
-
-    WeakAdmissibility WAStruct;
-    allocateWeakAdmissibilityStruct(WAStruct, numberOfInputPoints, bucketSize);
+void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct) {
 
     magma_init();
     kblasHandle_t kblasHandle;
@@ -26,11 +23,11 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     // TODO: use multiple streams
 
     for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
+        int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
         int batchSize = WAStruct.numTiles[level - 1];
         if(batchSize == 0) {
             continue;
         }
-        int batchUnitSize = 1 << (WAStruct.numLevels - (level + 1));
 
         // preprocessing
         int* d_tileIndices;
@@ -99,8 +96,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_A);
         cudaFree(d_B);
     }
-
-    freeWeakAdmissbilityStruct(WAStruct);
 }
 
 #endif

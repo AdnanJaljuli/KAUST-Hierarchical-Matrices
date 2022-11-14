@@ -15,7 +15,7 @@ void allocateKDTree(KDTree &tree, unsigned int numberOfInputPoints, unsigned int
     cudaMalloc((void**) &tree.segmentOffsets, (tree.numSegments + 1)*sizeof(int));
 }
 
-void cudaFreeKDTree(KDTree tree){
+void freeKDTree(KDTree tree){
     cudaFree(tree.segmentIndices);
     cudaFree(tree.segmentOffsets);
 }   

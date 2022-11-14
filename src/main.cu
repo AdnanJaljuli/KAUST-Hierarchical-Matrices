@@ -57,7 +57,6 @@ int main(int argc, char *argv[]) {
     TLR_Matrix matrix;
     matrix.ordering = COLUMN_MAJOR;
     uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints, matrix, kDTree, d_pointCloud, config.lowestLevelTolerance, ARA_R);
-    cudaDeviceSynchronize();
 
     #if EXPAND_MATRIX
     H2Opus_Real* d_denseMatrix;
@@ -67,7 +66,6 @@ int main(int argc, char *argv[]) {
     #endif
 
     cudaFree(d_pointCloud);
-    gpuErrchk(cudaPeekAtLastError());
 
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, matrix, d_denseMatrix);
@@ -77,28 +75,30 @@ int main(int argc, char *argv[]) {
     TLR_Matrix mortonOrderedMatrix;
     mortonOrderedMatrix.ordering = MORTON;
     convertColumnMajorToMorton(kDTree.numSegments, kDTree.segmentSize, rankSum, matrix, mortonOrderedMatrix);
-    cudaFreeMatrix(matrix);
+    freeMatrix(matrix);
 
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);
     #endif
 
     // Build hierarchical matrix
+    WeakAdmissibility WAStruct;
+    allocateWeakAdmissibilityStruct(WAStruct, config.numberOfInputPoints, config.bucketSize);
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
-    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix);
+    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct);
 
     #if EXPAND_MATRIX
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
 
-    cudaFreeKDTree(kDTree);
-    cudaFreeMatrix(mortonOrderedMatrix);
+    freeWeakAdmissbilityStruct(WAStruct);
+    freeKDTree(kDTree);
+    freeMatrix(mortonOrderedMatrix);
+    freeHMatrix(hierarchicalMatrix);
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
     #endif
-    
-    freeHMatrix(hierarchicalMatrix);
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);

@@ -9,10 +9,10 @@ struct HMatrixLevel {
     int* tileScanRanks;
     H2Opus_Real* U;
     H2Opus_Real* V;
+    // TODO: make a double pointer array to U and V
 };
 
 void allocateAndCopyToHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAdmissibility WAStruct, unsigned int level, H2Opus_Real *A, H2Opus_Real *B, int maxRows, int maxRank) {
-    // TODO: make a double pointer array to U and V
     matrixLevel.numTiles = WAStruct.numTiles[level - 1];
     matrixLevel.level = level;
 
