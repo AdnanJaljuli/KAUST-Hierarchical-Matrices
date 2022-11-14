@@ -5,7 +5,7 @@ ifeq (${GPU_ARCH}, volta)
 	NVOPTS = arch=compute_70,code=sm_70
 else ifeq (${GPU_ARCH}, ampere)
 	NVOPTS = arch=compute_80,code=sm_80
-endif
+endif # TODO: What if neither are true?
 
 _KBLAS_ROOT_?=/scratch/7701501-aaj35/lr-kblas-gpu
 _MAGMA_ROOT_?=/apps/sw/magma-2.5.4-gcc-7.2.0-cuda-10.1
