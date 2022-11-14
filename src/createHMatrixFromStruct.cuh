@@ -13,7 +13,7 @@
 // TODO: break this code into smaller pieces
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct) {
 
-    magma_init();
+    magma_init(); // TODO: check if there's an opposite call you need to do at the end
     kblasHandle_t kblasHandle;
     kblasRandState_t randState;
     kblasCreate(&kblasHandle);
@@ -58,7 +58,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         maxRows = batchUnitSize*bucketSize;
         maxCols = maxRows;
         maxRank = maxRows/2;
-        cudaMalloc((void**) &d_ranks, batchSize*sizeof(int));
+        cudaMalloc((void**) &d_ranks, batchSize*sizeof(int)); // TODO: allocate and free outside loop and reuse memory pools across levels
         cudaMalloc((void**) &d_rowsBatch, batchSize*sizeof(int));
         cudaMalloc((void**) &d_colsBatch, batchSize*sizeof(int));
         cudaMalloc((void**) &d_LDABatch, batchSize*sizeof(int));
