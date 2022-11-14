@@ -15,7 +15,7 @@
 #include <stddef.h>
 
 // TODO: clean the file
-static void createKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int bucketSize, KDTree &kDTree, H2Opus_Real* d_pointCloud) {
+static void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int bucketSize, KDTree &kDTree, H2Opus_Real* d_pointCloud) {
 
     int *d_dimxNSegmentOffsets;
     H2Opus_Real *d_kDTreePoints;

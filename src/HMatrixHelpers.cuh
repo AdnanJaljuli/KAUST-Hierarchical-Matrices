@@ -31,10 +31,7 @@ void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int n
             unsigned int tileIndex = j*dim + j + x;
             WAStruct.tileIndices[level][j + x] = IndextoMOIndex_h(dim, tileIndex);
         }
-        for(unsigned int j = 0; j < numTiles; ++j) {
-            printf("%d ", WAStruct.tileIndices[level][j]);
-        }
-        printf("\n");
+        
         dim <<= 1;
     }
 }

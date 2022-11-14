@@ -103,7 +103,6 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
         cudaDeviceSynchronize();
         cudaFree(d_tempStorage);
 
-        printK <<< 1, 1 >>> (d_ranks + segment*(kDTree.numSegments - 1), kDTree.numSegments - 1);
         getTotalMem <<< 1, 1 >>> (d_totalMem, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaMemcpy(totalMem, d_totalMem, sizeof(uint64_t), cudaMemcpyDeviceToHost);
 

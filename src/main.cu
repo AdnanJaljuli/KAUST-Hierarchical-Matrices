@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     // Build the KD-tree
     KDTree kDTree;
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
-    createKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
+    constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
     gpuErrchk(cudaPeekAtLastError());
 
     printf("segment size: %lu\n", kDTree.segmentSize);

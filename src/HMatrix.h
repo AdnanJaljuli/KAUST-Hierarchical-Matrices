@@ -12,6 +12,12 @@ struct HMatrixLevel {
     // TODO: make a double pointer array to U and V
 };
 
+struct HMatrix {
+    int numLevels;
+    H2Opus_Real* diagonalBlocks;
+    HMatrixLevel* levels;
+};
+
 void allocateAndCopyToHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAdmissibility WAStruct, unsigned int level, H2Opus_Real *A, H2Opus_Real *B, int maxRows, int maxRank) {
     matrixLevel.numTiles = WAStruct.numTiles[level - 1];
     matrixLevel.level = level;
@@ -50,11 +56,6 @@ void freeHMatrixLevel(HMatrixLevel matrixLevel){
     cudaFree(matrixLevel.V);
 }
 
-struct HMatrix {
-    int numLevels;
-    H2Opus_Real* diagonalBlocks;
-    HMatrixLevel* levels;
-};
 
 void allocateHMatrix(HMatrix &matrix, TLR_Matrix mortonOrderedMatrix, int segmentSize, int numSegments, unsigned int numberOfInputPoints, unsigned int bucketSize) {
     cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
