@@ -2,8 +2,8 @@
 #ifndef __HELPERKERNELS_CUH__
 #define __HELPERKERNELS_CUH__
 
-#include "kDTree.h"
-#include "TLRMatrix.h"
+#include "kDTree.cuh"
+#include "TLRMatrix.cuh"
 
 #include <assert.h>
 #include <ctype.h>

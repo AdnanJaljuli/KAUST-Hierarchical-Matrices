@@ -2,13 +2,11 @@
 #ifndef __GENERATE_HIERARCHICALMATRIX_H__
 #define __GENERATE_HIERARCHICALMATRIX_H__
 
-#include "config.h"
-#include "counters.h"
 #include "expandMatrix.cuh"
 #include "HMatrixHelpers.cuh"
 #include "HMatrix.h"
-#include "kDTree.h"
-#include "TLRMatrix.h"
+#include "kDTree.cuh"
+#include "TLRMatrix.cuh"
 
 // TODO: break this code into smaller pieces
 void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, WeakAdmissibility WAStruct) {

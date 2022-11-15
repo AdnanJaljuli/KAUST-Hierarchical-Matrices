@@ -2,11 +2,9 @@
 #ifndef __GENERATE_HIERARCHICALMATRIX_H__
 #define __GENERATE_HIERARCHICALMATRIX_H__
 
-#include "config.h"
-#include "counters.h"
 #include "generateHierarchicalMatrixHelpers.cuh"
 #include "kDTree.h"
-#include "TLRMatrix.h"
+#include "TLRMatrix.cuh"
 
 void genereateHierarchicalMatrix(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance) {
     const int numHMatrixLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;

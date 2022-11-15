@@ -6,7 +6,7 @@
 #include <cstdint> 
 #include "cublas_v2.h"
 #include "kblas.h"
-#include "TLRMatrix.h"
+#include "TLRMatrix.cuh"
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
 

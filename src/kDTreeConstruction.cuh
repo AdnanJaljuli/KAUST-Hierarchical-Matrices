@@ -2,7 +2,7 @@
 #ifndef __KDTREECONSTRUCTION_CUH__
 #define __KDTREECONSTRUCTION_CUH__
 
-#include "kDTree.h"
+#include "kDTree.cuh"
 #include "kDTreeHelpers.cuh"
 
 #include <assert.h>

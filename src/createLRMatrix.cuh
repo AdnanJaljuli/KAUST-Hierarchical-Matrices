@@ -13,7 +13,7 @@
 // TODO: ask Izzat about the order of the below 3 header files. If their order is different, it throus a compilation error.
 #include "cublas_v2.h"
 #include "kblas.h"
-#include "kDTree.h"
+#include "kDTree.cuh"
 #include "batch_rand.h"
 #include "helperFunctions.cuh"
 #include "helperKernels.cuh"

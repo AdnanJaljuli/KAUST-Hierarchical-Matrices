@@ -1,6 +1,6 @@
 
 # specify the gpu architecture (volta, ampere)
-GPU_ARCH = volta
+GPU_ARCH = ampere
 ifeq (${GPU_ARCH}, volta)
 	NVOPTS = arch=compute_70,code=sm_70
 else ifeq (${GPU_ARCH}, ampere)
@@ -28,7 +28,8 @@ LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse
 CC = nvcc
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
-OBJS = main.o
+OBJ = main.o kDTree.o kDTreeHelpers.o TLRMatrix.o
+EXE = output
 
 USE_COUNTERS = 0
 EXPAND_MATRIX = 0
@@ -36,11 +37,20 @@ DEFS = -DUSE_COUNTERS=$(USE_COUNTERS)
 DEFS += -DEXPAND_MATRIX=$(EXPAND_MATRIX)
 
 # TODO: fix the compilation so that each file is compiled independently
-output: $(OBJS)
-	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LIB_DIR) $(LIB) main.o -o output
+output: $(OBJ)
+	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LIB_DIR) $(LIB) $(OBJ) -o $(EXE)
 
-main.o: main.cu
+main.o: main.cu kDTree.cuh config.h counters.h
 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) main.cu
+
+kDTree.o: kDTree.cu kDTree.cuh
+	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTree.cu
+
+kDTreeHelpers.o: kDTreeHelpers.cu kDTreeHelpers.cuh
+	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTreeHelpers.cu
+
+TLRMatrix.o: TLRMatrix.cu TLRMatrix.cuh
+	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) TLRMatrix.cu
 
 clean:
 	rm -fv *.o output *.csv

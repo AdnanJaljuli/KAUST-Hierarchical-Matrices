@@ -1,12 +1,4 @@
-#ifndef __KD_TREE_H__
-#define __KD_TREE_H__
-
-struct KDTree{
-    uint64_t numSegments;
-    uint64_t segmentSize;
-    int *segmentIndices;
-    int *segmentOffsets;
-};
+#include "kDTree.cuh"
 
 void allocateKDTree(KDTree &tree, unsigned int numberOfInputPoints, unsigned int bucketSize){
     tree.numSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
@@ -18,6 +10,4 @@ void allocateKDTree(KDTree &tree, unsigned int numberOfInputPoints, unsigned int
 void freeKDTree(KDTree tree){
     cudaFree(tree.segmentIndices);
     cudaFree(tree.segmentOffsets);
-}   
-
-#endif
+}

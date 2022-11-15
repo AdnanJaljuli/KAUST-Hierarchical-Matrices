@@ -17,12 +17,6 @@ struct TLR_Matrix{
     H2Opus_Real *diagonal;
 };
 
-void freeMatrix(TLR_Matrix matrix){
-    cudaFree(matrix.blockRanks);
-    cudaFree(matrix.blockOffsets);
-    cudaFree(matrix.U);
-    cudaFree(matrix.V);
-    cudaFree(matrix.diagonal);
-}
+void freeMatrix(TLR_Matrix matrix);
 
 #endif
