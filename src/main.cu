@@ -1,7 +1,7 @@
 
 #include "config.h"
 #include "counters.h"
-#include "createLRMatrix.cuh"
+#include "constructTLRMatrix.cuh"
 #include "expandMatrix.cuh"
 #include "helperFunctions.cuh"
 #include "createHMatrixFromStruct.cuh"
