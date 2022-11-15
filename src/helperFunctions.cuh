@@ -100,8 +100,11 @@ static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegment
         unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
         if(h_matrix_ranks[i] > 0){
-            copyTilestoMO <<< numBlocks, numThreadsPerBlock >>> (h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
-            copyTilestoMO <<< numBlocks, numThreadsPerBlock >>> (h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            // TODO: optimize this
+            cudaMemcpy(&mortonMatrix.U[h_mortonMatrix_offsets[MOIndex]*maxSegmentSize], &matrix.U[h_matrix_offsets[i]*maxSegmentSize], h_matrix_ranks[i]*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+            cudaMemcpy(&mortonMatrix.V[h_mortonMatrix_offsets[MOIndex]*maxSegmentSize], &matrix.V[h_matrix_offsets[i]*maxSegmentSize], h_matrix_ranks[i]*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+            // copyTilestoMO <<< numBlocks, numThreadsPerBlock >>> (h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.U, matrix.U, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
+            // copyTilestoMO <<< numBlocks, numThreadsPerBlock >>> (h_matrix_ranks[i]*maxSegmentSize, mortonMatrix.V, matrix.V, h_mortonMatrix_offsets[MOIndex]*maxSegmentSize, h_matrix_offsets[i]*maxSegmentSize);
         }
     }
 
