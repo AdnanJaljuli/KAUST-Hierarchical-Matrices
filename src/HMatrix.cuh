@@ -1,5 +1,5 @@
-#ifndef __HIERARCHICALMATRIX__
-#define __HIERARCHICALMATRIX__
+#ifndef HMATRIX_H
+#define HMATRIX_H
 
 #include "HMatrixHelpers.cuh"
 

@@ -1,6 +1,6 @@
 
-#ifndef __GENERATE_HIERARCHICALMATRIX_H__
-#define __GENERATE_HIERARCHICALMATRIX_H__
+#ifndef CONSTRUCT_HMATRIX_FROM_STRUCT_H
+#define CONSTRUCT_HMATRIX_FROM_STRUCT_H
 
 #include "HMatrix.cuh"
 #include "TLRMatrix.cuh"

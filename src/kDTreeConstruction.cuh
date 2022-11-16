@@ -1,6 +1,6 @@
 
-#ifndef __KDTREECONSTRUCTION_CUH__
-#define __KDTREECONSTRUCTION_CUH__
+#ifndef KDTREE_CONSTRUCTION_H
+#define KDTREE_CONSTRUCTION_H
 
 #include "kDTree.cuh"
 

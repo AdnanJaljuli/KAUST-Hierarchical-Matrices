@@ -1,6 +1,6 @@
 
-#ifndef __HELPER_FUNCTIONS_H__
-#define __HELPER_FUNCTIONS_H__
+#ifndef HELPER_FUNCTIONS_H
+#define HELPER_FUNCTIONS_H
 
 #include "TLRMatrix.cuh"
 #include "helperKernels.cuh"

@@ -1,6 +1,6 @@
 
-#ifndef __HELPERS_HIERARCHICALMATRIX_H__
-#define __HELPERS_HIERARCHICALMATRIX_H__
+#ifndef HMATRIX_HELPERS_H
+#define HMATRIX_HELPERS_H
 
 #include "TLRMatrix.cuh"
 

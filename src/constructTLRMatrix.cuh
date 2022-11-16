@@ -1,6 +1,6 @@
 
-#ifndef __CREATE_LR_MATRIX_CUH__
-#define __CREATE_LR_MATRIX_CUH__
+#ifndef CREATE_TLR_MATRIX_H
+#define CREATE_TLR_MATRIX_H
 
 // TODO: ask Izzat about the order of the below 3 header files. If their order is different, it throus a compilation error.
 #include "kDTree.cuh"

@@ -1,6 +1,6 @@
 
-#ifndef __KD_TREE_HELPER_FUNCTIONS_H__
-#define __KD_TREE_HELPER_FUNCTIONS_H__
+#ifndef KDTREE_HELPERS_H
+#define KDTREE_HELPERS_H
 
 #include "kDTree.cuh"
 #include "helperKernels.cuh"

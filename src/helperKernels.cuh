@@ -1,6 +1,6 @@
 
-#ifndef __HELPERKERNELS_CUH__
-#define __HELPERKERNELS_CUH__
+#ifndef HELPER_KERNELS_H
+#define HELPER_KERNELS_H
 
 #include "kDTree.cuh"
 #include "TLRMatrix.cuh"

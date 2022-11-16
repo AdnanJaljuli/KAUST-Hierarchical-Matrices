@@ -1,6 +1,6 @@
 
-#ifndef __EXPAND_MATRIX_HELPERS_CUH__
-#define __EXPAND_MATRIX_HELPERS_CUH__
+#ifndef EXPAND_MATRIX_H
+#define EXPAND_MATRIX_H
 
 #include "HMatrix.cuh"
 

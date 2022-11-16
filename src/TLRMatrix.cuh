@@ -1,5 +1,5 @@
-#ifndef __TLR_MATRIX_H__
-#define __TLR_MATRIX_H__
+#ifndef TLR_MATRIX_H
+#define TLR_MATRIX_H
 
 #include <cstdint>
 #include "kDTree.cuh"
