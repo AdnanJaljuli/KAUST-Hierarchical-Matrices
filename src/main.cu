@@ -6,7 +6,7 @@
 #include "generateDataset.cuh"
 #include "helperFunctions.cuh"
 #include "HMatrix.cuh"
-#include "createHMatrixFromStruct.cuh"
+#include "constructHMatrixFromStruct.cuh"
 #include "kDTree.cuh"
 #include "kDTreeConstruction.cuh"
 #include "magma_auxiliary.h"

@@ -64,37 +64,3 @@ void freeLevelTilePtrs(LevelTilePtrs tilePtrs) {
     cudaFree(tilePtrs.U);
     cudaFree(tilePtrs.V);
 }
-
-__global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize, int batchSize) {
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < batchSize) {
-        d_scanRanksPtrs[i] = &d_scanRanks[i*batchUnitSize*batchUnitSize];
-    }
-}
-
-__global__ void fillLRARAArrays(int batchSize, int maxRows, int* d_rowsBatch, int* d_colsBatch, int* d_LDABatch, int* d_LDBBatch){
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < batchSize){
-        d_rowsBatch[i] = maxRows;
-        d_colsBatch[i] = maxRows;
-        d_LDABatch[i] = maxRows;
-        d_LDBBatch[i] = maxRows;
-    }
-}
-
-void generateScanRanks(int batchSize, int batchUnitSize, int *ranks, int *scanRanks, int **scanRanksPtrs, int *levelTileIndices) {
-    // TODO: we already have a scanRanks array of all the ranks in the MOMatrix. Use that one instead of this
-    for(unsigned int batch = 0; batch < batchSize; ++batch) {
-        void *d_temp_storage = NULL;
-        size_t temp_storage_bytes = 0;
-        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks + levelTileIndices[batch]*batchUnitSize*batchUnitSize, scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
-        cudaMalloc(&d_temp_storage, temp_storage_bytes);
-        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks + levelTileIndices[batch]*batchUnitSize*batchUnitSize, scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
-        cudaFree(d_temp_storage);
-    }
-
-    // fillScanRanksPtrs
-    unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    fillScanRankPtrs <<< numBlocks, numThreadsPerBlock >>> (scanRanksPtrs, scanRanks, batchUnitSize, batchSize);
-}
