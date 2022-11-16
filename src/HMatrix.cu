@@ -1,3 +1,5 @@
+
+#include <cub/cub.cuh>
 #include "HMatrix.cuh"
 
 void allocateAndCopyToHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAdmissibility WAStruct, unsigned int level, H2Opus_Real *A, H2Opus_Real *B, int maxRows, int maxRank) {

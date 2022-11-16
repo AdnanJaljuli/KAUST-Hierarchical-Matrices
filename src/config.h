@@ -94,7 +94,7 @@ struct Config
 static Config parseArgs(int argc, char **argv)
 {
     Config config;
-    config.numberOfInputPoints = 128;
+    config.numberOfInputPoints = 1024;
     config.bucketSize = 32;
     config.lowestLevelTolerance = 1e-5;
     config.divMethod = POWER_OF_TWO_ON_LEFT;
