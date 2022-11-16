@@ -28,7 +28,8 @@ LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse
 CC = nvcc
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
-OBJ = main.o kDTree.o kDTreeHelpers.o TLRMatrix.o
+OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o TLRMatrix.o HMatrix.o generateDataset.o
+HDR = kDTree.cuh kDTreeHelpers.cuh TLRMatrix.cuh HMatrix.cuh generateDataset.cuh
 EXE = output
 
 USE_COUNTERS = 0
@@ -36,21 +37,30 @@ EXPAND_MATRIX = 0
 DEFS = -DUSE_COUNTERS=$(USE_COUNTERS)
 DEFS += -DEXPAND_MATRIX=$(EXPAND_MATRIX)
 
-# TODO: fix the compilation so that each file is compiled independently
-output: $(OBJ)
+%.o: %.cu $(HDR)
+	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) -o $@ $<
+
+$(EXE): $(OBJ)
 	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LIB_DIR) $(LIB) $(OBJ) -o $(EXE)
 
-main.o: main.cu kDTree.cuh config.h counters.h
-	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) main.cu
-
-kDTree.o: kDTree.cu kDTree.cuh
-	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTree.cu
-
-kDTreeHelpers.o: kDTreeHelpers.cu kDTreeHelpers.cuh
-	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTreeHelpers.cu
-
-TLRMatrix.o: TLRMatrix.cu TLRMatrix.cuh
-	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) TLRMatrix.cu
-
 clean:
-	rm -fv *.o output *.csv
+	rm -fv $(OBJ) $(EXE) *.csv
+
+# # TODO: fix the compilation so that each file is compiled independently
+# output: $(OBJ)
+# 	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LIB_DIR) $(LIB) $(OBJ) -o $(EXE)
+
+# main.o: main.cu kDTree.cuh config.h counters.h
+# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) main.cu
+
+# kDTree.o: kDTree.cu kDTree.cuh
+# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTree.cu
+
+# kDTreeHelpers.o: kDTreeHelpers.cu kDTreeHelpers.cuh
+# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTreeHelpers.cu
+
+# TLRMatrix.o: TLRMatrix.cu TLRMatrix.cuh
+# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) TLRMatrix.cu
+
+# HMatrix.o: HMatrix.cu HMatrix.cuh
+# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) HMatrix.cu

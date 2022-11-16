@@ -52,3 +52,14 @@ __global__ void fillKeysIn(int n, unsigned int segmentSize, H2Opus_Real* keys_in
         keys_in[i] = pointCloud[spanReduced[i/segmentSize].key*n + values_in[i]];
     }
 }
+
+__device__ __host__ int upperPowerOfTwo(int v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}

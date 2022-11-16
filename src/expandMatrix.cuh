@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stddef.h>
 
-#include "HMatrix.h"
+#include "HMatrix.cuh"
 
 #include <curand_kernel.h>
 #include <thrust/binary_search.h>

@@ -4,8 +4,6 @@
 
 #include <utility>
 #include <cstdint> 
-#include "cublas_v2.h"
-#include "kblas.h"
 #include "TLRMatrix.cuh"
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
@@ -18,34 +16,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
         if (abort)
             exit(code);
     }
-}
-
-__global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* pointCloud) {
-    unsigned int i = blockDim.x*blockIdx.x + threadIdx.x;
-    if(i < numberOfInputPoints*dimensionOfInputPoints) {
-        unsigned int seed = i;
-        curandState s;
-        curand_init(seed, 0, 0, &s);
-        pointCloud[i] = curand_uniform(&s);
-    }
-}
-
-static void generateDataset(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus_Real* d_pointCloud) {
-    unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    generateDataset_kernel <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, d_pointCloud);
-    cudaDeviceSynchronize();
-}
-
-static __device__ __host__ int upperPowerOfTwo(int v) {
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
 }
 
 static bool isPowerOfTwo (int v) {

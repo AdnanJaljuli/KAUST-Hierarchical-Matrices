@@ -3,7 +3,9 @@
 #include "counters.h"
 #include "constructTLRMatrix.cuh"
 #include "expandMatrix.cuh"
+#include "generateDataset.cuh"
 #include "helperFunctions.cuh"
+#include "HMatrix.cuh"
 #include "createHMatrixFromStruct.cuh"
 #include "kblas.h"
 #include "kDTree.cuh"
@@ -22,6 +24,7 @@
 #include <utility>
 using namespace std;
 
+// TODO: template all functions that deal with H2Opus_Real
 // TODO: debug dealing with non-powers of two
 // TODO: add counters for functions in main
 int main(int argc, char *argv[]) {

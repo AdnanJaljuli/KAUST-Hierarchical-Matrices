@@ -4,7 +4,7 @@
 
 #include "expandMatrix.cuh"
 #include "HMatrixHelpers.cuh"
-#include "HMatrix.h"
+#include "HMatrix.cuh"
 #include "kDTree.cuh"
 #include "TLRMatrix.cuh"
 
