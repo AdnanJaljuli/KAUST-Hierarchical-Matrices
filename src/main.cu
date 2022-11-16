@@ -7,7 +7,6 @@
 #include "helperFunctions.cuh"
 #include "HMatrix.cuh"
 #include "createHMatrixFromStruct.cuh"
-#include "kblas.h"
 #include "kDTree.cuh"
 #include "kDTreeConstruction.cuh"
 #include "TLRMatrix.cuh"

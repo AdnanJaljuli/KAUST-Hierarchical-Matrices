@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 #include "HMatrix.cuh"
+#include "TLRMatrix.cuh"
 
 #include <curand_kernel.h>
 #include <thrust/binary_search.h>
