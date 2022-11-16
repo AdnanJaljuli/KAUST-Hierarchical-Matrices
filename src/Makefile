@@ -28,8 +28,8 @@ LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse
 CC = nvcc
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
-OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o TLRMatrix.o HMatrix.o HMatrixHelpers.o generateDataset.o helperFunctions.o constructTLRMatrix.o constructHMatrixFromStruct.o
-HDR = config.h counters.h kDTree.cuh kDTreeHelpers.cuh constructTLRMatrix.cuh TLRMatrix.cuh HMatrix.cuh generateDataset.cuh constructHMatrixFromStruct.cuh expandMatrix.cuh helperFunctions.cuh helperKernels.cuh HMatrixHelpers.cuh kDTreeConstruction.cuh 
+OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o TLRMatrix.o HMatrix.o HMatrixHelpers.o generateDataset.o helperFunctions.o constructTLRMatrix.o constructHMatrixFromStruct.o expandMatrix.o
+HDR = config.h counters.h HMatrix.cuh HMatrixHelpers.cuh constructHMatrixFromStruct.cuh TLRMatrix.cuh constructTLRMatrix.cuh expandMatrix.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh
 EXE = output
 
 USE_COUNTERS = 0
@@ -45,22 +45,3 @@ $(EXE): $(OBJ)
 
 clean:
 	rm -fv $(OBJ) $(EXE) *.csv
-
-# # TODO: fix the compilation so that each file is compiled independently
-# output: $(OBJ)
-# 	$(CC) $(NVCC_FLAGS) $(DEBUG_FLAGS) $(LIB_DIR) $(LIB) $(OBJ) -o $(EXE)
-
-# main.o: main.cu kDTree.cuh config.h counters.h
-# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) main.cu
-
-# kDTree.o: kDTree.cu kDTree.cuh
-# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTree.cu
-
-# kDTreeHelpers.o: kDTreeHelpers.cu kDTreeHelpers.cuh
-# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) kDTreeHelpers.cu
-
-# TLRMatrix.o: TLRMatrix.cu TLRMatrix.cuh
-# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) TLRMatrix.cu
-
-# HMatrix.o: HMatrix.cu HMatrix.cuh
-# 	$(CC) -c $(NVCC_FLAGS) $(DEBUG_FLAGS) $(INC) $(DEFS) HMatrix.cu

@@ -72,6 +72,7 @@ struct UnaryAoAAssign : public thrust::unary_function<int, T*>
 template<class T>
 static void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int stride, int num_arrays, cudaStream_t stream)
 {
+    
     thrust::device_ptr<T*> dev_data(array_of_arrays);
     thrust::transform(
         thrust::cuda::par.on(stream),

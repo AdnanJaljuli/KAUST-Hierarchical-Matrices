@@ -109,6 +109,8 @@ int main(int argc, char *argv[]) {
     printCountersInFile(config, &counters);
     #endif
 
+    printf("done :)\n");
+
     return 0;
 
 }
