@@ -24,7 +24,7 @@ static __global__ void expandLRMatrix(int num_segments, int maxSegmentSize, H2Op
     else{
         unsigned int index;
         if(matrix.ordering == MORTON) {
-            index = CMIndextoMOIndex_h(num_segments, blockIdx.x*num_segments + blockIdx.y);
+            index = CMIndextoMOIndex(num_segments, blockIdx.x*num_segments + blockIdx.y);
         }
         else if(matrix.ordering == COLUMN_MAJOR) {
             index = blockIdx.x*num_segments + blockIdx.y;

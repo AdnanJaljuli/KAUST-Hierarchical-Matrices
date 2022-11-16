@@ -24,7 +24,7 @@ void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int n
                 x = -1;
             }
             unsigned int tileIndex = j*dim + j + x;
-            WAStruct.tileIndices[level][j + x] = CMIndextoMOIndex_h(dim, tileIndex);
+            WAStruct.tileIndices[level][j + x] = CMIndextoMOIndex(dim, tileIndex);
         }
         
         dim <<= 1;

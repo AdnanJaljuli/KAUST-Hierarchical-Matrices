@@ -102,13 +102,6 @@ static __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int
     }
 }
 
-static __global__ void  fillPopCount(int num_threads, uint64_t* bit_vector, short int* popc_bit_vector){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i<num_threads){
-        popc_bit_vector[i] = __popcll(bit_vector[i]);
-    }
-}
-
 static __global__ void printK(int* K, int num_segments){
     printf("ks\n");
     for(int i=0; i<num_segments; ++i){
@@ -156,14 +149,6 @@ static void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int
     cudaGetLastError();
 }
 
-static __global__ void printARAOutput(H2Opus_Real* d_A, H2Opus_Real* d_B, int* k, int batchCount, int max_rows, int max_rank){
-    printf("ks\n");
-    for(unsigned int i=0;i<batchCount; ++i){
-        printf("%d ", k[i]);
-    }
-    printf("\n");
-}
-
 static __global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
     if(threadIdx.x < d_ranks[blockIdx.x]) {
         for(unsigned int i = 0; i < maxSegmentSize; ++i) {
@@ -186,7 +171,7 @@ static __global__ void copyRanks(int num_segments, int maxSegmentSize, int* from
     }
 }
 
-static __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
+static __host__ __device__ int getMOfromXY(unsigned int x, unsigned int y){
     static const unsigned int B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF};
     static const unsigned int S[] = {1, 2, 4, 8};
 
@@ -205,25 +190,17 @@ static __host__ __device__ int getMOfromXY_h(unsigned int x, unsigned int y){
 }
 
 // TODO: don't capitalize first letter
-// TODO: rename
-static __host__ __device__ int CMIndextoMOIndex_h(int numSegments, int n){
+static __host__ __device__ int CMIndextoMOIndex(int numSegments, int n){
     unsigned int i = n%numSegments;
     unsigned int j = n/numSegments;
-    return getMOfromXY_h(j, i);
+    return getMOfromXY(j, i);
 }
 
 static __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i<num_segments*num_segments){
-        int MOIndex = CMIndextoMOIndex_h(num_segments, i);
+        int MOIndex = CMIndextoMOIndex(num_segments, i);
         mortonMatrixRanks[MOIndex] = matrixRanks[i];
-    }
-}
-
-static __global__ void copyTilestoMO(int n, H2Opus_Real* toArray, H2Opus_Real* fromArray, int offset_1, int offset_2){
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i<n){
-        toArray[offset_1 + i] = fromArray[offset_2 + i];
     }
 }
 
@@ -236,52 +213,6 @@ static __device__ uint32_t morton1(uint32_t x)
     x = (x | (x >> 4)) & 0x00FF00FF;
     x = (x | (x >> 8)) & 0x0000FFFF;
     return x;
-}
-
-static __global__ void fillActiveTiles(int numExistingArrays, int* activeArrays, int* existingArrays, int* activeRanks, int* existingRanks){
-    int tmp = 0;
-    for(int i=0; i<numExistingArrays; ++i){
-        if(existingArrays[i]%4 == 0 && i<=(numExistingArrays-4)){
-            bool flag = true;
-            for(int j=1; j<4; ++j){
-                if(existingArrays[i + j] != existingArrays[i] + j){
-                    flag = false;
-                    break;
-                }
-            }
-            if(flag){
-                for(int j=0; j<4; ++j){
-                    activeArrays[tmp] = existingArrays[i + j];
-                    activeRanks[tmp++] = existingRanks[i + j];
-                }
-                i += 3;
-            }
-        }
-    }
-}
-
-static __global__ void fillBitVector(int num_ops, int tile_size, int* new_ranks, int* old_ranks, int* new_level_bit_vector, int* old_level_bit_vector){
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < num_ops){
-        if(2*tile_size*(old_ranks[i*4] + old_ranks[i*4 + 1] + old_ranks[i*4 + 2] + old_ranks[i*4 + 3]) > 4*tile_size*new_ranks[i]){
-            new_level_bit_vector[i] = 1;
-            old_level_bit_vector[i] = 0;
-        }
-        else{
-            new_level_bit_vector[i] = 0;
-            old_level_bit_vector[i] = 1;
-        }
-    }
-}
-
-static __global__ void fillNewLevel(int num_ops, int* bit_vector, int* bit_vector_scan, int* ranks_output, int* new_ranks, int* old_active_tiles, int* new_active_tiles){
-    int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i < num_ops){
-        if(bit_vector[i] == 1){
-            new_ranks[bit_vector_scan[i]] = ranks_output[i];
-            new_active_tiles[bit_vector_scan[i]] = old_active_tiles[i*4]/4;
-        }
-    }
 }
 
 #endif

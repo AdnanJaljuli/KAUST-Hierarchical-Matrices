@@ -65,7 +65,7 @@ static void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegment
     cudaMemcpy(h_matrix_ranks, matrix.blockRanks, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
 
     for(unsigned int i=0; i<numSegments*numSegments; ++i){
-        int MOIndex = CMIndextoMOIndex_h(numSegments, i);
+        int MOIndex = CMIndextoMOIndex(numSegments, i);
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
