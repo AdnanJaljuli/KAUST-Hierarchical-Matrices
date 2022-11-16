@@ -9,6 +9,7 @@
 #include "createHMatrixFromStruct.cuh"
 #include "kDTree.cuh"
 #include "kDTreeConstruction.cuh"
+#include "magma_auxiliary.h"
 #include "TLRMatrix.cuh"
 
 #include <algorithm>

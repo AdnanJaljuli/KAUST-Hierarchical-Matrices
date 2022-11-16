@@ -2,9 +2,12 @@
 #ifndef __GENERATE_HIERARCHICALMATRIX_H__
 #define __GENERATE_HIERARCHICALMATRIX_H__
 
+#include "cublas_v2.h"
 #include "expandMatrix.cuh"
 #include "HMatrixHelpers.cuh"
 #include "HMatrix.cuh"
+#include "kblas.h"
+#include "batch_rand.h"
 #include "kDTree.cuh"
 #include "TLRMatrix.cuh"
 

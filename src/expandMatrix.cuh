@@ -9,8 +9,9 @@
 #include <string.h>
 #include <stddef.h>
 
+#include "helperKernels.cuh"
 #include "HMatrix.cuh"
-#include "TLRMatrix.cuh"
+#include "constructTLRMatrix.cuh"
 
 #include <curand_kernel.h>
 #include <thrust/binary_search.h>

@@ -59,21 +59,6 @@ static __global__ void printK(int* K, int num_segments){
     printf("\n");
 }
 
-static __global__ void getTotalMem(uint64_t* totalMem, int* K, int* scan_K, int num_segments){
-    *totalMem = (uint64_t)scan_K[num_segments - 1] + (uint64_t)K[num_segments - 1];
-}
-
-static __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < batchCount){
-        d_rows_batch[i] = maxSegmentSize;
-        d_cols_batch[i] = maxSegmentSize;
-        d_ldm_batch[i] = maxSegmentSize;
-        d_lda_batch[i] = maxSegmentSize;
-        d_ldb_batch[i] = maxSegmentSize;
-    }
-}
-
 template<class T>
 struct UnaryAoAAssign : public thrust::unary_function<int, T*>
 {
@@ -98,28 +83,6 @@ static void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int
     cudaGetLastError();
 }
 
-static __global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
-    if(threadIdx.x < d_ranks[blockIdx.x]) {
-        for(unsigned int i = 0; i < maxSegmentSize; ++i) {
-            d_U_tiled_segmented[d_scan_k[blockIdx.x]*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
-            d_V_tiled_segmented[d_scan_k[blockIdx.x]*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_B[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
-        }
-    }
-}
-
-static __global__ void copyRanks(int num_segments, int maxSegmentSize, int* from_ranks, int* to_ranks){
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < num_segments*(num_segments-1)){
-        int row = i%(num_segments-1);
-        int col = i/(num_segments-1);
-        int diff = (row>=col) ? 1 : 0;
-        to_ranks[i + col + diff] = from_ranks[i];
-    }
-    if(i < num_segments){
-        to_ranks[i*num_segments + i] = 0;
-    }
-}
-
 static __host__ __device__ int getMOfromXY(unsigned int x, unsigned int y){
     static const unsigned int B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF};
     static const unsigned int S[] = {1, 2, 4, 8};
@@ -138,19 +101,10 @@ static __host__ __device__ int getMOfromXY(unsigned int x, unsigned int y){
     return z;
 }
 
-// TODO: don't capitalize first letter
 static __host__ __device__ int CMIndextoMOIndex(int numSegments, int n){
     unsigned int i = n%numSegments;
     unsigned int j = n/numSegments;
     return getMOfromXY(j, i);
-}
-
-static __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i<num_segments*num_segments){
-        int MOIndex = CMIndextoMOIndex(num_segments, i);
-        mortonMatrixRanks[MOIndex] = matrixRanks[i];
-    }
 }
 
 // TODO: rename

@@ -45,3 +45,11 @@ void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegmentSize, u
     cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
     gpuErrchk(cudaPeekAtLastError());
 }
+
+__global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<num_segments*num_segments){
+        int MOIndex = CMIndextoMOIndex(num_segments, i);
+        mortonMatrixRanks[MOIndex] = matrixRanks[i];
+    }
+}
