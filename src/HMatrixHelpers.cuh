@@ -6,6 +6,8 @@
 
 typedef double H2Opus_Real;
 
+// TODO: rename to HMatrixStructure
+// TODO: make this part of the HMatrix struct
 struct WeakAdmissibility {
     int numLevels;
     int* numTiles;
