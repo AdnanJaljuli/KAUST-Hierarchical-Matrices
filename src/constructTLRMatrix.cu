@@ -121,7 +121,6 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
     kblasCreate(&kblasHandle);
     kblasInitRandState(kblasHandle, &randState, 1 << 15, 0);
     kblasEnableMagma(kblasHandle);
-    kblas_gesvj_batch_wsquery<H2Opus_Real>(kblasHandle, kDTree.segmentSize, kDTree.segmentSize, kDTree.numSegments - 1);
     kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, bucketSize, kDTree.numSegments - 1);
     kblasAllocateWorkspace(kblasHandle);
 
