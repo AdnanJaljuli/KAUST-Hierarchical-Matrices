@@ -1,13 +1,13 @@
 
 #include "helperFunctions.cuh"
 
-void convertColumnMajorToMorton(uint64_t numSegments, uint64_t maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
+void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmentSize, unsigned int rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
 
-    cudaMalloc((void**) &mortonMatrix.U, rankSum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
-    cudaMalloc((void**) &mortonMatrix.V, rankSum*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
-    cudaMalloc((void**) &mortonMatrix.blockOffsets, numSegments*numSegments*(uint64_t)sizeof(int));
-    cudaMalloc((void**) &mortonMatrix.blockRanks, numSegments*numSegments*(uint64_t)sizeof(int));
-    cudaMalloc((void**) &mortonMatrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*(uint64_t)sizeof(H2Opus_Real));
+    cudaMalloc((void**) &mortonMatrix.U, rankSum*maxSegmentSize*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &mortonMatrix.V, rankSum*maxSegmentSize*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &mortonMatrix.blockOffsets, numSegments*numSegments*sizeof(int));
+    cudaMalloc((void**) &mortonMatrix.blockRanks, numSegments*numSegments*sizeof(int));
+    cudaMalloc((void**) &mortonMatrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numSegments*numSegments + 1024 - 1)/1024;

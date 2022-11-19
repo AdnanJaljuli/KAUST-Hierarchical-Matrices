@@ -35,7 +35,7 @@ __global__ void errorInLRMatrix(int num_segments, int maxSegmentSize, H2Opus_Rea
     atomicAdd(error, (x - y)*(x - y));
 }
 
-void checkErrorInLRMatrix(uint64_t numSegments, uint64_t maxSegmentSize, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix) {
+void checkErrorInLRMatrix(unsigned int numSegments, unsigned int maxSegmentSize, TLR_Matrix matrix, H2Opus_Real* d_denseMatrix) {
     H2Opus_Real* d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, numSegments*maxSegmentSize*numSegments*maxSegmentSize*sizeof(H2Opus_Real));
 
@@ -138,7 +138,7 @@ void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierar
     }
 }
 
-__global__ void generateDenseMatrix_kernel(uint64_t numberOfInputPoints, uint64_t numSegments, uint64_t maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* denseMatrix, int* indexMap, int* offsetsSort, H2Opus_Real* pointCloud) {
+__global__ void generateDenseMatrix_kernel(unsigned int numberOfInputPoints, unsigned int numSegments, unsigned int maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* denseMatrix, int* indexMap, int* offsetsSort, H2Opus_Real* pointCloud) {
     for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i){
         for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j){
             

@@ -28,9 +28,9 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
     cudaMalloc((void**) &d_segmentSpanOffsets, (kDTree.numSegments + 1)*sizeof(int));
     cudaMalloc((void**) &d_segmentSpanReduction, (kDTree.numSegments + 1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
 
-    uint64_t currentNumSegments = 1;
-    uint64_t numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
-    uint64_t currentSegmentSize = upperPowerOfTwo(numberOfInputPoints);
+    unsigned int currentNumSegments = 1;
+    unsigned int numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
+    unsigned int currentSegmentSize = upperPowerOfTwo(numberOfInputPoints);
     void *d_tempStorage;
     size_t tempStorageBytes;
     int *d_temp;

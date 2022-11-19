@@ -7,8 +7,8 @@
 #include "kblas.h"
 #include "batch_rand.h"
 
-__global__ void getTotalMem(uint64_t* totalMem, int* K, int* scan_K, int num_segments){
-    *totalMem = (uint64_t)scan_K[num_segments - 1] + (uint64_t)K[num_segments - 1];
+__global__ void getTotalMem(unsigned int* totalMem, int* K, int* scan_K, int num_segments){
+    *totalMem = scan_K[num_segments - 1] + K[num_segments - 1];
 }
 
 __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_rows_batch, int* d_cols_batch, int* d_ldm_batch, int* d_lda_batch, int* d_ldb_batch){
@@ -64,7 +64,7 @@ __device__ H2Opus_Real interaction(int n, int dim, int col, int row, H2Opus_Real
     return exp(-dist/getCorrelationLength(dim));
 }
 
-__global__ void generateDenseBlockColumn(uint64_t numberOfInputPoints, uint64_t maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* matrix, H2Opus_Real* pointCloud, KDTree kDTree, int columnIndex, H2Opus_Real* diagonal) {
+__global__ void generateDenseBlockColumn(unsigned int numberOfInputPoints, unsigned int maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* matrix, H2Opus_Real* pointCloud, KDTree kDTree, int columnIndex, H2Opus_Real* diagonal) {
     for(unsigned int i = 0; i < (maxSegmentSize/blockDim.x); ++i) {
         for(unsigned int j = 0; j < (maxSegmentSize/blockDim.x); ++j) {
             unsigned int row = blockIdx.y*maxSegmentSize + i*blockDim.x + threadIdx.y;
@@ -95,7 +95,7 @@ __global__ void generateDenseBlockColumn(uint64_t numberOfInputPoints, uint64_t 
     }
 }
 
-uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int dimensionOfInputPoints, TLR_Matrix &matrix, KDTree kDTree, H2Opus_Real* &d_dataset, float tolerance, int ARA_R) {
+unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int dimensionOfInputPoints, TLR_Matrix &matrix, KDTree kDTree, H2Opus_Real* &d_dataset, float tolerance, int ARA_R) {
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
@@ -125,10 +125,10 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
     kblasAllocateWorkspace(kblasHandle);
 
     float ARATotalTime = 0;
-    uint64_t rankSum = 0;
-    uint64_t* totalMem = (uint64_t*)malloc(sizeof(uint64_t));
-    uint64_t* d_totalMem;
-    cudaMalloc((void**) &d_totalMem, sizeof(uint64_t));
+    unsigned int rankSum = 0;
+    unsigned int* totalMem = (unsigned int*)malloc(sizeof(unsigned int));
+    unsigned int* d_totalMem;
+    cudaMalloc((void**) &d_totalMem, sizeof(unsigned int));
 
     H2Opus_Real* d_inputMatrixSegmented;
     int* d_scanRanksSegmented;
@@ -169,7 +169,7 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
 
         // TODO: replace this with a cudaMemcpy
         getTotalMem <<< 1, 1 >>> (d_totalMem, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
-        cudaMemcpy(totalMem, d_totalMem, sizeof(uint64_t), cudaMemcpyDeviceToHost);
+        cudaMemcpy(totalMem, d_totalMem, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
         cudaMalloc((void**) &d_UTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_VTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
@@ -221,12 +221,12 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
     cudaMemcpy(h_scanRanks, matrix.blockOffsets, kDTree.numSegments*kDTree.numSegments*sizeof(int), cudaMemcpyDeviceToHost);
 
     for(unsigned int segment = 0; segment < kDTree.numSegments - 1; ++segment) {
-        cudaMemcpy(&matrix.U[h_scanRanks[kDTree.numSegments*segment]*kDTree.segmentSize], d_UTiledTemp[segment], (h_scanRanks[kDTree.numSegments*(segment + 1)] - h_scanRanks[kDTree.numSegments*segment])*kDTree.segmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(&matrix.V[h_scanRanks[kDTree.numSegments*segment]*kDTree.segmentSize], d_VTiledTemp[segment], (h_scanRanks[kDTree.numSegments*(segment + 1)] - h_scanRanks[kDTree.numSegments*segment])*kDTree.segmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+        cudaMemcpy(&matrix.U[h_scanRanks[kDTree.numSegments*segment]*kDTree.segmentSize], d_UTiledTemp[segment], (h_scanRanks[kDTree.numSegments*(segment + 1)] - h_scanRanks[kDTree.numSegments*segment])*kDTree.segmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+        cudaMemcpy(&matrix.V[h_scanRanks[kDTree.numSegments*segment]*kDTree.segmentSize], d_VTiledTemp[segment], (h_scanRanks[kDTree.numSegments*(segment + 1)] - h_scanRanks[kDTree.numSegments*segment])*kDTree.segmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
     }
 
-    cudaMemcpy(&matrix.U[h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)]*kDTree.segmentSize], d_UTiledTemp[kDTree.numSegments - 1], (rankSum - h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)])*kDTree.segmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(&matrix.V[h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)]*kDTree.segmentSize], d_VTiledTemp[kDTree.numSegments - 1], (rankSum - h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)])*kDTree.segmentSize*(uint64_t)sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&matrix.U[h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)]*kDTree.segmentSize], d_UTiledTemp[kDTree.numSegments - 1], (rankSum - h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)])*kDTree.segmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&matrix.V[h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)]*kDTree.segmentSize], d_VTiledTemp[kDTree.numSegments - 1], (rankSum - h_scanRanks[kDTree.numSegments*(kDTree.numSegments - 1)])*kDTree.segmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
     free(h_scanRanks);
 
     for(unsigned int segment = 0; segment < kDTree.numSegments; ++segment) {

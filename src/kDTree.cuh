@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 struct KDTree{
-    uint64_t numSegments;
-    uint64_t segmentSize;
+    unsigned int numSegments;
+    unsigned int segmentSize;
     int *segmentIndices;
     int *segmentOffsets;
 };
