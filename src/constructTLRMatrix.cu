@@ -10,9 +10,8 @@
 #include <assert.h>
 
 unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int dimensionOfInputPoints, TLR_Matrix &matrix, KDTree kDTree, H2Opus_Real* &d_dataset, float tolerance, int ARA_R) {
-    unsigned int maxRank = kDTree.segmentSize/2;
-    printf("maxRanks: %d\n", maxRank);
 
+    unsigned int maxRank = kDTree.segmentSize/2;
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
@@ -43,7 +42,7 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
 
     float ARATotalTime = 0;
     unsigned int rankSum = 0;
-    unsigned int* totalMem = (unsigned int*)malloc(sizeof(unsigned int));
+    unsigned int totalMem;
     unsigned int* d_totalMem;
     cudaMalloc((void**) &d_totalMem, sizeof(unsigned int));
 
@@ -81,22 +80,21 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
         cub::DeviceScan::InclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaFree(d_tempStorage);
 
-        cudaMemcpy(totalMem, d_scanRanksSegmented + kDTree.numSegments - 2, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&totalMem, d_scanRanksSegmented + kDTree.numSegments - 2, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 
-        cudaMalloc((void**) &d_UTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_VTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_UTiledTemp[segment], kDTree.segmentSize*totalMem*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_VTiledTemp[segment], kDTree.segmentSize*totalMem*sizeof(H2Opus_Real));
 
         // TODO: optimize thread allocation here OR replace with cudaMemcpys
         int numThreadsPerBlock = kDTree.segmentSize;
         int numBlocks = kDTree.numSegments - 1;
         copyTiles <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments - 1, kDTree.segmentSize, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, d_UTiledTemp[segment], d_A, d_VTiledTemp[segment], d_B, maxRank);
-        rankSum += (*totalMem);
+        rankSum += totalMem;
     }
 
     kblasDestroy(&kblasHandle);
     kblasDestroyRandState(randState);
 
-    free(totalMem);
     cudaFree(d_totalMem);
     cudaFree(d_inputMatrixSegmented);
     cudaFree(d_scanRanksSegmented);
