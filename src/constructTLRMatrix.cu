@@ -22,12 +22,12 @@ __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_rows_ba
     }
 }
 
-__global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, unsigned int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
+__global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, unsigned int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B, unsigned int maxRank){
     if(threadIdx.x < d_ranks[blockIdx.x]) {
         unsigned int scanRanks = d_scan_k[blockIdx.x] - d_ranks[blockIdx.x];
         for(unsigned int i = 0; i < maxSegmentSize; ++i) {
-            d_U_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
-            d_V_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_B[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
+            d_U_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxRank + threadIdx.x*maxSegmentSize + i];
+            d_V_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_B[blockIdx.x*maxSegmentSize*maxRank + threadIdx.x*maxSegmentSize + i];
         }
     }
 }
@@ -97,6 +97,9 @@ __global__ void generateDenseBlockColumn(unsigned int numberOfInputPoints, unsig
 }
 
 unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int dimensionOfInputPoints, TLR_Matrix &matrix, KDTree kDTree, H2Opus_Real* &d_dataset, float tolerance, int ARA_R) {
+    unsigned int maxRank = kDTree.segmentSize/2;
+    printf("maxRanks: %d\n", maxRank);
+
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
@@ -107,8 +110,8 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
     cudaMalloc((void**) &d_LDMBatch, (kDTree.numSegments - 1)*sizeof(int));
     cudaMalloc((void**) &d_LDABatch, (kDTree.numSegments - 1)*sizeof(int));
     cudaMalloc((void**) &d_LDBBatch, (kDTree.numSegments - 1)*sizeof(int));
-    cudaMalloc((void**) &d_A, (kDTree.numSegments - 1)*kDTree.segmentSize*kDTree.segmentSize*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_B, (kDTree.numSegments - 1)*kDTree.segmentSize*kDTree.segmentSize*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_A, (kDTree.numSegments - 1)*kDTree.segmentSize*maxRank*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_B, (kDTree.numSegments - 1)*kDTree.segmentSize*maxRank*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_MPtrs, (kDTree.numSegments - 1)*sizeof(H2Opus_Real*));
     cudaMalloc((void**) &d_APtrs, (kDTree.numSegments - 1)*sizeof(H2Opus_Real*));
     cudaMalloc((void**) &d_BPtrs, (kDTree.numSegments - 1)*sizeof(H2Opus_Real*));
@@ -148,14 +151,14 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
         cudaDeviceSynchronize();
 
         generateArrayOfPointersT<H2Opus_Real>(d_inputMatrixSegmented, d_MPtrs, kDTree.segmentSize*kDTree.segmentSize, kDTree.numSegments - 1, 0);
-        generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, kDTree.segmentSize*kDTree.segmentSize, kDTree.numSegments - 1, 0);
-        generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, kDTree.segmentSize*kDTree.segmentSize, kDTree.numSegments - 1, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, kDTree.segmentSize*maxRank, kDTree.numSegments - 1, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, kDTree.segmentSize*maxRank, kDTree.numSegments - 1, 0);
         cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 
         int kblas_ara_return = kblas_ara_batch(
             kblasHandle, d_rowsBatch, d_colsBatch, d_MPtrs, d_LDMBatch, 
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks + segment*(kDTree.numSegments - 1),
-            tolerance, kDTree.segmentSize, kDTree.segmentSize, 16, 16, ARA_R, randState, 0, kDTree.numSegments - 1
+            tolerance, kDTree.segmentSize, kDTree.segmentSize, maxRank, 16, ARA_R, randState, 0, kDTree.numSegments - 1
         );
         assert(kblas_ara_return == 1);
         cudaDeviceSynchronize();
@@ -168,22 +171,18 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
         cudaDeviceSynchronize();
         cudaFree(d_tempStorage);
 
-        // TODO: replace this with a cudaMemcpy
-        // getTotalMem <<< 1, 1 >>> (d_totalMem, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
-        // cudaMemcpy(totalMem, d_totalMem, sizeof(unsigned int), cudaMemcpyDeviceToHost);
         cudaMemcpy(totalMem, d_scanRanksSegmented + kDTree.numSegments - 2, sizeof(unsigned int), cudaMemcpyDeviceToHost);
-        printf("total mem: %d\n", (*totalMem));
 
         cudaMalloc((void**) &d_UTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_VTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
 
-        // TODO: optimize thread allocation here
+        // TODO: optimize thread allocation here OR replace with cudaMemcpys
         int numThreadsPerBlock = kDTree.segmentSize;
         int numBlocks = kDTree.numSegments - 1;
-        copyTiles <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments - 1, kDTree.segmentSize, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, d_UTiledTemp[segment], d_A, d_VTiledTemp[segment], d_B);
+        copyTiles <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments - 1, kDTree.segmentSize, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, d_UTiledTemp[segment], d_A, d_VTiledTemp[segment], d_B, maxRank);
         rankSum += (*totalMem);
     }
-    
+
     kblasDestroy(&kblasHandle);
     kblasDestroyRandState(randState);
 
@@ -208,6 +207,7 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
 
     numThreadsPerBlock = 1024;
     numBlocks = ((kDTree.numSegments - 1)*kDTree.numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    // TODO: no need for this. Instead, replace d_ranks with matrix.blockRanks
     copyRanks <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments, kDTree.segmentSize, d_ranks, matrix.blockRanks);
     cudaDeviceSynchronize();
     cudaFree(d_ranks);
