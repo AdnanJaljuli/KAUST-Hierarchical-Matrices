@@ -20,6 +20,8 @@ struct TLR_Matrix{
     H2Opus_Real *diagonal;
 };
 
+// TODO: have an allocateMatrix function
+
 void freeMatrix(TLR_Matrix matrix);
 
 #endif

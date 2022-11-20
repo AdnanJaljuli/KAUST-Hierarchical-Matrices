@@ -4,7 +4,7 @@
 
 #include "helperKernels.cuh"
 #include "HMatrix.cuh"
-#include "constructTLRMatrix.cuh"
+#include "TLRMatrixHelpers.cuh"
 
 __global__ void expandLRMatrix(int num_segments, int maxSegmentSize, H2Opus_Real* expandedMatrix, TLR_Matrix matrix) {
     if(blockIdx.x == blockIdx.y) {
