@@ -107,7 +107,6 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
     dim3 m_numThreadsPerBlock(32, 32);
     dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
     expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrixLevel, d_expandedMatrix, batchUnitSize*bucketSize);
-    cudaDeviceSynchronize();
 
     // compare expanded H matrix level with dense matrix
     H2Opus_Real* d_error;

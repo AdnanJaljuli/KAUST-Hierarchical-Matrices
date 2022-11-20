@@ -12,7 +12,6 @@ void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmen
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numSegments*numSegments + 1024 - 1)/1024;
     copyCMRanksToMORanks <<< numBlocks, numThreadsPerBlock >>> (numSegments, maxSegmentSize, matrix.blockRanks, mortonMatrix.blockRanks);
-    cudaDeviceSynchronize();
 
     // scan mortonMatrix ranks
     void* d_temp_storage = NULL;
@@ -20,7 +19,6 @@ void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmen
     cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, mortonMatrix.blockRanks, mortonMatrix.blockOffsets, numSegments*numSegments);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, mortonMatrix.blockRanks, mortonMatrix.blockOffsets, numSegments*numSegments);
-    cudaDeviceSynchronize();
     cudaFree(d_temp_storage);
 
     int* h_matrix_offsets = (int*)malloc(numSegments*numSegments*sizeof(int));

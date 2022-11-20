@@ -16,5 +16,4 @@ void generateDataset(int numberOfInputPoints, int dimensionOfInputPoints, H2Opus
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
     generateDataset_kernel <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, d_pointCloud);
-    cudaDeviceSynchronize();
 }

@@ -48,7 +48,6 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
         numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillReductionArray <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, d_pointCloud, kDTree.segmentIndices, d_reduceIn);
-        cudaDeviceSynchronize();
 
         d_tempStorage = NULL;
         tempStorageBytes = 0;
@@ -72,7 +71,6 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
         numThreadsPerBlock = 1024;
         numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
         findSpan <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, d_minSegmentItem, d_maxSegmentItem, d_segmentSpan, d_segmentSpanOffsets);
-        cudaDeviceSynchronize();
 
         d_tempStorage = NULL;
         tempStorageBytes = 0;
@@ -86,7 +84,6 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
         numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, currentSegmentSize, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud);
-        cudaDeviceSynchronize();
 
         d_tempStorage = NULL;
         tempStorageBytes = 0;
