@@ -22,11 +22,12 @@ __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_rows_ba
     }
 }
 
-__global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
+__global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, unsigned int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B){
     if(threadIdx.x < d_ranks[blockIdx.x]) {
+        unsigned int scanRanks = d_scan_k[blockIdx.x] - d_ranks[blockIdx.x];
         for(unsigned int i = 0; i < maxSegmentSize; ++i) {
-            d_U_tiled_segmented[d_scan_k[blockIdx.x]*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
-            d_V_tiled_segmented[d_scan_k[blockIdx.x]*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_B[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
+            d_U_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
+            d_V_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_B[blockIdx.x*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + i];
         }
     }
 }
@@ -131,9 +132,9 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
     cudaMalloc((void**) &d_totalMem, sizeof(unsigned int));
 
     H2Opus_Real* d_inputMatrixSegmented;
-    int* d_scanRanksSegmented;
+    unsigned int* d_scanRanksSegmented;
     cudaMalloc((void**) &d_inputMatrixSegmented, kDTree.segmentSize*kDTree.segmentSize*kDTree.numSegments*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_scanRanksSegmented, (kDTree.numSegments - 1)*sizeof(int));
+    cudaMalloc((void**) &d_scanRanksSegmented, (kDTree.numSegments - 1)*sizeof(unsigned int));
     cudaMalloc((void**) &matrix.blockRanks, kDTree.numSegments*kDTree.numSegments*sizeof(int));
     cudaMalloc((void**) &matrix.diagonal, kDTree.numSegments*kDTree.segmentSize*kDTree.segmentSize*sizeof(H2Opus_Real));
     H2Opus_Real **d_UTiledTemp = (H2Opus_Real**)malloc(kDTree.numSegments*sizeof(H2Opus_Real*));
@@ -161,15 +162,17 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
 
         void* d_tempStorage = NULL;
         size_t tempStorageBytes = 0;
-        cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
+        cub::DeviceScan::InclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaMalloc(&d_tempStorage, tempStorageBytes);
-        cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
+        cub::DeviceScan::InclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaDeviceSynchronize();
         cudaFree(d_tempStorage);
 
         // TODO: replace this with a cudaMemcpy
-        getTotalMem <<< 1, 1 >>> (d_totalMem, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
-        cudaMemcpy(totalMem, d_totalMem, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+        // getTotalMem <<< 1, 1 >>> (d_totalMem, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
+        // cudaMemcpy(totalMem, d_totalMem, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(totalMem, d_scanRanksSegmented + kDTree.numSegments - 2, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+        printf("total mem: %d\n", (*totalMem));
 
         cudaMalloc((void**) &d_UTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_VTiledTemp[segment], kDTree.segmentSize*(*totalMem)*sizeof(H2Opus_Real));
