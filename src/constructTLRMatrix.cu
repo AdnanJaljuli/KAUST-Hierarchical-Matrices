@@ -148,7 +148,6 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
 
     for(unsigned int segment = 0; segment < kDTree.numSegments; ++segment) {
         generateDenseBlockColumn <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, kDTree.segmentSize, dimensionOfInputPoints, d_inputMatrixSegmented, d_dataset, kDTree, segment, matrix.diagonal);
-        cudaDeviceSynchronize();
 
         generateArrayOfPointersT<H2Opus_Real>(d_inputMatrixSegmented, d_MPtrs, kDTree.segmentSize*kDTree.segmentSize, kDTree.numSegments - 1, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, kDTree.segmentSize*maxRank, kDTree.numSegments - 1, 0);
@@ -161,14 +160,12 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
             tolerance, kDTree.segmentSize, kDTree.segmentSize, maxRank, 16, ARA_R, randState, 0, kDTree.numSegments - 1
         );
         assert(kblas_ara_return == 1);
-        cudaDeviceSynchronize();
 
         void* d_tempStorage = NULL;
         size_t tempStorageBytes = 0;
         cub::DeviceScan::InclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
         cudaMalloc(&d_tempStorage, tempStorageBytes);
         cub::DeviceScan::InclusiveSum(d_tempStorage, tempStorageBytes, d_ranks + segment*(kDTree.numSegments - 1), d_scanRanksSegmented, kDTree.numSegments - 1);
-        cudaDeviceSynchronize();
         cudaFree(d_tempStorage);
 
         cudaMemcpy(totalMem, d_scanRanksSegmented + kDTree.numSegments - 2, sizeof(unsigned int), cudaMemcpyDeviceToHost);
@@ -209,7 +206,6 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
     numBlocks = ((kDTree.numSegments - 1)*kDTree.numSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
     // TODO: no need for this. Instead, replace d_ranks with matrix.blockRanks
     copyRanks <<< numBlocks, numThreadsPerBlock >>> (kDTree.numSegments, kDTree.segmentSize, d_ranks, matrix.blockRanks);
-    cudaDeviceSynchronize();
     cudaFree(d_ranks);
 
     void *d_tempStorage = NULL;
@@ -217,7 +213,6 @@ unsigned int createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigne
     cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, matrix.blockRanks, matrix.blockOffsets, kDTree.numSegments*kDTree.numSegments);
     cudaMalloc(&d_tempStorage, tempStorageBytes);
     cub::DeviceScan::ExclusiveSum(d_tempStorage, tempStorageBytes, matrix.blockRanks, matrix.blockOffsets, kDTree.numSegments*kDTree.numSegments);
-    cudaDeviceSynchronize();
     cudaFree(d_tempStorage);
 
     int* h_scanRanks = (int*)malloc(kDTree.numSegments*kDTree.numSegments*sizeof(int));
