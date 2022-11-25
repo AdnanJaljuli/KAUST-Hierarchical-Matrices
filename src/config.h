@@ -35,6 +35,9 @@ static void usage()
             "   -d <dimension of input points>      Used to set the dimension of the input points. \n"
             "                                       This must be an integer.\n"
             "                                  - Default : 2\n"
+            "\n"
+            "   -v <width of vector>                Used to set the width of the vector that is multiplied by the hierarchical matrix"
+            "                                  - Default: 64"
             "\n");
 }
 
@@ -88,6 +91,7 @@ struct Config
     unsigned int numberOfInputPoints;
     unsigned int dimensionOfInputPoints;
     unsigned int bucketSize;
+    unsigned int vectorWidth;
     float lowestLevelTolerance;
 };
 
@@ -99,9 +103,10 @@ static Config parseArgs(int argc, char **argv)
     config.lowestLevelTolerance = 1e-5;
     config.divMethod = POWER_OF_TWO_ON_LEFT;
     config.dimensionOfInputPoints = 2;
+    config.vectorWidth = 64;
 
     int opt;
-    while ((opt = getopt(argc, argv, "n:b:t:m:d:h")) >= 0)
+    while ((opt = getopt(argc, argv, "n:b:t:m:d:v:h")) >= 0)
     {
         switch (opt)
         {
@@ -120,6 +125,8 @@ static Config parseArgs(int argc, char **argv)
         case 'd':
             config.dimensionOfInputPoints = atoi(optarg);
             break;
+        case 'v':
+            config.vectorWidth = atoi(optarg);
         case 'h':
             usage();
             exit(0);
@@ -140,6 +147,7 @@ static void printArgs(Config config) {
     printf("bucket size: %d\n", config.bucketSize);
     printf("lowest level tolerance: %f\n", config.lowestLevelTolerance);
     printf("dimension of input points: %d\n", config.dimensionOfInputPoints);
+    printf("vector width: %u\n", config.vectorWidth);
 }
 
 #endif

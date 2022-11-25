@@ -6,6 +6,7 @@
 #include "generateDataset.cuh"
 #include "helperFunctions.cuh"
 #include "HMatrix.cuh"
+#include "HMatrixVectorMultiplication.cuh"
 #include "constructHMatrixFromStruct.cuh"
 #include "kDTree.cuh"
 #include "kDTreeConstruction.cuh"
@@ -132,12 +133,19 @@ int main(int argc, char *argv[]) {
     freeWeakAdmissbilityStruct(WAStruct);
     freeKDTree(kDTree);
     freeMatrix(mortonOrderedMatrix);
-    freeHMatrix(hierarchicalMatrix);
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
     #endif
 
     magma_finalize();
+
+    // TODO: generate random vector
+    H2Opus_Real *d_vectors;
+    cudaMalloc((void**) &d_vectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
+
+    // hierarchical matrix - vector multiplication
+
+    freeHMatrix(hierarchicalMatrix);
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);

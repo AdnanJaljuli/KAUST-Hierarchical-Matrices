@@ -1,6 +1,6 @@
 
 # specify the gpu architecture (volta, ampere)
-GPU_ARCH = ampere
+GPU_ARCH = volta
 ifeq (${GPU_ARCH}, volta)
 	NVOPTS = arch=compute_70,code=sm_70
 else ifeq (${GPU_ARCH}, ampere)
