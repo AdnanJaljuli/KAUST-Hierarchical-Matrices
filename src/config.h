@@ -127,6 +127,7 @@ static Config parseArgs(int argc, char **argv)
             break;
         case 'v':
             config.vectorWidth = atoi(optarg);
+            break;
         case 'h':
             usage();
             exit(0);

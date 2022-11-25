@@ -142,9 +142,11 @@ int main(int argc, char *argv[]) {
     // TODO: generate random vector
     H2Opus_Real *d_vectors;
     cudaMalloc((void**) &d_vectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
+    generateRandomVector(config.vectorWidth, config.numberOfInputPoints, d_vectors);
 
     // hierarchical matrix - vector multiplication
 
+    cudaFree(d_vectors);
     freeHMatrix(hierarchicalMatrix);
 
     #if USE_COUNTERS

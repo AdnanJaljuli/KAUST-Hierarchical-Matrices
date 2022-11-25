@@ -1,5 +1,6 @@
 
 #include "helperFunctions.cuh"
+#include <curand.h>
 
 void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmentSize, unsigned int rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
 
@@ -49,5 +50,22 @@ __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* 
     if(i<num_segments*num_segments){
         int MOIndex = CMIndextoMOIndex(num_segments, i);
         mortonMatrixRanks[MOIndex] = matrixRanks[i];
+    }
+}
+
+void generateRandomVector(unsigned int vectorWidth, unsigned int vectorHeight, H2Opus_Real *vector) {
+    curandGenerator_t gen;
+    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
+    curandGenerateUniformDouble(gen, vector, vectorWidth*vectorHeight);
+    curandDestroyGenerator(gen);
+
+    H2Opus_Real *h_vector = (H2Opus_Real*)malloc(vectorWidth*vectorHeight*sizeof(H2Opus_Real));
+    cudaMemcpy(h_vector, vector, vectorWidth*vectorHeight*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    for(unsigned int i = 0; i < vectorWidth; ++i) {
+        for(unsigned int j = 0; j < vectorHeight; ++j) {
+            printf("%lf ", h_vector[i*vectorHeight + j]);
+        }
+        printf("\n");
     }
 }
