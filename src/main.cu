@@ -121,10 +121,9 @@ int main(int argc, char *argv[]) {
     allocateWeakAdmissibilityStruct(WAStruct, config.numberOfInputPoints, config.bucketSize);
     HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
-    unsigned int *d_maxRanks;
-    cudaMalloc((void**) &d_maxRanks, (hierarchicalMatrix.numLevels - 2)*sizeof(unsigned int));
-    generateMaxRanks(hierarchicalMatrix.numLevels, config.bucketSize, d_maxRanks);
-    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct, d_maxRanks);
+    unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.numLevels - 2)*sizeof(unsigned int));
+    generateMaxRanks(hierarchicalMatrix.numLevels, config.bucketSize, maxRanks);
+    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct, maxRanks);
     #if USE_COUNTERS
     endTime(HMATRIX, &counters);
     #endif
@@ -133,7 +132,7 @@ int main(int argc, char *argv[]) {
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
 
-    cudaFree(d_maxRanks);
+    free(maxRanks);
     freeWeakAdmissbilityStruct(WAStruct);
     freeKDTree(kDTree);
     freeMatrix(mortonOrderedMatrix);
@@ -142,6 +141,7 @@ int main(int argc, char *argv[]) {
     #endif
 
     magma_finalize();
+    return 0;
 
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;

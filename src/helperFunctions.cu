@@ -69,7 +69,7 @@ __global__ void generateMaxRanks_kernel (unsigned int numLevels, unsigned int bu
 }
 
 void generateMaxRanks(unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks) {
-    unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = ((numLevels - 2) + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    generateMaxRanks_kernel <<< numBlocks, numThreadsPerBlock >>> (numLevels - 2, bucketSize, maxRanks);
+    for(unsigned int i = 0; i < numLevels - 2; ++i) {
+        maxRanks[i] = bucketSize*(1 << i);
+    }
 }

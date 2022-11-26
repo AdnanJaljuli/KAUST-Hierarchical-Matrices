@@ -21,7 +21,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
     // TODO: get rid of maxCols
     int maxRows;
     int maxCols;
-    int maxRank;
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
     int *d_LDABatch, *d_LDBBatch;
     H2Opus_Real *d_A, *d_B;
@@ -55,7 +54,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         tolerance *= 2;
         maxRows = batchUnitSize*bucketSize;
         maxCols = maxRows;
-        maxRank = maxRows/2;
         cudaMalloc((void**) &d_ranks, batchSize*sizeof(int)); // TODO: allocate and free outside loop and reuse memory pools across levels
         cudaMalloc((void**) &d_rowsBatch, batchSize*sizeof(int));
         cudaMalloc((void**) &d_colsBatch, batchSize*sizeof(int));
@@ -63,26 +61,26 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaMalloc((void**) &d_LDBBatch, batchSize*sizeof(int));
         cudaMalloc((void**) &d_APtrs, batchSize*sizeof(H2Opus_Real*));
         cudaMalloc((void**) &d_BPtrs, batchSize*sizeof(H2Opus_Real*));
-        cudaMalloc((void**) &d_A, batchSize*maxRows*maxRank*sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_B, batchSize*maxRows*maxRank*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_A, batchSize*maxRows*maxRanks[WAStruct.numLevels - level - 2]*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_B, batchSize*maxRows*maxRanks[WAStruct.numLevels - level - 2]*sizeof(H2Opus_Real));
 
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillLRARAArrays <<< numBlocks, numThreadsPerBlock >>> (batchSize, maxRows, d_rowsBatch, d_colsBatch, d_LDABatch, d_LDBBatch);
 
-        generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxRank, batchSize, 0);
-        generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxRank, batchSize, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxRanks[WAStruct.numLevels - level - 2], batchSize, 0);
+        generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxRanks[WAStruct.numLevels - level - 2], batchSize, 0);
         kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
         kblasAllocateWorkspace(kblasHandle);
 
         int LRARAReturnVal = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, tilePtrs.U, tilePtrs.V, d_scanRanksPtrs,
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks,
-            tolerance, maxRows, maxCols, maxRank, 16, ARA_R, randState, 0, batchSize
+            tolerance, maxRows, maxCols, maxRanks[WAStruct.numLevels - level - 2], 16, ARA_R, randState, 0, batchSize
         );
         assert(LRARAReturnVal == 1);
 
         // allocate HMatrix level
-        allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRank);
+        allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, WAStruct, level, d_A, d_B, maxRows, maxRanks[WAStruct.numLevels - level - 2]);
 
         // free memory
         freeLevelTilePtrs(tilePtrs);
