@@ -16,7 +16,8 @@ _OPENBLAS_ROOT_?=$(OPENBLAS_HOME)
 
 INC = -I$(_MAGMA_ROOT_)/include
 INC += -I$(_KBLAS_ROOT_)/include
-INC += -I$(CUB_HOME)
+INC += -I/home/jaljula/cutlass/include
+INC += -I/home/jaljula/cutlass/tools/util/include
 
 LIB_DIR = -L$(_CUDA_ROOT_)/lib64
 LIB_DIR += -L$(_MAGMA_ROOT_)/lib
