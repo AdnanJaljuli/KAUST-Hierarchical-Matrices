@@ -60,3 +60,16 @@ void generateRandomVector(unsigned int vectorWidth, unsigned int vectorHeight, H
     curandGenerateUniformDouble(gen, vector, vectorWidth*vectorHeight);
     curandDestroyGenerator(gen);
 }
+
+__global__ void generateMaxRanks_kernel (unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < numLevels) {
+        maxRanks[i] = bucketSize*(1 << i);
+    }
+}
+
+void generateMaxRanks(unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks) {
+    unsigned int numThreadsPerBlock = 1024;
+    unsigned int numBlocks = ((numLevels - 2) + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    generateMaxRanks_kernel <<< numBlocks, numThreadsPerBlock >>> (numLevels - 2, bucketSize, maxRanks);
+}
