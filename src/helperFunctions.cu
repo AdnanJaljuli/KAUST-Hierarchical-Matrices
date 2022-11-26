@@ -59,13 +59,4 @@ void generateRandomVector(unsigned int vectorWidth, unsigned int vectorHeight, H
     curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
     curandGenerateUniformDouble(gen, vector, vectorWidth*vectorHeight);
     curandDestroyGenerator(gen);
-
-    H2Opus_Real *h_vector = (H2Opus_Real*)malloc(vectorWidth*vectorHeight*sizeof(H2Opus_Real));
-    cudaMemcpy(h_vector, vector, vectorWidth*vectorHeight*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    for(unsigned int i = 0; i < vectorWidth; ++i) {
-        for(unsigned int j = 0; j < vectorHeight; ++j) {
-            printf("%lf ", h_vector[i*vectorHeight + j]);
-        }
-        printf("\n");
-    }
 }

@@ -140,13 +140,15 @@ int main(int argc, char *argv[]) {
     magma_finalize();
 
     // TODO: generate random vector
-    H2Opus_Real *d_vectors;
-    cudaMalloc((void**) &d_vectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
-    generateRandomVector(config.vectorWidth, config.numberOfInputPoints, d_vectors);
-
+    H2Opus_Real *d_inputVectors, *d_resultVectors;
+    cudaMalloc((void**) &d_inputVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_resultVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
+    generateRandomVector(config.vectorWidth, config.numberOfInputPoints, d_inputVectors);
+    
     // hierarchical matrix - vector multiplication
+    HMatrixVecMult(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, config.vectorWidth, hierarchicalMatrix, d_inputVectors, d_resultVectors);
 
-    cudaFree(d_vectors);
+    cudaFree(d_inputVectors);
     freeHMatrix(hierarchicalMatrix);
 
     #if USE_COUNTERS
