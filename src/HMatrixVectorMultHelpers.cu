@@ -56,33 +56,24 @@ cudaError_t cutlassDiagonalXVec(
     unsigned int numberOfInputPoints, unsigned int  bucketSize, 
     unsigned int  numSegments, unsigned int  vectorWidth, H2Opus_Real *diagonal,
     H2Opus_Real *inputVectors, H2Opus_Real *resultVectors) {
-        // Arbitrary problem size
-        int const m = bucketSize;
-        int const n = vectorWidth;
-        int const k = bucketSize;
-        int const batch_count = numSegments;
 
-        // A, B are non-transpose, column major
-        int const lda = m;
-        int const ldb = k * batch_count;
-        int const ldc = m;
+        int const lda = bucketSize;
+        int const ldb = bucketSize*numSegments;
+        int const ldc = bucketSize;
 
-        // the memory is batched along K dimension
-        long long int batch_stride_A = static_cast<long long int>(lda) * static_cast<long long int>(k);
-        long long int batch_stride_B = static_cast<long long int>(k);
-        long long int batch_stride_C = static_cast<long long int>(ldc) * static_cast<long long int>(n);
+        long long int batch_stride_A = static_cast<long long int>(lda)*static_cast<long long int>(bucketSize);
+        long long int batch_stride_B = static_cast<long long int>(bucketSize);
+        long long int batch_stride_C = static_cast<long long int>(ldc)*static_cast<long long int>(vectorWidth);
 
-        // alpha and beta
         double alpha = 1.0f;
         double beta = 0.0f;
 
         cudaError_t result = cudaSuccess;
-
         result = cutlass_strided_batched_sgemm(
-            m, n, k, alpha, diagonal, lda, batch_stride_A, inputVectors, ldb, batch_stride_B, resultVectors, ldc, batch_stride_C,
-            beta, batch_count);
-        if (result != cudaSuccess)
-            return result;
+            bucketSize, vectorWidth, bucketSize, alpha, diagonal, lda, batch_stride_A, inputVectors, ldb, batch_stride_B, resultVectors, ldc, batch_stride_C,
+            beta, numSegments);
+
+        return result;
 }
 
 // __global__ void diagonalXVec(
