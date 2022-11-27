@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     // TODO: generate Morton ordering directly
     // TODO: print how much memory the matrix is consuming
     // TODO: print the rank distribution of the tiles and more statistics
-    unsigned int rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints, matrix, kDTree, d_pointCloud, config.lowestLevelTolerance, ARA_R);
+    uint64_t rankSum = createColumnMajorLRMatrix(config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints, matrix, kDTree, d_pointCloud, config.lowestLevelTolerance, ARA_R);
     #if USE_COUNTERS
     endTime(TLR_MATRIX, &counters);
     #endif

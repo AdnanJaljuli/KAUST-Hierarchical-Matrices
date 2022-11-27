@@ -14,12 +14,12 @@ __global__ void fillARAArrays(int batchCount, int maxSegmentSize, int* d_rows_ba
     }
 }
 
-__global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, unsigned int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B, unsigned int maxRank){
+__global__ void copyTiles(int batchCount, int maxSegmentSize, int* d_ranks, int* d_scan_k, H2Opus_Real* d_U_tiled_segmented, H2Opus_Real* d_A, H2Opus_Real* d_V_tiled_segmented, H2Opus_Real* d_B, unsigned int maxRank){
     if(threadIdx.x < d_ranks[blockIdx.x]) {
-        unsigned int scanRanks = d_scan_k[blockIdx.x] - d_ranks[blockIdx.x];
+        int scanRanks = d_scan_k[blockIdx.x] - d_ranks[blockIdx.x];
         for(unsigned int i = 0; i < maxSegmentSize; ++i) {
-            d_U_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxRank + threadIdx.x*maxSegmentSize + i];
-            d_V_tiled_segmented[scanRanks*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_B[blockIdx.x*maxSegmentSize*maxRank + threadIdx.x*maxSegmentSize + i];
+            d_U_tiled_segmented[static_cast<uint64_t>(scanRanks)*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_A[blockIdx.x*maxSegmentSize*maxRank + threadIdx.x*maxSegmentSize + i];
+            d_V_tiled_segmented[static_cast<uint64_t>(scanRanks)*maxSegmentSize + threadIdx.x*maxSegmentSize + i] = d_B[blockIdx.x*maxSegmentSize*maxRank + threadIdx.x*maxSegmentSize + i];
         }
     }
 }

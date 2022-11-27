@@ -43,10 +43,10 @@ __global__ void fillBatchPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchSize) {
         if(blockIdx.y == 0) {
-            d_UPtrs[i] = &mortonOrderedMatrix.U[mortonOrderedMatrix.blockOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*segmentSize];
+            d_UPtrs[i] = &mortonOrderedMatrix.U[static_cast<uint64_t>(mortonOrderedMatrix.blockOffsets[tileIndices[i]*batchUnitSize*batchUnitSize])*segmentSize];
         }
         else {
-            d_VPtrs[i] = &mortonOrderedMatrix.V[mortonOrderedMatrix.blockOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*segmentSize];
+            d_VPtrs[i] = &mortonOrderedMatrix.V[static_cast<uint64_t>(mortonOrderedMatrix.blockOffsets[tileIndices[i]*batchUnitSize*batchUnitSize])*segmentSize];
         }
     }
 }

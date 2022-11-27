@@ -2,13 +2,13 @@
 #include "helperFunctions.cuh"
 #include <curand.h>
 
-void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmentSize, unsigned int rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
+void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
 
     cudaMalloc((void**) &mortonMatrix.U, rankSum*maxSegmentSize*sizeof(H2Opus_Real));
     cudaMalloc((void**) &mortonMatrix.V, rankSum*maxSegmentSize*sizeof(H2Opus_Real));
     cudaMalloc((void**) &mortonMatrix.blockOffsets, numSegments*numSegments*sizeof(int));
     cudaMalloc((void**) &mortonMatrix.blockRanks, numSegments*numSegments*sizeof(int));
-    cudaMalloc((void**) &mortonMatrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &mortonMatrix.diagonal, static_cast<uint64_t>(numSegments)*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real));
 
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numSegments*numSegments + 1024 - 1)/1024;
@@ -36,8 +36,8 @@ void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmen
         unsigned int numBlocks = (h_matrix_ranks[i]*maxSegmentSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         assert(h_matrix_ranks[i] >= 0);
         if(h_matrix_ranks[i] > 0){
-            cudaMemcpy(&mortonMatrix.U[h_mortonMatrix_offsets[MOIndex]*maxSegmentSize], &matrix.U[h_matrix_offsets[i]*maxSegmentSize], h_matrix_ranks[i]*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-            cudaMemcpy(&mortonMatrix.V[h_mortonMatrix_offsets[MOIndex]*maxSegmentSize], &matrix.V[h_matrix_offsets[i]*maxSegmentSize], h_matrix_ranks[i]*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+            cudaMemcpy(&mortonMatrix.U[static_cast<uint64_t>(h_mortonMatrix_offsets[MOIndex])*maxSegmentSize], &matrix.U[static_cast<uint64_t>(h_matrix_offsets[i])*maxSegmentSize], static_cast<uint64_t>(h_matrix_ranks[i])*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+            cudaMemcpy(&mortonMatrix.V[static_cast<uint64_t>(h_mortonMatrix_offsets[MOIndex])*maxSegmentSize], &matrix.V[static_cast<uint64_t>(h_matrix_offsets[i])*maxSegmentSize], static_cast<uint64_t>(h_matrix_ranks[i])*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
         }
     }
 
@@ -61,15 +61,11 @@ void generateRandomVector(unsigned int vectorWidth, unsigned int vectorHeight, H
     curandDestroyGenerator(gen);
 }
 
-__global__ void generateMaxRanks_kernel (unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks) {
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < numLevels) {
-        maxRanks[i] = bucketSize*(1 << i);
-    }
-}
-
 void generateMaxRanks(unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks) {
     for(unsigned int i = 0; i < numLevels - 2; ++i) {
         maxRanks[i] = bucketSize*(1 << i);
+        if(i > 5) {
+            maxRanks[i]/=4;
+        }
     }
 }
