@@ -1,6 +1,5 @@
 
 #include "cutlassDiagonalXVector.cuh"
-#include "HMatrix.cuh"
 #include <vector>
 #include <cutlass/cutlass.h>
 #include <cutlass/layout/matrix.h>
@@ -53,8 +52,8 @@ cudaError_t cutlass_strided_batched_dgemm(
 }
 
 cudaError_t cutlassDiagonalXVec(
-    unsigned int numberOfInputPoints, unsigned int  bucketSize, 
-    unsigned int  numSegments, unsigned int  vectorWidth, H2Opus_Real *diagonal,
+    unsigned int numberOfInputPoints, unsigned int bucketSize, 
+    unsigned int numSegments, unsigned int vectorWidth, H2Opus_Real *diagonal,
     H2Opus_Real *inputVectors, H2Opus_Real *resultVectors) {
 
 		int const lda = bucketSize;

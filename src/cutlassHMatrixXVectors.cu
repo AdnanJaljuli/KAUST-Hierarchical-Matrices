@@ -1,4 +1,11 @@
 
+#include "cutlassHMatrixXVectors.cuh"
+#include "HMatrix.cuh"
+#include <cutlass/cutlass.h>
+#include <cutlass/layout/matrix.h>
+#include <cutlass/gemm/device/gemm_array.h>
+#include <cutlass/gemm/device/gemm_batched.h>
+
 struct Result {
 
 	double runtime_ms;
@@ -24,8 +31,10 @@ cudaError_t cutlass_grouped_dgemm() {
 
 cudaError_t cutlassHierarchicalXVec(
     unsigned int numberOfInputPoints, unsigned int  bucketSize, 
-    unsigned int  numSegments, unsigned int  vectorWidth, HMatrix hierarchicalMatrix,
+    unsigned int  numSegments, unsigned int vectorWidth, HMatrix hierarchicalMatrix,
     H2Opus_Real *inputVectors, H2Opus_Real *resultVectors) {
+
+		std::vector<cutlass::gemm::GemmCoord> problemSizes;
 
 		using ElementA = double;
 		using ElementB = double;
@@ -54,15 +63,27 @@ cudaError_t cutlassHierarchicalXVec(
 			4>::GemmKernel;
 
     	using Gemm = cutlass::gemm::device::GemmGrouped<GemmKernel>;
-		
+
 		typename Gemm::EpilogueOutputOp::Params epilogue_1(1.0f, 0.0f);
 		typename Gemm::EpilogueOutputOp::Params epilogue_2(1.0f, 1.0f);
 
       	// loop over levels
 		for(unsigned int level = WAStruct.numLevels - 2; level > 0; --level) {
-        	// TODO: preprocess each level
 
-			int threadblock_count = Gemm::sufficient(problem_sizes.data(), problem_count);
+			int problemCount = hierarchicalMatrix.levels[level - 1].numTiles;
+			problemSizes.clear();
+			problemSizes.reserve(problemCount);
+			int previousTileScanRank = 0;
+			for (unsigned int tile = 0; tile < problemCount; ++tile) {
+				int tileRank = hierarchicalMatrix.levels[level - 1].tileScanRanks[tiles] - previousTileScanRank;
+				previousTileScanRank += tileRank;
+				unsigned int tileDimension = 1 << (hierarchicalMatrix..numLevels - (level + 1))*bucketSize;
+				cutlass::gemm::GemmCoord problem(tileRank, vectorWidth, tileDimension);
+      			problemSizes.push_back(problem);
+			}
+
+			// TODO: preprocess each level
+			int threadblock_count = Gemm::sufficient(problemSizes.data(), problemCount);
 			if (!threadblock_count) {
 				printf("Active CUDA device lacks hardware resources to run CUTLASS Grouped GEMM kernel.");
 				return result;
@@ -70,18 +91,18 @@ cudaError_t cutlassHierarchicalXVec(
 
 			typename Gemm::Arguments args(
 				problem_sizes_device.get(),
-				problem_count(),
+				problemCount,
 				threadblock_count,
 				epilogue_1,
-				ptr_A.get(),
+				ptr_A.get(), // double ptr to where A matrices start
 				ptr_B.get(),
 				ptr_C.get(),
 				ptr_D.get(),
-				lda.get(),
+				lda.get(), // ptr to lda of each matrix
 				ldb.get(),
 				ldc.get(),
 				ldd.get(),
-				options.problem_sizes.data()
+				problemSizes.data() // ptr to where data in vector starts
 			);
 
 			Gemm gemm;

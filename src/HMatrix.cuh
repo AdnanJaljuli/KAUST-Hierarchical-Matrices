@@ -6,7 +6,7 @@
 struct HMatrixLevel {
     int numTiles, level;
     int* tileIndices;
-    int* tileScanRanks;
+    int* tileScanRanks; // inclusive scan
     H2Opus_Real* U;
     H2Opus_Real* V;
     // TODO: make a double pointer array to U and V

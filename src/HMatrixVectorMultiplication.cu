@@ -10,6 +10,7 @@ cudaError_t HMatrixVecMult(unsigned int numberOfInputPoints, unsigned int bucket
     assert((vectorWidth & (vectorWidth - 1)) == 0);
     cudaError_t result;
     // multiply diagonal blocks first
+    // TODO: replace this with cuBLAS batched gemm
     result = cutlassDiagonalXVec(numberOfInputPoints, bucketSize, numSegments, vectorWidth, hierarchicalMatrix.diagonalBlocks, inpuVectors, resultVectors);
     // TODO: add error checking and return error message if result != success
     
