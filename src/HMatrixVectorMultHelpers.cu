@@ -6,7 +6,7 @@
 #include <cutlass/gemm/device/gemm_array.h>
 #include <cutlass/gemm/device/gemm_batched.h>
 
-cudaError_t cutlass_strided_batched_sgemm(
+cudaError_t cutlass_strided_batched_dgemm(
   int m, 
   int n,
   int k,
@@ -69,7 +69,7 @@ cudaError_t cutlassDiagonalXVec(
         double beta = 0.0f;
 
         cudaError_t result = cudaSuccess;
-        result = cutlass_strided_batched_sgemm(
+        result = cutlass_strided_batched_dgemm(
             bucketSize, vectorWidth, bucketSize, alpha, diagonal, lda, batch_stride_A, inputVectors, ldb, batch_stride_B, resultVectors, ldc, batch_stride_C,
             beta, numSegments);
 
