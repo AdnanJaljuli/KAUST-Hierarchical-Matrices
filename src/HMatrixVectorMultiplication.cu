@@ -1,6 +1,7 @@
 
 #include "HMatrixVectorMultiplication.cuh"
 #include "cutlassDiagonalXVector.cuh"
+#include "cutlassHMatrixXVector.cuh"
 #include "HMatrix.cuh"
 #include <assert.h>
 
@@ -15,7 +16,7 @@ cudaError_t HMatrixVecMult(unsigned int numberOfInputPoints, unsigned int bucket
     // TODO: add error checking and return error message if result != success
     
     // multiply rest of hierarchical matrix by the vector
-    // result = cutlassHierarchicalXVec(numberOfInputPoints, bucketSize, numSegments, vectorWidth, hierarchicalMatrix, inpuVectors, resultVectors);
+    result = cutlassHierarchicalXVec(numberOfInputPoints, bucketSize, numSegments, vectorWidth, hierarchicalMatrix, inpuVectors, resultVectors);
 
     return result;
 }
