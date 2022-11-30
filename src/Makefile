@@ -13,11 +13,12 @@ _KBLAS_ROOT_?=$(KBLAS_HOME)
 _MAGMA_ROOT_?=$(MAGMA_HOME)
 _CUDA_ROOT_?=$(CUDA_HOME)
 _OPENBLAS_ROOT_?=$(OPENBLAS_HOME)
+_CUTLASS_ROOT_?=$(CUTLASS_HOME)
 
 INC = -I$(_MAGMA_ROOT_)/include
 INC += -I$(_KBLAS_ROOT_)/include
-INC += -I/home/jaljula/cutlass/include
-INC += -I/home/jaljula/cutlass/tools/util/include
+INC += -I$(_CUTLASS_ROOT_)/include
+INC += -I$(_CUTLASS_ROOT_)/tools/util/include
 
 LIB_DIR = -L$(_CUDA_ROOT_)/lib64
 LIB_DIR += -L$(_MAGMA_ROOT_)/lib
