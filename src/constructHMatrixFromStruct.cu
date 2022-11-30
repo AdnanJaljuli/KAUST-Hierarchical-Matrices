@@ -61,8 +61,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaMalloc((void**) &d_LDBBatch, batchSize*sizeof(int));
         cudaMalloc((void**) &d_APtrs, batchSize*sizeof(H2Opus_Real*));
         cudaMalloc((void**) &d_BPtrs, batchSize*sizeof(H2Opus_Real*));
-        cudaMalloc((void**) &d_A, batchSize*maxRows*maxRanks[WAStruct.numLevels - level - 2]*sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_B, batchSize*maxRows*maxRanks[WAStruct.numLevels - level - 2]*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_A, static_cast<uint64_t>(batchSize)*maxRows*maxRanks[WAStruct.numLevels - level - 2]*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_B, static_cast<uint64_t>(batchSize)*maxRows*maxRanks[WAStruct.numLevels - level - 2]*sizeof(H2Opus_Real));
 
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;

@@ -68,7 +68,7 @@ __global__ void generateDenseBlockColumn(unsigned int numberOfInputPoints, unsig
             }
             else {
                 unsigned int diff = (blockIdx.y > columnIndex) ? 1 : 0;
-                unsigned int matrixIndex = blockIdx.y*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.y + threadIdx.y;
+                uint64_t matrixIndex = static_cast<uint64_t>(blockIdx.y)*maxSegmentSize*maxSegmentSize - diff*maxSegmentSize*maxSegmentSize + j*blockDim.x*maxSegmentSize + threadIdx.x*maxSegmentSize + i*blockDim.y + threadIdx.y;
                 int xDim = kDTree.segmentOffsets[columnIndex + 1] - kDTree.segmentOffsets[columnIndex];
                 int yDim = kDTree.segmentOffsets[blockIdx.y + 1] - kDTree.segmentOffsets[blockIdx.y];
 

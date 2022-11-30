@@ -61,9 +61,9 @@ cudaError_t cutlassDiagonalXVec(
         int const ldb = bucketSize*numSegments;
         int const ldc = bucketSize;
 
-        long long int batch_stride_A = static_cast<long long int>(lda)*static_cast<long long int>(bucketSize);
+        long long int batch_stride_A = static_cast<long long int>(bucketSize)*static_cast<long long int>(bucketSize);
         long long int batch_stride_B = static_cast<long long int>(bucketSize);
-        long long int batch_stride_C = static_cast<long long int>(ldc)*static_cast<long long int>(vectorWidth);
+        long long int batch_stride_C = static_cast<long long int>(bucketSize)*static_cast<long long int>(vectorWidth);
 
         double alpha = 1.0f;
         double beta = 0.0f;
@@ -75,31 +75,3 @@ cudaError_t cutlassDiagonalXVec(
 
         return result;
 }
-
-// __global__ void diagonalXVec(
-//     unsigned int numberOfInputPoints, unsigned int  bucketSize, 
-//     unsigned int  numSegments, unsigned int  vectorWidth, H2Opus_Real *diagonal,
-//     H2Opus_Real *inpuVectors, H2Opus_Real *resultVectors) {
-        
-//         extern __shared__ H2Opus_Real shared_mem[];
-//         H2Opus_Real *firstTile_s = shared_mem;
-//         H2Opus_Real *secondTile_s = &shared_mem[blockDim.x*blockDim.y];
-
-//         unsigned int blockRow = blockIdx.y*blockDim.y + threadIdx.y;
-//         unsigned int blockCol = blockIdx.x*blockDim.x + threadIdx.x;
-//         H2Opus_Real sum = 0.0lf;
-
-//         // loop over tiles
-//         unsigned int numTiles = bucketSize/blockDim.y;
-//         for(unsigned int tile = 0; tile < numTiles; ++tile) {
-//             // load blocks to shared memory
-//             secondTile_s[threadIdx.x*blockDim.y + threadIdx.y] = inpuVectors[blockCol*numberOfInputPoints + blockIdx.y*blockDim.y + tile*];
-
-//             // firstTile_s[threadIdx.x*blockDim.y + threadIdx.y] = diagonal[blockIdx.z*bucketSize*bucketSize + (tile*blockDim.x + threadIdx.x)*bucketSize + row];
-//             __syncthreads();
-
-//             // multiply and store in register
-
-//         }
-//         // store back to results array
-// }

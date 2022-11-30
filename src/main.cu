@@ -141,7 +141,6 @@ int main(int argc, char *argv[]) {
     #endif
 
     magma_finalize();
-    return 0;
 
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
