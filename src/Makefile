@@ -30,8 +30,8 @@ LIB = -lcublas -lcudadevrt -lcuda -lcurand -lcusolver -lkblas-gpu -lmagma_sparse
 CC = nvcc
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
-OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o TLRMatrix.o TLRMatrixHelpers.o HMatrix.o HMatrixHelpers.o generateDataset.o helperFunctions.o constructTLRMatrix.o constructHMatrixFromStruct.o expandMatrix.o HMatrixVectorMultiplication.o HMatrixVectorMultHelpers.o
-HDR = config.h counters.h HMatrix.cuh HMatrixHelpers.cuh constructHMatrixFromStruct.cuh TLRMatrix.cuh TLRMatrixHelpers.cuh constructTLRMatrix.cuh expandMatrix.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh HMatrixVectorMultiplication.cuh HMatrixVectorMultHelpers.cuh
+OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o TLRMatrix.o TLRMatrixHelpers.o HMatrix.o HMatrixHelpers.o generateDataset.o helperFunctions.o constructTLRMatrix.o constructHMatrixFromStruct.o expandMatrix.o HMatrixVectorMultiplication.o cutlassDiagonalXVector.o
+HDR = config.h counters.h HMatrix.cuh HMatrixHelpers.cuh constructHMatrixFromStruct.cuh TLRMatrix.cuh TLRMatrixHelpers.cuh constructTLRMatrix.cuh expandMatrix.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh HMatrixVectorMultiplication.cuh cutlassDiagonalXVector.cuh
 EXE = output
 
 USE_COUNTERS = 0
