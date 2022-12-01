@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
 
     magma_finalize();
 
+    #if 0
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
     cudaMalloc((void**) &d_inputVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
@@ -152,6 +153,8 @@ int main(int argc, char *argv[]) {
     HMatrixVecMult(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, config.vectorWidth, hierarchicalMatrix, d_inputVectors, d_resultVectors);
 
     cudaFree(d_inputVectors);
+    #endif
+    
     freeHMatrix(hierarchicalMatrix);
 
     #if USE_COUNTERS
