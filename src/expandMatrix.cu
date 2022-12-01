@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "cublas_v2.h"
 #include "helperKernels.cuh"
 #include "HMatrix.cuh"
 #include "TLRMatrixHelpers.cuh"
@@ -172,4 +173,38 @@ void generateDenseMatrix(int numberOfInputPoints, int numSegments, int maxSegmen
     dim3 m_numThreadsPerBlock(min(32, (int)maxSegmentSize), min(32, (int)maxSegmentSize));
     dim3 m_numBlocks(numSegments, numSegments);
     generateDenseMatrix_kernel <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_denseMatrix, d_valuesIn, d_offsetsSort, d_dataset);
+}
+
+__global__ void printOutputMatrix(unsigned int numberOfInputPoints, unsigned int  vectorWidth, H2Opus_Real *resultVectors, H2Opus_Real *originalOutput) {
+	for(unsigned int i = 0; i < vectorWidth; ++i) {
+		for(unsigned int j = 0; j < numberOfInputPoints; ++j) {
+			printf("%lf   ", resultVectors[i*numberOfInputPoints + j]);
+            printf("%lf\n", originalOutput[i*numberOfInputPoints + j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+
+
+void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int vectorWidth, H2Opus_Real *d_denseMatrix, H2Opus_Real *d_inputVectors, H2Opus_Real *d_resultVectors) {
+
+    H2Opus_Real *d_denseXVec;
+    cudaMalloc((void**) &d_denseXVec, numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real));
+    const double alpha = 1.0f;
+    const double beta  = 0.0f;
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    cublasDgemm(handle,
+        CUBLAS_OP_N, CUBLAS_OP_N,
+        numberOfInputPoints, vectorWidth, numberOfInputPoints,
+        &alpha,
+        d_denseMatrix, numberOfInputPoints,
+        d_inputVectors, numberOfInputPoints,
+        &beta,
+        d_denseXVec, numberOfInputPoints);
+
+    printOutputMatrix <<< 1, 1 >>> (numberOfInputPoints, vectorWidth, d_resultVectors, d_denseXVec);
+    
+    cublasDestroy(handle);
 }
