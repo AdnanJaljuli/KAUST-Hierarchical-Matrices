@@ -57,12 +57,12 @@ cudaError_t cutlassDiagonalXVec(
     H2Opus_Real *inputVectors, H2Opus_Real *resultVectors) {
 
 		int const lda = bucketSize;
-		int const ldb = bucketSize*numSegments;
-		int const ldc = bucketSize;
+		int const ldb = numberOfInputPoints;
+		int const ldc = numberOfInputPoints;
 
 		long long int batch_stride_A = static_cast<long long int>(bucketSize)*static_cast<long long int>(bucketSize);
 		long long int batch_stride_B = static_cast<long long int>(bucketSize);
-		long long int batch_stride_C = static_cast<long long int>(bucketSize)*static_cast<long long int>(vectorWidth);
+		long long int batch_stride_C = static_cast<long long int>(bucketSize);
 
 		double alpha = 1.0f;
 		double beta = 0.0f;
