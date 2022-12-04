@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
     WeakAdmissibility WAStruct;
     allocateWeakAdmissibilityStruct(WAStruct, config.numberOfInputPoints, config.bucketSize);
     HMatrix hierarchicalMatrix;
-    allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize);
+    allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, WAStruct);
     unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.numLevels - 2)*sizeof(unsigned int));
     generateMaxRanks(hierarchicalMatrix.numLevels, config.bucketSize, maxRanks);
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct, maxRanks);
@@ -137,7 +137,8 @@ int main(int argc, char *argv[]) {
     freeMatrix(mortonOrderedMatrix);
 
     magma_finalize();
-
+    return 0;
+    
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
     cudaMalloc((void**) &d_inputVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));

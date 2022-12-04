@@ -128,7 +128,7 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
 }
 
 void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
-    for(unsigned int level = hierarchicalMatrix.numLevels - 2; level > 0; --level) {
+    for(unsigned int level = hierarchicalMatrix.numLevels - 1; level > 0; --level) {
         int batchSize = hierarchicalMatrix.levels[level - 1].numTiles;
         if(batchSize == 0) {
             continue;
@@ -175,15 +175,21 @@ void generateDenseMatrix(int numberOfInputPoints, int numSegments, int maxSegmen
     generateDenseMatrix_kernel <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, numSegments, maxSegmentSize, dimensionOfInputPoints, d_denseMatrix, d_valuesIn, d_offsetsSort, d_dataset);
 }
 
-__global__ void printOutputMatrix(unsigned int numberOfInputPoints, unsigned int  vectorWidth, H2Opus_Real *resultVectors, H2Opus_Real *originalOutput) {
+__global__ void printOutputMatrix(unsigned int numberOfInputPoints, unsigned int  vectorWidth, H2Opus_Real *resultVectors, H2Opus_Real *originalOutput, H2Opus_Real *error, H2Opus_Real *tmp) {
 	for(unsigned int i = 0; i < numberOfInputPoints; ++i) {
 		for(unsigned int j = 0; j < vectorWidth; ++j) {
-			printf("%lf   ", resultVectors[j*numberOfInputPoints + i]);
-            printf("%lf\n", originalOutput[j*numberOfInputPoints + i]);
+            H2Opus_Real x = originalOutput[j*numberOfInputPoints + i];
+            H2Opus_Real y = resultVectors[j*numberOfInputPoints + i];
+
+            atomicAdd(tmp, x*x);
+            atomicAdd(error, (x - y)*(x - y));
+
+			// printf("%lf   ", resultVectors[j*numberOfInputPoints + i]);
+            // printf("%lf\n", originalOutput[j*numberOfInputPoints + i]);
 		}
-		printf("\n");
+		// printf("\n");
 	}
-	printf("\n");
+	// printf("\n");
 }
 
 
@@ -204,7 +210,21 @@ void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int v
         &beta,
         d_denseXVec, numberOfInputPoints);
 
-    printOutputMatrix <<< 1, 1 >>> (numberOfInputPoints, vectorWidth, d_resultVectors, d_denseXVec);
-    
+    H2Opus_Real* d_error;
+    H2Opus_Real* d_tmp;
+    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
+    cudaMemset(d_error, 0, sizeof(H2Opus_Real));
+    cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
+    printOutputMatrix <<< 1, 1 >>> (numberOfInputPoints, vectorWidth, d_resultVectors, d_denseXVec, d_error, d_tmp);
+    H2Opus_Real h_error;
+    H2Opus_Real h_tmp;
+    cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaFree(d_tmp);
+    cudaFree(d_error);
+    cudaFree(d_denseXVec);
+    printf("error in hmatvec: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+
     cublasDestroy(handle);
 }
