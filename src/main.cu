@@ -149,9 +149,7 @@ int main(int argc, char *argv[]) {
     HMatrixVecMult(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, config.vectorWidth, hierarchicalMatrix, d_inputVectors, d_resultVectors);
     cudaFree(d_inputVectors);
 
-    #if 0
     checkErrorInHmatrixVecMult(config.numberOfInputPoints, config.vectorWidth, d_denseMatrix, d_inputVectors, d_resultVectors);
-    #endif
 
     freeHMatrix(hierarchicalMatrix);
 
@@ -163,7 +161,7 @@ int main(int argc, char *argv[]) {
     endTime(TOTAL_TIME, &counters);
     printCountersInFile(config, &counters);
     #endif
-    
+
     freeKDTree(kDTree);
     printf("done :)\n");
 

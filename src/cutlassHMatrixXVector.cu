@@ -86,7 +86,6 @@ void preprocessGroupedGEMM(
 			}
 			h_ldc->at(tile) = (int64_t)numberOfInputPoints;
 
-			// TODO: fix pointers.
 			h_ptrA->at(tile) = AMatrix + previousTileScanRank*tileDimension;
 			if(iteration == 0) {
 				int diff = (tile%2 == 0) ? 1 : -1;
@@ -193,7 +192,7 @@ void VxVector(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 		gemm.run();
 }
 
-cudaError_t UxResult(unsigned int numberOfInputPoints, unsigned int level, int numLevels,
+void UxResult(unsigned int numberOfInputPoints, unsigned int level, int numLevels,
 	int problemCount, unsigned int bucketSize, unsigned int vectorWidth,
 	HMatrixLevel matrixLevel,
 	std::vector<cutlass::gemm::GemmCoord> *h_problemSizes, cutlass::DeviceAllocation<cutlass::gemm::GemmCoord> *d_problemSizes,
@@ -203,6 +202,10 @@ cudaError_t UxResult(unsigned int numberOfInputPoints, unsigned int level, int n
 	std::vector<H2Opus_Real*> *h_ptrA, std::vector<H2Opus_Real*> *h_ptrB, std::vector<H2Opus_Real*> *h_ptrC,
 	cutlass::DeviceAllocation<H2Opus_Real *> *ptr_A, cutlass::DeviceAllocation<H2Opus_Real *> *ptr_B, cutlass::DeviceAllocation<H2Opus_Real *> *ptr_C) {
 		
+		char filename[100] = "results/output_cutlass.txt";
+    	FILE *output_file = fopen(filename, "a");
+
+		fprintf(output_file, "in UxResult\n");
 		using ElementInput = H2Opus_Real;
 		using ElementOutput = H2Opus_Real;
 		using ElementAccumulator = H2Opus_Real;
@@ -230,7 +233,7 @@ cudaError_t UxResult(unsigned int numberOfInputPoints, unsigned int level, int n
 			4>::GemmKernel;
 
 		using Gemm = cutlass::gemm::device::GemmGrouped<GemmKernel>;
-
+		fprintf(output_file, "before preprocessing\n");
 		preprocessGroupedGEMM(numberOfInputPoints, level, numLevels,
 			problemCount, bucketSize, vectorWidth,
 			matrixLevel,
@@ -241,11 +244,12 @@ cudaError_t UxResult(unsigned int numberOfInputPoints, unsigned int level, int n
 			h_ptrA, h_ptrB, h_ptrC,
 			ptr_A, ptr_B, ptr_C,
 			1);
-
+		fprintf(output_file, "after preprocessing\n");
 		int threadblockCount = Gemm::sufficient(h_problemSizes->data(), problemCount);
 		if (!threadblockCount) {
 			printf("Active CUDA device lacks hardware resources to run CUTLASS Grouped GEMM kernel.");
 		}
+		fprintf(output_file, "threadblock count: %d\n", threadblockCount);
 
 		typename Gemm::EpilogueOutputOp::Params epilogue(1.0f, 1.0f);
 		typename Gemm::Arguments args(
@@ -263,12 +267,18 @@ cudaError_t UxResult(unsigned int numberOfInputPoints, unsigned int level, int n
 			ldc->get(),
 			h_problemSizes->data() // ptr to where data in vector starts
 		);
+		cudaDeviceSynchronize();
+		fprintf(output_file, "after arguments\n");
 
 		Gemm gemm;
 		size_t workspace_size = gemm.get_workspace_size(args);
 		cutlass::DeviceAllocation<uint8_t> workspace(workspace_size);
 		gemm.initialize(args, workspace.get());
+		cudaDeviceSynchronize();
+		fprintf(output_file, "after init\n");
 		gemm.run();
+		cudaDeviceSynchronize();
+		fprintf(output_file, "after run\n");
 }
 
 // __global__ void printOutputMatrix(unsigned int numberOfInputPoints, unsigned int  vectorWidth, H2Opus_Real *resultVectors) {
@@ -313,10 +323,15 @@ cudaError_t cutlassHierarchicalXVec(
 		ptr_B.reset(numSegments);
 		ptr_C.reset(numSegments);
 
+		#if 1
       	// loop over levels
 		for(unsigned int level = hierarchicalMatrix.numLevels - 2; level > 0; --level) {
 			// preprocess each level
+			cudaDeviceSynchronize();
+			printf("here\n");
 			int problemCount = hierarchicalMatrix.levels[level - 1].numTiles;
+			printf("problem count: %d   level: %d\n", problemCount, level);
+			#if 1
 			VxVector(numberOfInputPoints, level, hierarchicalMatrix.numLevels,
 				problemCount, bucketSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
@@ -326,17 +341,24 @@ cudaError_t cutlassHierarchicalXVec(
 				inputVectors, bufferVectors,
 				&h_ptrA, &h_ptrB, &h_ptrC,
 				&ptr_A, &ptr_B, &ptr_C);
-			
+			#endif
+
+			cudaDeviceSynchronize();
+			printf("here2\n");
 			UxResult(numberOfInputPoints, level, hierarchicalMatrix.numLevels,
 				problemCount, bucketSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
 				&h_problemSizes, &d_problemSizes,
 				&h_lda, &h_ldb, &h_ldc,
 				&d_lda, &d_ldb, &d_ldc,
-				bufferVectors, results,
+				bufferVectors, resultVectors,
 				&h_ptrA, &h_ptrB, &h_ptrC,
 				&ptr_A, &ptr_B, &ptr_C);
+			cudaDeviceSynchronize();
+			printf("here3\n");
+			break;
 		}
+		#endif
 
 		// printOutputMatrix <<< 1, 1 >>> (numberOfInputPoints, vectorWidth, resultVectors);
 

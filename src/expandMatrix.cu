@@ -176,10 +176,10 @@ void generateDenseMatrix(int numberOfInputPoints, int numSegments, int maxSegmen
 }
 
 __global__ void printOutputMatrix(unsigned int numberOfInputPoints, unsigned int  vectorWidth, H2Opus_Real *resultVectors, H2Opus_Real *originalOutput) {
-	for(unsigned int i = 0; i < vectorWidth; ++i) {
-		for(unsigned int j = 0; j < numberOfInputPoints; ++j) {
-			printf("%lf   ", resultVectors[i*numberOfInputPoints + j]);
-            printf("%lf\n", originalOutput[i*numberOfInputPoints + j]);
+	for(unsigned int i = 0; i < numberOfInputPoints; ++i) {
+		for(unsigned int j = 0; j < vectorWidth; ++j) {
+			printf("%lf   ", resultVectors[j*numberOfInputPoints + i]);
+            printf("%lf\n", originalOutput[j*numberOfInputPoints + i]);
 		}
 		printf("\n");
 	}
