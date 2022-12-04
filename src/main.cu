@@ -134,7 +134,6 @@ int main(int argc, char *argv[]) {
 
     free(maxRanks);
     freeWeakAdmissbilityStruct(WAStruct);
-    freeKDTree(kDTree);
     freeMatrix(mortonOrderedMatrix);
 
     magma_finalize();
@@ -150,9 +149,7 @@ int main(int argc, char *argv[]) {
     cudaFree(d_inputVectors);
 
     #if 0
-    #if EXPAND_MATRIX
     checkErrorInHmatrixVecMult(config.numberOfInputPoints, config.vectorWidth, d_denseMatrix, d_inputVectors, d_resultVectors);
-    #endif
     #endif
 
     freeHMatrix(hierarchicalMatrix);
@@ -165,7 +162,8 @@ int main(int argc, char *argv[]) {
     endTime(TOTAL_TIME, &counters);
     printCountersInFile(config, &counters);
     #endif
-
+    
+    freeKDTree(kDTree);
     printf("done :)\n");
 
     return 0;

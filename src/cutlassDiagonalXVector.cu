@@ -64,8 +64,8 @@ cudaError_t cutlassDiagonalXVec(
 		long long int batch_stride_B = static_cast<long long int>(bucketSize);
 		long long int batch_stride_C = static_cast<long long int>(bucketSize);
 
-		double alpha = 1.0f;
-		double beta = 0.0f;
+		double alpha = 1;
+		double beta = 0;
 
 		cudaError_t result = cudaSuccess;
 		result = cutlass_strided_batched_dgemm(

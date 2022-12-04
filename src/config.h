@@ -103,7 +103,7 @@ static Config parseArgs(int argc, char **argv)
     config.lowestLevelTolerance = 1e-5;
     config.divMethod = POWER_OF_TWO_ON_LEFT;
     config.dimensionOfInputPoints = 2;
-    config.vectorWidth = 64;
+    config.vectorWidth = 16;
 
     int opt;
     while ((opt = getopt(argc, argv, "n:b:t:m:d:v:h")) >= 0)
