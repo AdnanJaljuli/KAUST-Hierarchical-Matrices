@@ -96,6 +96,7 @@ cudaError_t HMatrixVecMult(unsigned int numberOfInputPoints, unsigned int bucket
     printf("error in diagXVec: %lf\n", sqrt(h_error)/sqrt(h_tmp));
     cudaFree(d_tmp);
     cudaFree(d_error);
+    cudaFree(d_tempResultsVectors);
     #endif
 
     // multiply rest of hierarchical matrix by the vector

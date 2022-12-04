@@ -141,8 +141,9 @@ int main(int argc, char *argv[]) {
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
     cudaMalloc((void**) &d_inputVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_resultVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
     generateRandomVector(config.vectorWidth, config.numberOfInputPoints, d_inputVectors);
+    cudaMalloc((void**) &d_resultVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
+    cudaMemset(d_resultVectors, 0, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
 
     // hierarchical matrix - vector multiplication
     HMatrixVecMult(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, config.vectorWidth, hierarchicalMatrix, d_inputVectors, d_resultVectors);
