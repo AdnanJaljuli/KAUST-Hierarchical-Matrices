@@ -56,6 +56,7 @@ void allocateHMatrix(HMatrix &matrix, TLR_Matrix mortonOrderedMatrix, int segmen
     cudaMemcpy(h_ranks, mortonOrderedMatrix.blockRanks, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(h_scanRanks, mortonOrderedMatrix.blockOffsets, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
     matrix.levels[matrix.numLevels - 2].numTiles = WAStruct.numTiles[matrix.numLevels - 2];
+    matrix.levels[matrix.numLevels - 2].level = matrix.numLevels - 1;
 
     int rankSum = 0;
     for(unsigned int i = 0; i < matrix.levels[matrix.numLevels - 2].numTiles; ++i) {

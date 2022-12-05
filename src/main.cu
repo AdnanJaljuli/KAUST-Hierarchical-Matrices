@@ -137,7 +137,6 @@ int main(int argc, char *argv[]) {
     freeMatrix(mortonOrderedMatrix);
 
     magma_finalize();
-    return 0;
     
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
@@ -150,7 +149,7 @@ int main(int argc, char *argv[]) {
     HMatrixVecMult(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, config.vectorWidth, hierarchicalMatrix, d_inputVectors, d_resultVectors);
     cudaFree(d_inputVectors);
 
-    checkErrorInHmatrixVecMult(config.numberOfInputPoints, config.vectorWidth, d_denseMatrix, d_inputVectors, d_resultVectors);
+    checkErrorInHmatrixVecMult(config.numberOfInputPoints, config.vectorWidth, kDTree.numSegments, d_denseMatrix, d_inputVectors, d_resultVectors);
 
     freeHMatrix(hierarchicalMatrix);
 

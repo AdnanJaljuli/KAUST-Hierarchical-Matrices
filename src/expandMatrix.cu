@@ -184,16 +184,25 @@ __global__ void printOutputMatrix(unsigned int numberOfInputPoints, unsigned int
             atomicAdd(tmp, x*x);
             atomicAdd(error, (x - y)*(x - y));
 
-			// printf("%lf   ", resultVectors[j*numberOfInputPoints + i]);
-            // printf("%lf\n", originalOutput[j*numberOfInputPoints + i]);
+			printf("%lf   ", resultVectors[j*numberOfInputPoints + i]);
+            printf("%lf\n", originalOutput[j*numberOfInputPoints + i]);
 		}
-		// printf("\n");
+		printf("\n");
 	}
-	// printf("\n");
+	printf("\n");
 }
 
+__global__ void denseMatVecMult(unsigned int numberOfInputPoints, H2Opus_Real *d_denseMatrix, H2Opus_Real *d_inputVectors, H2Opus_Real *d_denseXVec) {
+    int row = blockIdx.y*blockDim.y + threadIdx.y;
+    int col = blockIdx.x*blockDim.x + threadIdx.x;
+    H2Opus_Real sum = 0;
+    for(unsigned int i = 0; i < numberOfInputPoints; ++i) {
+        sum += (d_denseMatrix[i*numberOfInputPoints + row]*d_inputVectors[threadIdx.x*numberOfInputPoints + i]);
+    }
+    d_denseXVec[col*numberOfInputPoints + row] = sum;
+}
 
-void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int vectorWidth, H2Opus_Real *d_denseMatrix, H2Opus_Real *d_inputVectors, H2Opus_Real *d_resultVectors) {
+void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int vectorWidth, int numSegments, H2Opus_Real *d_denseMatrix, H2Opus_Real *d_inputVectors, H2Opus_Real *d_resultVectors) {
 
     H2Opus_Real *d_denseXVec;
     cudaMalloc((void**) &d_denseXVec, numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real));
@@ -209,7 +218,32 @@ void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int v
         d_inputVectors, numberOfInputPoints,
         &beta,
         d_denseXVec, numberOfInputPoints);
+ 
+    // dim3 numThreadsPerBlock(16, 32);
+    // dim3 numBlocks(1, numSegments);
+    // denseMatVecMult <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, d_denseMatrix, d_inputVectors, d_denseXVec);
+    cudaDeviceSynchronize();
+    H2Opus_Real *h_denseXVec = (H2Opus_Real*)malloc(numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real));
+    H2Opus_Real *h_resultVectors = (H2Opus_Real*)malloc(numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real));
+    cudaMemcpy(h_resultVectors, d_resultVectors, numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_denseXVec, d_denseXVec, numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
 
+    char filename[100] = "results/hmatvec.txt";
+    FILE *output_file = fopen(filename, "a");
+    H2Opus_Real tmp = 0;
+    H2Opus_Real error = 0;
+    for(unsigned int i = 0; i < numberOfInputPoints; ++i) {
+		for(unsigned int j = 0; j < vectorWidth; ++j) {
+            fprintf(output_file, "%d  %d    %lf           %lf\n", i, j, h_resultVectors[j*numberOfInputPoints + i], h_denseXVec[j*numberOfInputPoints + i]);
+            tmp += h_denseXVec[j*numberOfInputPoints + i]*h_denseXVec[j*numberOfInputPoints + i];
+            error += (h_denseXVec[j*numberOfInputPoints + i]-h_resultVectors[j*numberOfInputPoints + i])*(h_denseXVec[j*numberOfInputPoints + i]-h_resultVectors[j*numberOfInputPoints + i]);
+        }
+        fprintf(output_file, "\n");
+    }
+    printf("error in hmatvec: %lf\n", sqrt(error)/sqrt(tmp));
+    fprintf(output_file, "\n");
+    fclose(output_file);
+    #if 0
     H2Opus_Real* d_error;
     H2Opus_Real* d_tmp;
     cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
@@ -225,6 +259,7 @@ void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int v
     cudaFree(d_error);
     cudaFree(d_denseXVec);
     printf("error in hmatvec: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+    #endif
 
-    cublasDestroy(handle);
+    // cublasDestroy(handle);
 }

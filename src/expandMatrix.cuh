@@ -13,6 +13,6 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
 void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix);
 __global__ void generateDenseMatrix_kernel(unsigned int numberOfInputPoints, unsigned int numSegments, unsigned int maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* denseMatrix, int* indexMap, int* offsetsSort, H2Opus_Real* pointCloud);
 void generateDenseMatrix(int numberOfInputPoints, int numSegments, int maxSegmentSize, int dimensionOfInputPoints, H2Opus_Real* d_denseMatrix, int* &d_valuesIn, int* &d_offsetsSort, H2Opus_Real* &d_dataset);
-void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int vectorWidth, H2Opus_Real *d_denseMatrix, H2Opus_Real *d_inputVectors, H2Opus_Real *d_resultVectors);
+void checkErrorInHmatrixVecMult(unsigned int numberOfInputPoints, unsigned int vectorWidth, int numSegments, H2Opus_Real *d_denseMatrix, H2Opus_Real *d_inputVectors, H2Opus_Real *d_resultVectors);
 
 #endif
