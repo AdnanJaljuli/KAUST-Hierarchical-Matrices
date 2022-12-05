@@ -5,7 +5,6 @@
 void allocateAndCopyToHMatrixLevel(HMatrixLevel &matrixLevel, int* ranks, WeakAdmissibility WAStruct, unsigned int level, H2Opus_Real *A, H2Opus_Real *B, int maxRows, int maxRank) {
     matrixLevel.numTiles = WAStruct.numTiles[level - 1];
     matrixLevel.level = level;
-    printf("num tiles: %d   level %d\n", matrixLevel.numTiles, level);
 
     // scan ranks array
     cudaMalloc((void**) &matrixLevel.tileScanRanks, matrixLevel.numTiles*sizeof(int));
@@ -64,7 +63,6 @@ void allocateHMatrix(HMatrix &matrix, TLR_Matrix mortonOrderedMatrix, int segmen
         h_levelRanks[i] = h_ranks[WAStruct.tileIndices[matrix.numLevels - 2][i]];
     }
 
-    printf("ranks sum: %d\n", rankSum);
     cudaMalloc((void**) &matrix.levels[matrix.numLevels - 2].tileIndices, matrix.levels[matrix.numLevels - 2].numTiles*sizeof(int));
     cudaMemcpy(matrix.levels[matrix.numLevels - 2].tileIndices, WAStruct.tileIndices[matrix.numLevels - 2], matrix.levels[matrix.numLevels - 2].numTiles*sizeof(int), cudaMemcpyHostToDevice);
 

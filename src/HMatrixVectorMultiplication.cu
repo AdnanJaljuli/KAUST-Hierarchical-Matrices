@@ -72,33 +72,6 @@ cudaError_t HMatrixVecMult(unsigned int numberOfInputPoints, unsigned int bucket
     result = cutlassDiagonalXVec(numberOfInputPoints, bucketSize, numSegments, vectorWidth, hierarchicalMatrix.diagonalBlocks, inpuVectors, resultVectors);
     // TODO: add error checking and return error message if result != success
 
-    #if 0
-    H2Opus_Real *d_tempResultsVectors;
-    cudaMalloc((void**) &d_tempResultsVectors, numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real));
-    dim3 d_numThreadsPerBlock(16, 32);
-    dim3 d_numBlocks(numSegments);
-    d_gemmBatched <<< d_numBlocks, d_numThreadsPerBlock >>> (numberOfInputPoints, bucketSize, vectorWidth, hierarchicalMatrix.diagonalBlocks, inpuVectors, d_tempResultsVectors);
-    H2Opus_Real* d_error;
-    H2Opus_Real* d_tmp;
-    cudaMalloc((void**) &d_error, sizeof(H2Opus_Real));
-    cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
-    cudaMemset(d_error, 0, sizeof(H2Opus_Real));
-    cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
-
-    unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = (numberOfInputPoints*vectorWidth + numThreadsPerBlock - 1)/numThreadsPerBlock;
-    checkErrorInDiagXVec <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints*vectorWidth, resultVectors, d_tempResultsVectors, d_error, d_tmp);
-
-    H2Opus_Real h_error;
-    H2Opus_Real h_tmp;
-    cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error in diagXVec: %lf\n", sqrt(h_error)/sqrt(h_tmp));
-    cudaFree(d_tmp);
-    cudaFree(d_error);
-    cudaFree(d_tempResultsVectors);
-    #endif
-
     // multiply rest of hierarchical matrix by the vector
     H2Opus_Real *d_bufferVectors;
     cudaMalloc((void**) &d_bufferVectors, numberOfInputPoints*vectorWidth*sizeof(H2Opus_Real));

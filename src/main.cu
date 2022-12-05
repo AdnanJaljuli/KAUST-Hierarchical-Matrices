@@ -131,12 +131,9 @@ int main(int argc, char *argv[]) {
     #if EXPAND_MATRIX
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
-
     free(maxRanks);
     freeWeakAdmissbilityStruct(WAStruct);
     freeMatrix(mortonOrderedMatrix);
-
-    magma_finalize();
     
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
@@ -147,12 +144,16 @@ int main(int argc, char *argv[]) {
 
     // hierarchical matrix - vector multiplication
     HMatrixVecMult(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, config.vectorWidth, hierarchicalMatrix, d_inputVectors, d_resultVectors);
-    cudaFree(d_inputVectors);
 
+    #if EXPAND_MATRIX
     checkErrorInHmatrixVecMult(config.numberOfInputPoints, config.vectorWidth, kDTree.numSegments, d_denseMatrix, d_inputVectors, d_resultVectors);
+    #endif
 
+    cudaFree(d_inputVectors);
+    cudaFree(d_resultVectors);
+    freeKDTree(kDTree);
     freeHMatrix(hierarchicalMatrix);
-
+    magma_finalize();
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
     #endif
@@ -162,7 +163,6 @@ int main(int argc, char *argv[]) {
     printCountersInFile(config, &counters);
     #endif
 
-    freeKDTree(kDTree);
     printf("done :)\n");
 
     return 0;
