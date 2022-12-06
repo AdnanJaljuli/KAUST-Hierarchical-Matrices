@@ -18,11 +18,12 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
 
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
-            maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
+            maxNumSegments = 1<<(1 + getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
         }
         else {
             maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
         }
+        printf("max num segments: %d\n", maxNumSegments);
 
         int *d_dimxNSegmentOffsets;
         H2Opus_Real *d_kDTreePoints;
@@ -80,11 +81,11 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
 
         #if 1
         while(largestSegmentSize > bucketSize)
-        // #else
-        // while(currentSegmentSize > bucketSize)
+        #else
+        while(currentSegmentSize > bucketSize)
         #endif
         {
-            if(divMethod == POWER_OF_TWO_ON_LEFT){
+            if(divMethod == POWER_OF_TWO_ON_LEFT) {
                 numThreadsPerBlock = 1024;
                 numBlocks = (currentNumSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
                 fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);

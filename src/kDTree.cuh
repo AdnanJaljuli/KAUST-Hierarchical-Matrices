@@ -2,6 +2,7 @@
 #define KD_TREE_H
 
 #include <stdint.h>
+#include "config.h"
 
 struct KDTree{
     unsigned int numSegments;
@@ -10,7 +11,7 @@ struct KDTree{
     int *segmentOffsets;
 };
 
-void allocateKDTree(KDTree &tree, unsigned int numberOfInputPoints, unsigned int bucketSize);
+void allocateKDTree(KDTree &tree, unsigned int numberOfInputPoints, unsigned int bucketSize, DIVISION_METHOD divMethod);
 void freeKDTree(KDTree tree);
 
 #endif

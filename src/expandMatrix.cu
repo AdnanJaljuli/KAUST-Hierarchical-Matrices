@@ -149,21 +149,16 @@ __global__ void generateDenseMatrix_kernel(unsigned int numberOfInputPoints, uns
             int yDim = offsetsSort[blockIdx.y + 1] - offsetsSort[blockIdx.y];
             unsigned int matrixIndex = col*maxSegmentSize*numSegments + row;
 
-            if(blockIdx.y == blockIdx.x) {
-                    denseMatrix[matrixIndex] = interaction(numberOfInputPoints, dimensionOfInputPoints, indexMap[offsetsSort[blockIdx.x] + blockDim.x*j + threadIdx.x], indexMap[offsetsSort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
-            }
-            else {
-                if(threadIdx.x + j*blockDim.x >= xDim || threadIdx.y + i*blockDim.x >= yDim) {
-                    if (col == row) {
-                        denseMatrix[matrixIndex] = 1;
-                    }
-                    else {
-                        denseMatrix[matrixIndex] = 0;
-                    }
+            if(threadIdx.x + j*blockDim.x >= xDim || threadIdx.y + i*blockDim.x >= yDim) {
+                if (col == row) {
+                    denseMatrix[matrixIndex] = 1;
                 }
                 else {
-                    denseMatrix[matrixIndex] = interaction(numberOfInputPoints, dimensionOfInputPoints, indexMap[offsetsSort[blockIdx.x] + blockDim.x*j + threadIdx.x], indexMap[offsetsSort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
+                    denseMatrix[matrixIndex] = 0;
                 }
+            }
+            else {
+                denseMatrix[matrixIndex] = interaction(numberOfInputPoints, dimensionOfInputPoints, indexMap[offsetsSort[blockIdx.x] + blockDim.x*j + threadIdx.x], indexMap[offsetsSort[blockIdx.y] + i*blockDim.x + threadIdx.y], pointCloud);
             }
         }
     }

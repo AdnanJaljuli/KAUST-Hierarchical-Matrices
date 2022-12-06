@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     #endif
     // TODO: generate bounding box data
     KDTree kDTree;
-    allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
+    allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize, config.divMethod);
     constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud, config.divMethod); // TODO: pass a reference to kdtree
     #if USE_COUNTERS
     endTime(KDTREE, &counters);
@@ -108,6 +108,7 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     endTime(CMTOMO, &counters);
     #endif
+    return 0;
 
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);
