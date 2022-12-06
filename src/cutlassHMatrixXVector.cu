@@ -310,12 +310,10 @@ void UxResult(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 		result.status = gemm.initialize(args, workspace.get());
 		if (result.status != cutlass::Status::kSuccess) {
 			std::cerr << "Failed to run CUTLASS Grouped GEMM kernel." << std::endl;
-			
 		}
 		result.status = gemm.run();
 		if (result.status != cutlass::Status::kSuccess) {
 			std::cerr << "Failed to run CUTLASS Grouped GEMM kernel." << std::endl;
-			
 		}
 }
 

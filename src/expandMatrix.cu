@@ -57,7 +57,7 @@ void checkErrorInLRMatrix(unsigned int numSegments, unsigned int maxSegmentSize,
     H2Opus_Real h_tmp;
     cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     cudaMemcpy(&h_tmp, d_tmp, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
-    printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+    printf("error in LR matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
     cudaFree(d_tmp);
     cudaFree(d_error);
     cudaFree(d_expandedMatrix);
@@ -124,7 +124,7 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
     cudaFree(d_tmp);
     cudaFree(d_error);
     cudaFree(d_expandedMatrix);
-    printf("error in matrix: %lf\n", sqrt(h_error)/sqrt(h_tmp));
+    printf("error in hierarchical matrix level %d is: %lf\n", matrixLevel.level, sqrt(h_error)/sqrt(h_tmp));
 }
 
 void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
