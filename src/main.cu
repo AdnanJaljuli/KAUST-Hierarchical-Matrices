@@ -60,14 +60,14 @@ int main(int argc, char *argv[]) {
     // TODO: generate bounding box data
     KDTree kDTree;
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize);
-    constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud);
+    constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud, config.divMethod); // TODO: pass a reference to kdtree
     #if USE_COUNTERS
     endTime(KDTREE, &counters);
     #endif
 
     printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
-
+    
     // Build the TLR matrix
     #if USE_COUNTERS
     startTime(TLR_MATRIX, &counters);

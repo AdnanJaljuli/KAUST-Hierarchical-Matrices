@@ -8,16 +8,16 @@ __global__ void initIndexMap(unsigned int numberOfInputPoints, KDTree kDTree) {
     }
 }
 
-__global__ void initIndexMap(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, KDTree kDTree, int* input_search, int *d_dimxNSegmentOffsets) {
+__global__ void initIndexMap(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, KDTree tree, int* input_search, int *d_dimxNSegmentOffsets) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numberOfInputPoints) {
-        kDTree.segmentIndices[i] = i;
+        tree.segmentIndices[i] = i;
         input_search[i] = i;
     }
     
     if(threadIdx.x == 0 && blockIdx.x == 0){
-        kDTree.segmentOffsets[0] = 0;
-        kDTree.segmentOffsets[1] = numberOfInputPoints;
+        tree.segmentOffsets[0] = 0;
+        tree.segmentOffsets[1] = numberOfInputPoints;
         for(unsigned int j = 0; j < dimensionOfInputPoints + 1; ++j) { //TODO: might have to be <dim+1
             d_dimxNSegmentOffsets[j] = j*numberOfInputPoints;
         }
