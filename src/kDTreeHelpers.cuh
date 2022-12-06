@@ -15,5 +15,6 @@ __global__ void fillKeysIn(int n, H2Opus_Real* keys_in, cub::KeyValuePair<int, H
 __global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* aux_offsets_sort);
 __global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce);
 __device__ __host__ int upperPowerOfTwo(int v);
+std::pair<int, int> getMaxSegmentSize(int n, int bucket_size);
 
 #endif

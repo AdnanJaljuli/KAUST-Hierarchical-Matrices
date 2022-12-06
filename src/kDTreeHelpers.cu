@@ -113,3 +113,15 @@ __device__ __host__ int upperPowerOfTwo(int v) {
     v++;
     return v;
 }
+
+std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
+    int it=0;
+    while(n > bucket_size){
+        n = (n + 1)/2;
+        ++it;
+    }
+    std::pair<int, int> p;
+    p.first = n;
+    p.second = it;
+    return p;
+}

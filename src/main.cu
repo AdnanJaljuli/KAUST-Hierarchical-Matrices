@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 
     printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
-    
+
     // Build the TLR matrix
     #if USE_COUNTERS
     startTime(TLR_MATRIX, &counters);

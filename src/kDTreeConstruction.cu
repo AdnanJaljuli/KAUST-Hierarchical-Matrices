@@ -16,7 +16,13 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
     H2Opus_Real* d_pointCloud,
     DIVISION_METHOD divMethod) {
 
-        int maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
+        int maxNumSegments;
+        if(divMethod == FULL_TREE) {
+            maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
+        }
+        else {
+            maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
+        }
 
         int *d_dimxNSegmentOffsets;
         H2Opus_Real *d_kDTreePoints;
@@ -72,12 +78,12 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
             initIndexMap <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, kDTree, d_input_search, d_dimxNSegmentOffsets);
         }
 
-        #if 0
+        #if 1
         while(largestSegmentSize > bucketSize)
+        // #else
+        // while(currentSegmentSize > bucketSize)
         #endif
-        while(currentSegmentSize > bucketSize) 
         {
-
             if(divMethod == POWER_OF_TWO_ON_LEFT){
                 numThreadsPerBlock = 1024;
                 numBlocks = (currentNumSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
@@ -189,11 +195,11 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
         cudaFree(d_segmentSpan);
         cudaFree(d_segmentSpanOffsets);
         cudaFree(d_segmentSpanReduction);
-        #if 0
-        cudaFree(d_aux_offsets_sort);
-        cudaFree(A);
-        cudaFree(B);
-        cudaFree(d_bin_search_output);
-        cudaFree(d_input_search);
-        #endif
+        if(divMethod == FULL_TREE) {
+            cudaFree(d_aux_offsets_sort);
+            cudaFree(A);
+            cudaFree(B);
+            cudaFree(d_bin_search_output);
+            cudaFree(d_input_search);
+        }
 }
