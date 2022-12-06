@@ -8,6 +8,22 @@ __global__ void initIndexMap(unsigned int numberOfInputPoints, KDTree kDTree) {
     }
 }
 
+__global__ void initIndexMap(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, KDTree kDTree, int* input_search, int *d_dimxNSegmentOffsets) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < numberOfInputPoints) {
+        kDTree.segmentIndices[i] = i;
+        input_search[i] = i;
+    }
+    
+    if(threadIdx.x == 0 && blockIdx.x == 0){
+        kDTree.segmentOffsets[0] = 0;
+        kDTree.segmentOffsets[1] = numberOfInputPoints;
+        for(unsigned int j = 0; j < dimensionOfInputPoints + 1; ++j) { //TODO: might have to be <dim+1
+            d_dimxNSegmentOffsets[j] = j*numberOfInputPoints;
+        }
+    }
+}
+
 __global__ void fillOffsets(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int currentNumSegments, unsigned int currentSegmentSize, KDTree kDTree, int* dimxNSegmentOffsets) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < currentNumSegments + 1){
@@ -50,6 +66,40 @@ __global__ void fillKeysIn(int n, unsigned int segmentSize, H2Opus_Real* keys_in
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if( i < n) {
         keys_in[i] = pointCloud[spanReduced[i/segmentSize].key*n + values_in[i]];
+    }
+}
+
+__global__ void fillKeysIn(int n, H2Opus_Real* keys_in, cub::KeyValuePair<int, H2Opus_Real>* spanReduced, int* values_in, H2Opus_Real* pointCloud, int* offsets_sort, int* output) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if( i < n) {
+        int segmentIndex = output[i] - 1;
+        keys_in[i] = pointCloud[spanReduced[segmentIndex].key*n + values_in[i]];
+    }
+}
+
+__global__ void fillOffsetsSort(int n, unsigned int dim, unsigned int num_segments, int* offsets_sort, int* aux_offsets_sort){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if(i==0){
+        aux_offsets_sort[num_segments*2] = n;
+    }
+
+    if(i < num_segments){
+        unsigned int index = i*2; 
+        aux_offsets_sort[index] = offsets_sort[i];
+        aux_offsets_sort[index + 1] = (offsets_sort[i+1] - offsets_sort[i] + 1)/2 + offsets_sort[i];
+    }
+}
+
+__global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int* offsets_sort, int* offsets_reduce){
+    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i==0){
+        offsets_reduce[0] = 0;
+    }
+    if(i < num_segments){
+        for(unsigned int j=0; j<dim; ++j){
+            offsets_reduce[j*num_segments + i + 1] = offsets_sort[i + 1] + (n*j);
+        }
     }
 }
 

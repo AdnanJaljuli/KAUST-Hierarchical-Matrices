@@ -3,6 +3,11 @@
 #include "kDTreeHelpers.cuh"
 #include <cub/cub.cuh>
 
+#include <thrust/binary_search.h>
+#include <thrust/device_vector.h>
+#include <thrust/functional.h>
+#include <thrust/execution_policy.h>
+
 // TODO: clean this file
 void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int bucketSize, KDTree &kDTree, H2Opus_Real* d_pointCloud) {
 
@@ -17,6 +22,15 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
     int* d_segmentSpanOffsets;
     cub::KeyValuePair<int, H2Opus_Real> *d_segmentSpanReduction;
 
+    #if 0
+    int* A;
+    int* B;
+    int* d_bin_search_output;
+    int* d_thrust_v_bin_search_output;
+    int* d_input_search;
+    int* d_aux_offsets_sort;
+    #endif
+
     cudaMalloc((void**) &d_dimxNSegmentOffsets, (kDTree.numSegments*dimensionOfInputPoints + 1)*sizeof(int));
     cudaMalloc((void**) &d_kDTreePoints, numberOfInputPoints*sizeof(H2Opus_Real));
     cudaMalloc((void**) &d_kDTreePointsOutput, numberOfInputPoints*sizeof(H2Opus_Real));
@@ -28,9 +42,18 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
     cudaMalloc((void**) &d_segmentSpanOffsets, (kDTree.numSegments + 1)*sizeof(int));
     cudaMalloc((void**) &d_segmentSpanReduction, (kDTree.numSegments + 1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
 
+    #if 0
+    cudaMalloc((void**) &d_aux_offsets_sort, (max_num_segments + 1) * sizeof(int));        
+    cudaMalloc((void**) &A, (max_num_segments + 1)*sizeof(int));        
+    cudaMalloc((void**) &B, n*sizeof(int));        
+    cudaMalloc((void**) &d_bin_search_output, n*sizeof(int));        
+    cudaMalloc((void**) &d_input_search, n*sizeof(int));        
+    #endif
+
     unsigned int currentNumSegments = 1;
     unsigned int numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
     unsigned int currentSegmentSize = upperPowerOfTwo(numberOfInputPoints);
+    unsigned int largestSegmentSize = numberOfInputPoints;
     void *d_tempStorage;
     size_t tempStorageBytes;
     int *d_temp;
@@ -38,12 +61,21 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
     unsigned int numThreadsPerBlock = 1024;
     unsigned int numBlocks = (numberOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
     initIndexMap <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, kDTree);
+    #if 0
+    initIndexMap <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, kDTree, input_search, d_dimxNSegmentOffsets);
+    #endif
 
-    while(currentSegmentSize > bucketSize) {
+    #if 0
+    while(largestSegmentSize > bucketSize)
+    #endif
+    while(currentSegmentSize > bucketSize) 
+    {
 
-        numThreadsPerBlock = 1024;
-        numBlocks = (currentNumSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
-        fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
+        if(div_method == POWER_OF_TWO_ON_LEFT){
+            numThreadsPerBlock = 1024;
+            numBlocks = (currentNumSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
+            fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
+        }
 
         numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints*dimensionOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
@@ -84,6 +116,13 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
         numThreadsPerBlock = 1024;
         numBlocks = (numberOfInputPoints + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, currentSegmentSize, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud);
+        #if 0
+        thrust::device_ptr<int> A = thrust::device_pointer_cast((int *)KDTree.segmentOffsets), B = thrust::device_pointer_cast((int *)d_input_search);
+        thrust::device_vector<int> d_bin_search_output(numberOfInputPoints);
+        thrust::upper_bound(A, A + num_segments + 1, B, B + n, d_bin_search_output.begin(), thrust::less<int>());
+        d_thrust_v_bin_search_output = thrust::raw_pointer_cast(&d_bin_search_output[0]);
+        fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud, KDTree.segmentOffsets, d_thrust_v_bin_search_output);
+        #endif
 
         d_tempStorage = NULL;
         tempStorageBytes = 0;
@@ -102,9 +141,31 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
 
         currentSegmentSize >>= 1;
         currentNumSegments = (numberOfInputPoints + currentSegmentSize - 1)/currentSegmentSize;
+
+        #if 0
+        numThreadsPerBlock = 1024;
+        numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        fillOffsetsSort <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, kDTree.segmentOffsets, d_aux_offsets_sort);
+
+        d_temp = d_aux_offsets_sort;
+        d_aux_offsets_sort = kDTree.segmentOffsets;
+        kDTree.segmentOffsets = d_temp;
+        currentNumSegments *= 2;
+
+        numThreadsPerBlock = 1024;
+        numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
+        fillOffsetsReduce <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, kDTree.segmentOffsets, d_dimxNSegmentOffsets);
+
+        ++largestSegmentSize;
+        largestSegmentSize >>= 1;
+        #endif
+
         numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
     }
-    fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
+
+    if(div_method == POWER_OF_TWO_ON_LEFT) {
+        fillOffsets <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
+    }
 
     cudaFree(d_dimxNSegmentOffsets);
     cudaFree(d_kDTreePoints);
@@ -116,4 +177,11 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
     cudaFree(d_segmentSpan);
     cudaFree(d_segmentSpanOffsets);
     cudaFree(d_segmentSpanReduction);
+    if(div_method != POWER_OF_TWO_ON_LEFT){
+        cudaFree(d_aux_offsets_sort);
+        cudaFree(A);
+        cudaFree(B);
+        cudaFree(d_bin_search_output);
+        cudaFree(d_input_search);
+    }
 }
