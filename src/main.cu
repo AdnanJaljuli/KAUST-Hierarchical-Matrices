@@ -78,6 +78,10 @@ int main(int argc, char *argv[]) {
     printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
 
+    // create HMatrixStructure
+    HMatrixStructure HMatrixStruct;
+    allocateHMatrixStructure(HMatrixStruct, config.numberOfInputPoints, config.bucketSize);
+
     // Build the TLR matrix
     #if USE_COUNTERS
     startTime(TLR_MATRIX, &counters);
@@ -124,13 +128,11 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     startTime(HMATRIX, &counters);
     #endif
-    WeakAdmissibility WAStruct;
-    allocateWeakAdmissibilityStruct(WAStruct, config.numberOfInputPoints, config.bucketSize);
     HMatrix hierarchicalMatrix;
-    allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, WAStruct);
+    allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, HMatrixStruct);
     unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.numLevels - 2)*sizeof(unsigned int));
     generateMaxRanks(hierarchicalMatrix.numLevels, config.bucketSize, maxRanks);
-    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, WAStruct, maxRanks);
+    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, HMatrixStruct, maxRanks);
     #if USE_COUNTERS
     endTime(HMATRIX, &counters);
     #endif
@@ -139,7 +141,7 @@ int main(int argc, char *argv[]) {
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
     free(maxRanks);
-    freeWeakAdmissbilityStruct(WAStruct);
+    freeHMatrixStructure(HMatrixStruct);
     freeMatrix(mortonOrderedMatrix);
     
     // TODO: generate random vector

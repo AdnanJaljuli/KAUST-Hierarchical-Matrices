@@ -4,18 +4,18 @@
 
 #include "TLRMatrix.cuh"
 
-typedef double H2Opus_Real;
+#include "precision.h"
 
 // TODO: rename to HMatrixStructure
 // TODO: make this part of the HMatrix struct
-struct WeakAdmissibility {
+struct HMatrixStructure {
     int numLevels;
     int* numTiles;
     int** tileIndices;
 };
 
-void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int numberOfInputPoints, unsigned int bucketSize);
-void freeWeakAdmissbilityStruct(WeakAdmissibility WAStruct);
+void allocateHMatrixStructure(HMatrixStructure &HMatrixStruct, unsigned int numberOfInputPoints, unsigned int bucketSize);
+void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 struct LevelTilePtrs {
     H2Opus_Real **U;

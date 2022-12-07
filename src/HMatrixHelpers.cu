@@ -3,18 +3,18 @@
 #include "helperKernels.cuh"
 #include "HMatrixHelpers.cuh"
 
-void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int numberOfInputPoints, unsigned int bucketSize) {
+void allocateHMatrixStructure(HMatrixStructure &HMatrixStruct, unsigned int numberOfInputPoints, unsigned int bucketSize) {
     // TODO: parallelize
-    WAStruct.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
-    WAStruct.numTiles = (int*)malloc((WAStruct.numLevels - 1)*sizeof(int));
-    WAStruct.tileIndices = (int**)malloc((WAStruct.numLevels - 1)*sizeof(int*));
+    HMatrixStruct.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+    HMatrixStruct.numTiles = (int*)malloc((HMatrixStruct.numLevels - 1)*sizeof(int));
+    HMatrixStruct.tileIndices = (int**)malloc((HMatrixStruct.numLevels - 1)*sizeof(int*));
 
     unsigned int dim = 2;
-    for(unsigned int level = 0; level < WAStruct.numLevels - 1; ++level) {
+    for(unsigned int level = 0; level < HMatrixStruct.numLevels - 1; ++level) {
         unsigned int numTiles = 1 << (level + 1);
-        WAStruct.numTiles[level] = numTiles;
+        HMatrixStruct.numTiles[level] = numTiles;
         
-        WAStruct.tileIndices[level] = (int*)malloc(numTiles*sizeof(int));
+        HMatrixStruct.tileIndices[level] = (int*)malloc(numTiles*sizeof(int));
         for(unsigned int j = 0; j < numTiles; ++j) {
             int x;
             if(j%2 == 0) {
@@ -24,19 +24,19 @@ void allocateWeakAdmissibilityStruct(WeakAdmissibility &WAStruct, unsigned int n
                 x = -1;
             }
             unsigned int tileIndex = j*dim + j + x;
-            WAStruct.tileIndices[level][j + x] = CMIndextoMOIndex(dim, tileIndex);
+            HMatrixStruct.tileIndices[level][j + x] = CMIndextoMOIndex(dim, tileIndex);
         }
         
         dim <<= 1;
     }
 }
 
-void freeWeakAdmissbilityStruct(WeakAdmissibility WAStruct) {
-    free(WAStruct.numTiles);
-    for(unsigned int i = 0; i < WAStruct.numLevels - 1; ++i) {
-        free(WAStruct.tileIndices[i]);
+void freeHMatrixStructure(HMatrixStructure &HMatrixStruct) {
+    free(HMatrixStruct.numTiles);
+    for(unsigned int i = 0; i < HMatrixStruct.numLevels - 1; ++i) {
+        free(HMatrixStruct.tileIndices[i]);
     }
-    free(WAStruct.tileIndices);
+    free(HMatrixStruct.tileIndices);
 }
 
 __global__ void fillBatchPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize, int* tileIndices, int level) {

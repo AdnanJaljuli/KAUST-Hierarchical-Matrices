@@ -46,7 +46,7 @@ __global__ void resortSegmentedScan(
 }
 
 void copyMaxandMinToBoundingBoxes(
-    KDTreeLevelBoundingBoxes BBlevel, 
+    KDTreeLevelBoundingBoxes BBlevel,
     H2Opus_Real *d_maxSegmentItem,
     H2Opus_Real *d_minSegmentItem,
     unsigned int level,
@@ -61,8 +61,8 @@ void copyMaxandMinToBoundingBoxes(
             d_maxSegmentItem, d_minSegmentItem, 
             d_bufferBBMax, d_bufferBBMin,
             dimensionOfInputPoints, currentNumSegments);
-
+        
         // copy buffer arrays to bblevel in host memory
-        cudaMemcpy(BBlevel.maxBBData, d_bufferBBMax, dimensionOfInputPoints*currentNumSegments*sizeof(int), cudaMemcpyDeviceToHost);
-        cudaMemcpy(BBlevel.minBBData, d_bufferBBMin, dimensionOfInputPoints*currentNumSegments*sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(BBlevel.maxBBData, d_bufferBBMax, dimensionOfInputPoints*currentNumSegments*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
+        cudaMemcpy(BBlevel.minBBData, d_bufferBBMin, dimensionOfInputPoints*currentNumSegments*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
 }
