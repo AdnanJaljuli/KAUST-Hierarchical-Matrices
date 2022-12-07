@@ -20,6 +20,8 @@ void constructKDTree(
     DIVISION_METHOD divMethod,
     KDTreeBoundingBoxes boundingBoxes) {
 
+
+
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
             maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
@@ -66,6 +68,10 @@ void constructKDTree(
             cudaMalloc((void**) &d_input_search, numberOfInputPoints*sizeof(int));
         }
 
+        H2Opus_Real *d_bufferBBMax, *d_bufferBBMin;
+        cudaMalloc((void**) &d_bufferBBMax, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_bufferBBMin, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(H2Opus_Real));
+
         unsigned int currentNumSegments = 1;
         unsigned int numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
         // TODO: make largestSegmentSize and currentSegmentSize one variable instead of two
@@ -94,11 +100,7 @@ void constructKDTree(
 
         unsigned int level = 0;
 
-        #if 1
         while(currentSegmentSize > bucketSize)
-        #else
-        while(currentSegmentSize > bucketSize)
-        #endif
         {
             if(divMethod == POWER_OF_TWO_ON_LEFT) {
                 numThreadsPerBlock = 1024;
@@ -129,7 +131,14 @@ void constructKDTree(
             cudaFree(d_tempStorage);
 
             // copy segmented min and max to bounding boxes
-            // copyMaxandMinToBoundingBoxes(boundingBoxes.levels[level], d_maxSegmentItem, d_minSegmentItem, level, dimensionOfInputPoints currentSegmentSize);
+            copyMaxandMinToBoundingBoxes(
+                boundingBoxes.levels[level],
+                d_maxSegmentItem,
+                d_minSegmentItem,
+                level,
+                dimensionOfInputPoints,
+                currentNumSegments,
+                d_bufferBBMax, d_bufferBBMin);
 
             numThreadsPerBlock = 1024;
             numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
@@ -214,6 +223,8 @@ void constructKDTree(
         cudaFree(d_segmentSpan);
         cudaFree(d_segmentSpanOffsets);
         cudaFree(d_segmentSpanReduction);
+        cudaFree(d_bufferBBMin);
+        cudaFree(d_bufferBBMax);
         if(divMethod == FULL_TREE) {
             cudaFree(d_aux_offsets_sort);
             cudaFree(A);

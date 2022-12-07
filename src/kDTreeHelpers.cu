@@ -126,13 +126,3 @@ std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     p.second = it;
     return p;
 }
-
-void copyMaxandMinToBoundingBoxes(
-    BoundingBox box,
-    H2Opus_Real *d_maxSegmentItem, 
-    H2Opus_Real *d_minSegmentItem,
-    H2Opus_Real *d_bufferBB, 
-    unsigned int level, unsigned int dimensionOfInputPoints, unsigned int currentSegmentSize) {
-
-
-}

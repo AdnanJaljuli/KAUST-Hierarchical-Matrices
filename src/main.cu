@@ -62,7 +62,15 @@ int main(int argc, char *argv[]) {
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize, config.divMethod);
     KDTreeBoundingBoxes boundingBoxes;
     allocateKDTreeBoundingBoxes(&boundingBoxes, config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints);
-    constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud, config.divMethod, boundingBoxes); // TODO: pass a reference to kdtree
+
+    constructKDTree(
+        config.numberOfInputPoints,
+        config.dimensionOfInputPoints,
+        config.bucketSize,
+        kDTree,
+        d_pointCloud,
+        config.divMethod,
+        boundingBoxes); // TODO: pass a reference to kdtree
     #if USE_COUNTERS
     endTime(KDTREE, &counters);
     #endif
@@ -95,8 +103,6 @@ int main(int argc, char *argv[]) {
     #endif
 
     cudaFree(d_pointCloud);
-
-    return 0;
 
     // Convert TLR matrix to morton order
     #if USE_COUNTERS

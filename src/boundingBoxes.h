@@ -28,4 +28,12 @@ void allocateKDTreeBoundingBoxes(
 
 void freeBoundingBoxes();
 
+void copyMaxandMinToBoundingBoxes(KDTreeLevelBoundingBoxes BBlevel, 
+    H2Opus_Real *d_maxSegmentItem,
+    H2Opus_Real *d_minSegmentItem,
+    unsigned int level,
+    unsigned int dimensionOfInputPoints,
+    unsigned int currentNumSegments,
+    H2Opus_Real *d_bufferBBMax, H2Opus_Real *d_bufferBBMin);
+
 #endif

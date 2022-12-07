@@ -31,3 +31,38 @@ void allocateKDTreeBoundingBoxes(
             allocateKDTreeLevelBoundingBox(&boxes->levels[level], numNodes, dimensionOfInputPoints);
         }
 }
+
+__global__ void resortSegmentedScan(
+    H2Opus_Real *maxSegmentItem, H2Opus_Real *minSegmentItem,
+    H2Opus_Real *bufferBBMax, H2Opus_Real *bufferBBMin,
+    unsigned int dimensionOfInputPoints,
+    unsigned int currentNumSegments) {
+
+        unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+        if(i < currentNumSegments) {
+            bufferBBMax[i*dimensionOfInputPoints + blockIdx.y] = maxSegmentItem[blockIdx.y*currentNumSegments + i];
+            bufferBBMin[i*dimensionOfInputPoints + blockIdx.y] = minSegmentItem[blockIdx.y*currentNumSegments + i];
+        }
+}
+
+void copyMaxandMinToBoundingBoxes(
+    KDTreeLevelBoundingBoxes BBlevel, 
+    H2Opus_Real *d_maxSegmentItem,
+    H2Opus_Real *d_minSegmentItem,
+    unsigned int level,
+    unsigned int dimensionOfInputPoints,
+    unsigned int currentNumSegments,
+    H2Opus_Real *d_bufferBBMax, H2Opus_Real *d_bufferBBMin) {
+        
+        // resort maxsegmentitem and minsegmentitem into buffer arrays
+        dim3 numThreadsPerBlock(1024);
+        dim3 numBlocks((currentNumSegments + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, dimensionOfInputPoints);
+        resortSegmentedScan <<< numBlocks, numThreadsPerBlock >>> (
+            d_maxSegmentItem, d_minSegmentItem, 
+            d_bufferBBMax, d_bufferBBMin,
+            dimensionOfInputPoints, currentNumSegments);
+
+        // copy buffer arrays to bblevel in host memory
+        cudaMemcpy(BBlevel.maxBBData, d_bufferBBMax, dimensionOfInputPoints*currentNumSegments*sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(BBlevel.minBBData, d_bufferBBMin, dimensionOfInputPoints*currentNumSegments*sizeof(int), cudaMemcpyDeviceToHost);
+}
