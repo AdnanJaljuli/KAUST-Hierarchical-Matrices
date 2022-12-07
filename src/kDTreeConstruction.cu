@@ -18,7 +18,7 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
 
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
-            maxNumSegments = 1<<(1 + getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
+            maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
         }
         else {
             maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
