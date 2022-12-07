@@ -1,4 +1,5 @@
 
+#include "boundingBoxes.h"
 #include "config.h"
 #include "counters.h"
 #include "constructTLRMatrix.cuh"
@@ -57,10 +58,11 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     startTime(KDTREE, &counters);
     #endif
-    // TODO: generate bounding box data
     KDTree kDTree;
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize, config.divMethod);
-    constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud, config.divMethod); // TODO: pass a reference to kdtree
+    KDTreeBoundingBoxes boundingBoxes;
+    allocateKDTreeBoundingBoxes(&boundingBoxes, config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints);
+    constructKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.bucketSize, kDTree, d_pointCloud, config.divMethod, boundingBoxes); // TODO: pass a reference to kdtree
     #if USE_COUNTERS
     endTime(KDTREE, &counters);
     #endif
@@ -89,13 +91,12 @@ int main(int argc, char *argv[]) {
     // TODO: assert that dense matrix doesn't exceed memory limit
     cudaMalloc((void**) &d_denseMatrix, kDTree.numSegments*kDTree.numSegments*kDTree.segmentSize*kDTree.segmentSize*sizeof(H2Opus_Real));
     generateDenseMatrix(config.numberOfInputPoints, kDTree.numSegments, kDTree.segmentSize, config.dimensionOfInputPoints, d_denseMatrix, kDTree.segmentIndices, kDTree.segmentOffsets, d_pointCloud);
+    checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, matrix, d_denseMatrix);
     #endif
 
     cudaFree(d_pointCloud);
 
-    #if EXPAND_MATRIX
-    checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, matrix, d_denseMatrix);
-    #endif
+    return 0;
 
     // Convert TLR matrix to morton order
     #if USE_COUNTERS
@@ -108,7 +109,6 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     endTime(CMTOMO, &counters);
     #endif
-    return 0;
 
     #if EXPAND_MATRIX
     checkErrorInLRMatrix(kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, d_denseMatrix);

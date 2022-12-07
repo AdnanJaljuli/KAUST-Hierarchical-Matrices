@@ -2,13 +2,21 @@
 #include "boundingBoxes.h"
 #include "kDTreeHelpers.cuh"
 
-template<typename T>
-void allocateBoundingBox(BoundingBox *box, unsigned int dimensionOfInputPoints) {
-    cudaMalloc((void**) &box->dimMax, dimensionOfInputPoints*sizeof(T));
-    cudaMalloc((void**) &box->dimMin, dimensionOfInputPoints*sizeof(T));
+void allocateKDTreeLevelBoundingBox(
+    KDTreeLevelBoundingBoxes *boundingBoxLevel, 
+    unsigned int numNodes, 
+    unsigned int dimensionOfInputPoints) {
+
+        boundingBoxLevel->maxBBData = (H2Opus_Real*)malloc(numNodes*dimensionOfInputPoints*sizeof(H2Opus_Real));
+        boundingBoxLevel->minBBData = (H2Opus_Real*)malloc(numNodes*dimensionOfInputPoints*sizeof(H2Opus_Real));
+        boundingBoxLevel->boundingBoxes = (BoundingBox*)malloc(numNodes*sizeof(BoundingBox));
+
+        for(unsigned int node = 0; node < numNodes; ++node) {
+            boundingBoxLevel->boundingBoxes[node].dimMax = &boundingBoxLevel->maxBBData[node*dimensionOfInputPoints];
+            boundingBoxLevel->boundingBoxes[node].dimMin = &boundingBoxLevel->minBBData[node*dimensionOfInputPoints];
+        }
 }
 
-template<typename T>
 void allocateKDTreeBoundingBoxes(
     KDTreeBoundingBoxes *boxes,
     unsigned int numberOfInputPoints,
@@ -16,14 +24,10 @@ void allocateKDTreeBoundingBoxes(
     unsigned int dimensionOfInputPoints) {
 
         unsigned int numLevels = 1 + __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/bucketSize);
-        boxes->levels = (BoundingBox**)malloc(numLevels*sizeof(BoundingBox*));
+        boxes->levels = (KDTreeLevelBoundingBoxes*)malloc(numLevels*sizeof(KDTreeLevelBoundingBoxes));
 
         for(unsigned int level = 0; level < numLevels; ++level) {
             unsigned int numNodes = 1<<level;
-            boxes->levels[level] = (BoundingBox*)malloc(numNodes*sizeof(BoundingBox));
-
-            for(unsigned int box = 0; box < numNodes; ++box) {
-                allocateBoundingBox < T > (boxes->levels[level][box], dimensionOfInputPoints);
-            }
+            allocateKDTreeLevelBoundingBox(&boxes->levels[level], numNodes, dimensionOfInputPoints);
         }
 }

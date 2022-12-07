@@ -10,17 +10,20 @@ struct BoundingBox {
     H2Opus_Real *dimMin;
 };
 
-struct KDTreeBoundingBoxes {
-    BoundingBox **levels;
+struct KDTreeLevelBoundingBoxes {
+    BoundingBox *boundingBoxes;
+    H2Opus_Real *maxBBData;
+    H2Opus_Real *minBBData;
 };
 
-template<typename T>
-void allocateBoundingBox(BoundingBox *box, unsigned int pointsDimension);
+struct KDTreeBoundingBoxes {
+    KDTreeLevelBoundingBoxes *levels;
+};
 
 void allocateKDTreeBoundingBoxes(
-    KDTreeBoundingBoxes *boundingBoxes,
-    unsigned int numberOfInputPoints, 
-    unsigned int bucketSize, 
+    KDTreeBoundingBoxes *boxes,
+    unsigned int numberOfInputPoints,
+    unsigned int bucketSize,
     unsigned int dimensionOfInputPoints);
 
 void freeBoundingBoxes();

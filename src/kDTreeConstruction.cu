@@ -1,20 +1,24 @@
 
 #include "kDTreeConstruction.cuh"
+#include "boundingBoxes.h"
 #include "config.h"
 #include "kDTreeHelpers.cuh"
-#include <cub/cub.cuh>
 
+#include <cub/cub.cuh>
 #include <thrust/binary_search.h>
 #include <thrust/device_vector.h>
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
 // TODO: clean this file
-void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, 
+void constructKDTree(
+    unsigned int numberOfInputPoints, 
+    unsigned int dimensionOfInputPoints, 
     unsigned int bucketSize, 
     KDTree &kDTree, 
     H2Opus_Real* d_pointCloud,
-    DIVISION_METHOD divMethod) {
+    DIVISION_METHOD divMethod,
+    KDTreeBoundingBoxes boundingBoxes) {
 
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
@@ -48,24 +52,33 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
         cudaMalloc((void**) &d_kDTreePointsOutput, numberOfInputPoints*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_indexMapOutput, numberOfInputPoints*sizeof(int));
         cudaMalloc((void**) &d_reduceIn, numberOfInputPoints*dimensionOfInputPoints*sizeof(H2Opus_Real));
-        cudaMalloc((void**) &d_minSegmentItem, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(int));
-        cudaMalloc((void**) &d_maxSegmentItem, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(int));
-        cudaMalloc((void**) &d_segmentSpan, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(int));
+        cudaMalloc((void**) &d_minSegmentItem, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_maxSegmentItem, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &d_segmentSpan, (maxNumSegments + 1)*dimensionOfInputPoints*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_segmentSpanOffsets, (maxNumSegments + 1)*sizeof(int));
         cudaMalloc((void**) &d_segmentSpanReduction, (maxNumSegments + 1)*sizeof(cub::KeyValuePair<int, H2Opus_Real>));
 
         if(divMethod == FULL_TREE) {
             cudaMalloc((void**) &d_aux_offsets_sort, (maxNumSegments + 1)*sizeof(int));
-            cudaMalloc((void**) &A, (maxNumSegments + 1)*sizeof(int));        
-            cudaMalloc((void**) &B, numberOfInputPoints*sizeof(int));        
-            cudaMalloc((void**) &d_bin_search_output, numberOfInputPoints*sizeof(int));        
+            cudaMalloc((void**) &A, (maxNumSegments + 1)*sizeof(int));
+            cudaMalloc((void**) &B, numberOfInputPoints*sizeof(int));
+            cudaMalloc((void**) &d_bin_search_output, numberOfInputPoints*sizeof(int));
             cudaMalloc((void**) &d_input_search, numberOfInputPoints*sizeof(int));
         }
 
         unsigned int currentNumSegments = 1;
         unsigned int numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
-        unsigned int currentSegmentSize = upperPowerOfTwo(numberOfInputPoints);
-        unsigned int largestSegmentSize = numberOfInputPoints;
+        // TODO: make largestSegmentSize and currentSegmentSize one variable instead of two
+        // unsigned int currentSegmentSize = upperPowerOfTwo(numberOfInputPoints);
+        // unsigned int currentSegmentSize = numberOfInputPoints;
+        unsigned int currentSegmentSize;
+        if(divMethod == POWER_OF_TWO_ON_LEFT) {
+            currentSegmentSize = upperPowerOfTwo(numberOfInputPoints);
+        }
+        else {
+            currentSegmentSize = numberOfInputPoints;
+        }
+
         void *d_tempStorage;
         size_t tempStorageBytes;
         int *d_temp;
@@ -79,8 +92,10 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
             initIndexMap <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, kDTree, d_input_search, d_dimxNSegmentOffsets);
         }
 
+        unsigned int level = 0;
+
         #if 1
-        while(largestSegmentSize > bucketSize)
+        while(currentSegmentSize > bucketSize)
         #else
         while(currentSegmentSize > bucketSize)
         #endif
@@ -113,7 +128,9 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
                 numSegmentsReduce, d_dimxNSegmentOffsets, d_dimxNSegmentOffsets + 1);
             cudaFree(d_tempStorage);
 
-            // TODO: launch more threads
+            // copy segmented min and max to bounding boxes
+            // copyMaxandMinToBoundingBoxes(boundingBoxes.levels[level], d_maxSegmentItem, d_minSegmentItem, level, dimensionOfInputPoints currentSegmentSize);
+
             numThreadsPerBlock = 1024;
             numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
             findSpan <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, d_minSegmentItem, d_maxSegmentItem, d_segmentSpan, d_segmentSpanOffsets);
@@ -173,11 +190,12 @@ void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfI
                 numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
                 fillOffsetsReduce <<< numBlocks, numThreadsPerBlock >>> (numberOfInputPoints, dimensionOfInputPoints, currentNumSegments, kDTree.segmentOffsets, d_dimxNSegmentOffsets);
 
-                ++largestSegmentSize;
-                largestSegmentSize >>= 1;
+                ++currentSegmentSize;
+                currentSegmentSize >>= 1;
             }
 
             numSegmentsReduce = currentNumSegments*dimensionOfInputPoints;
+            ++level;
         }
 
         if(divMethod == POWER_OF_TWO_ON_LEFT) {

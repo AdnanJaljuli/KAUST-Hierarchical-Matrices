@@ -3,10 +3,19 @@
 #define KDTREE_CONSTRUCTION_H
 
 #include "kDTree.cuh"
+#include "boundingBoxes.h"
 #include "config.h"
 
 typedef double H2Opus_Real;
 
-void constructKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int bucketSize, KDTree &kDTree, H2Opus_Real* d_pointCloud, DIVISION_METHOD divMethod);
+void constructKDTree(
+    unsigned int numberOfInputPoints, 
+    unsigned int dimensionOfInputPoints, 
+    unsigned int bucketSize, 
+    KDTree &kDTree, 
+    H2Opus_Real* 
+    d_pointCloud, 
+    DIVISION_METHOD divMethod, 
+    KDTreeBoundingBoxes boundingBoxes);
 
 #endif
