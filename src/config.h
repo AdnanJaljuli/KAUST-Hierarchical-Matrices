@@ -36,8 +36,12 @@ static void usage()
             "                                       This must be an integer.\n"
             "                                  - Default : 2\n"
             "\n"
-            "   -v <width of vector>                Used to set the width of the vector that is multiplied by the hierarchical matrix"
-            "                                  - Default: 64"
+            "   -v <width of vector>                Used to set the width of the vector that is multiplied by the hierarchical matrix\n"
+            "                                  - Default: 64\n"
+            "\n"
+            "   -a <admissibility condition>        Used to set the admissibility condition that builds hierarchical matrix structure\n"
+            "                                  - Options: weak, boxCenter\n"
+            "                                  - Default: weak\n"
             "\n");
 }
 
@@ -85,9 +89,33 @@ static const char *asString(DIVISION_METHOD divMethod)
     }
 }
 
+enum ADMISSIBILITY_CONDITION
+{
+    WEAK_ADMISSIBILITY,
+    BOX_CENTER_ADMISSIBILITY,
+};
+
+static ADMISSIBILITY_CONDITION parseAdmissibilityCondition(const char *s)
+{
+    if (strcmp(s, "weak") == 0)
+    {
+        return WEAK_ADMISSIBILITY;
+    }
+    else if (strcmp(s, "boxCenter") == 0)
+    {
+        return BOX_CENTER_ADMISSIBILITY;
+    }
+    else
+    {
+        fprintf(stderr, "Unrecognized -i option: %s\n", s);
+        exit(0);
+    }
+}
+
 struct Config
 {
     DIVISION_METHOD divMethod;
+    ADMISSIBILITY_CONDITION admissibility;
     unsigned int numberOfInputPoints;
     unsigned int dimensionOfInputPoints;
     unsigned int bucketSize;
@@ -98,35 +126,39 @@ struct Config
 static Config parseArgs(int argc, char **argv)
 {
     Config config;
-    config.numberOfInputPoints = 1024;
-    config.bucketSize = 32;
-    config.lowestLevelTolerance = 1e-5;
     config.divMethod = POWER_OF_TWO_ON_LEFT;
+    config.admissibility = WEAK_ADMISSIBILITY;
+    config.numberOfInputPoints = 1024;
     config.dimensionOfInputPoints = 2;
+    config.bucketSize = 32;
     config.vectorWidth = 16;
+    config.lowestLevelTolerance = 1e-5;
 
     int opt;
     while ((opt = getopt(argc, argv, "n:b:t:m:d:v:h")) >= 0)
     {
         switch (opt)
         {
-        case 'n':
-            config.numberOfInputPoints = atoi(optarg);
-            break;
-        case 'b':
-            config.bucketSize = atoi(optarg);
-            break;
-        case 't':
-            config.lowestLevelTolerance = atof(optarg);
-            break;
         case 'm':
             config.divMethod = parseDivMethod(optarg);
+            break;
+        case 'a':
+            config.admissibility = parseAdmissibilityCondition(optarg);
+            break;
+        case 'n':
+            config.numberOfInputPoints = atoi(optarg);
             break;
         case 'd':
             config.dimensionOfInputPoints = atoi(optarg);
             break;
+        case 'b':
+            config.bucketSize = atoi(optarg);
+            break;
         case 'v':
             config.vectorWidth = atoi(optarg);
+            break;
+        case 't':
+            config.lowestLevelTolerance = atof(optarg);
             break;
         case 'h':
             usage();
