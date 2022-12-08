@@ -85,12 +85,13 @@ int main(int argc, char *argv[]) {
     constructHMatrixStructure(
         &hierarchicalMatrix.matrixStructure,
         config.numberOfInputPoints,
+        config.dimensionOfInputPoints,
         config.bucketSize,
         config.admissibilityCondition,
         kDTree.boundingBoxes,
         kDTree.boundingBoxes);
 
-    #if 1
+    #if 0
 
     // Build the TLR matrix
     #if USE_COUNTERS

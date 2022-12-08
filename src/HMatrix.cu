@@ -1,9 +1,12 @@
 
 #include "HMatrix.cuh"
+#include "admissibilityCondition.cuh"
 #include "boundingBoxes.h"
 #include "config.h"
 #include "helperKernels.cuh"
+#include "kDTreeHelpers.cuh"
 #include <cub/cub.cuh>
+#include <functional>
 
 void constructWeakAdmissibilityStruct(HMatrixStructure *HMatrixStruct, 
     unsigned int numberOfInputPoints, 
@@ -36,18 +39,93 @@ void constructWeakAdmissibilityStruct(HMatrixStructure *HMatrixStruct,
         }
 }
 
+void constructMatrixStruct_recursive(
+    HMatrixStructure *HMatrixStruct,
+    KDTreeBoundingBoxes BBox_u,
+    KDTreeBoundingBoxes BBox_v,
+    BoundingBox node_u,
+    BoundingBox node_v,
+    unsigned int dimensionOfInputPoints,
+    unsigned int currentLevel,
+    unsigned int maxDepth,
+    float epsilon,
+    std::function<bool(
+        BoundingBox,
+        BoundingBox,
+        unsigned int,
+        unsigned int,
+        unsigned int,
+        unsigned int)> isAdmissible) {
+
+            if(isAdmissible(node_u, node_v, dimensionOfInputPoints, currentLevel, maxDepth, epsilon)) {
+                // write to HMatrixStruct
+                return;
+            }
+            else {
+                isAdmissible(
+                    BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index],
+                    BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
+                    dimensionOfInputPoints,
+                    currentLevel + 1,
+                    maxDepth,
+                    epsilon);
+
+                isAdmissible(
+                    BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index + 1],
+                    BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
+                    dimensionOfInputPoints,
+                    currentLevel + 1,
+                    maxDepth,
+                    epsilon);
+
+                isAdmissible(
+                    BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index],
+                    BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
+                    dimensionOfInputPoints,
+                    currentLevel + 1,
+                    maxDepth,
+                    epsilon);
+
+                isAdmissible(
+                    BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index + 1],
+                    BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
+                    dimensionOfInputPoints,
+                    currentLevel + 1,
+                    maxDepth,
+                    epsilon);
+            }
+}
+
 void constructMatrixStruct(
     HMatrixStructure *HMatrixStruct,
     ADMISSIBILITY_CONDITION admissibilityCondition,
     KDTreeBoundingBoxes BBox1,
-    KDTreeBoundingBoxes BBox2) {
+    KDTreeBoundingBoxes BBox2,
+    unsigned int numberOfInputPoints,
+    unsigned int dimensionOfInputPoints,
+    unsigned int bucketSize,
+    float epsilon = 0.01) {
 
-        // TODO: call recursive function
+        unsigned int maxDepth = __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/bucketSize);
+
+        // call recursive function
+        constructMatrixStruct_recursive(
+            HMatrixStruct,
+            BBox1,
+            BBox2,
+            BBox1.levels[0].boundingBoxes[0],
+            BBox2.levels[0].boundingBoxes[0],
+            dimensionOfInputPoints,
+            0,
+            maxDepth,
+            epsilon,
+            &BBoxCenterAdmissibility);
 }
 
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
     unsigned int numberOfInputPoints,
+    unsigned int dimensionOfInputPoints,
     unsigned int bucketSize,
     ADMISSIBILITY_CONDITION admissibilityCondition,
     KDTreeBoundingBoxes BBox1,
@@ -64,7 +142,10 @@ void constructHMatrixStructure(
                 HMatrixStruct,
                 admissibilityCondition,
                 BBox1,
-                BBox2);
+                BBox2,
+                numberOfInputPoints,
+                dimensionOfInputPoints,
+                bucketSize);
         }
 }
 

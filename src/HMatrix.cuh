@@ -13,7 +13,8 @@ struct HMatrixStructure {
 
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    unsigned int numberOfInputPoints, 
+    unsigned int numberOfInputPoints,
+    unsigned int dimensionOfInputPoints, 
     unsigned int bucketSize,
     ADMISSIBILITY_CONDITION admissibilityCondition,
     KDTreeBoundingBoxes BBox1,
