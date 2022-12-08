@@ -1,5 +1,4 @@
 
-#include "boundingBoxes.h"
 #include "config.h"
 #include "counters.h"
 #include "constructTLRMatrix.cuh"
@@ -60,17 +59,20 @@ int main(int argc, char *argv[]) {
     startTime(KDTREE, &counters);
     #endif
     KDTree kDTree;
-    allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize, config.divMethod);
-    KDTreeBoundingBoxes boundingBoxes;
-    allocateKDTreeBoundingBoxes(&boundingBoxes, config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints);
+    allocateKDTree(
+        kDTree,
+        config.numberOfInputPoints,
+        config.dimensionOfInputPoints,
+        config.bucketSize,
+        config.divMethod);
+
     constructKDTree(
         config.numberOfInputPoints,
         config.dimensionOfInputPoints,
         config.bucketSize,
         kDTree,
         d_pointCloud,
-        config.divMethod,
-        boundingBoxes); // TODO: pass a reference to kdtree
+        config.divMethod); // TODO: pass a reference to kdtree
     printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
     #if USE_COUNTERS
@@ -81,7 +83,7 @@ int main(int argc, char *argv[]) {
     // create HMatrixStructure
     HMatrix hierarchicalMatrix;
     constructHMatrixStructure(
-        hierarchicalMatrix.matrixStructure,
+        &hierarchicalMatrix.matrixStructure,
         config.numberOfInputPoints,
         config.bucketSize,
         config.admissibilityCondition);

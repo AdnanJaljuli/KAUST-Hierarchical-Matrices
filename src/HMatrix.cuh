@@ -11,7 +11,7 @@ struct HMatrixStructure {
 };
 
 void constructHMatrixStructure(
-    HMatrixStructure &HMatrixStruct, 
+    HMatrixStructure *HMatrixStruct,
     unsigned int numberOfInputPoints, 
     unsigned int bucketSize,
     ADMISSIBILITY_CONDITION admissibilityCondition);

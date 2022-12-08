@@ -45,6 +45,7 @@ __global__ void resortSegmentedScan(
         }
 }
 
+// TODO: rename function
 void copyMaxandMinToBoundingBoxes(
     KDTreeLevelBoundingBoxes BBlevel,
     H2Opus_Real *d_maxSegmentItem,
@@ -53,7 +54,7 @@ void copyMaxandMinToBoundingBoxes(
     unsigned int dimensionOfInputPoints,
     unsigned int currentNumSegments,
     H2Opus_Real *d_bufferBBMax, H2Opus_Real *d_bufferBBMin) {
-        
+
         // resort maxsegmentitem and minsegmentitem into buffer arrays
         dim3 numThreadsPerBlock(1024);
         dim3 numBlocks((currentNumSegments + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, dimensionOfInputPoints);

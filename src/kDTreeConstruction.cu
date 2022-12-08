@@ -17,10 +17,7 @@ void constructKDTree(
     unsigned int bucketSize, 
     KDTree &kDTree, 
     H2Opus_Real* d_pointCloud,
-    DIVISION_METHOD divMethod,
-    KDTreeBoundingBoxes boundingBoxes) {
-
-
+    DIVISION_METHOD divMethod) {
 
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
@@ -29,7 +26,6 @@ void constructKDTree(
         else {
             maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
         }
-        printf("max num segments: %d\n", maxNumSegments);
 
         int *d_dimxNSegmentOffsets;
         H2Opus_Real *d_kDTreePoints;
@@ -132,7 +128,7 @@ void constructKDTree(
 
             // copy segmented min and max to bounding boxes
             copyMaxandMinToBoundingBoxes(
-                boundingBoxes.levels[level],
+                kDTree.boundingBoxes.levels[level],
                 d_maxSegmentItem,
                 d_minSegmentItem,
                 level,
