@@ -36,11 +36,22 @@ void constructWeakAdmissibilityStruct(HMatrixStructure *HMatrixStruct,
         }
 }
 
+void constructMatrixStruct(
+    HMatrixStructure *HMatrixStruct,
+    ADMISSIBILITY_CONDITION admissibilityCondition,
+    KDTreeBoundingBoxes BBox1,
+    KDTreeBoundingBoxes BBox2) {
+
+        // TODO: call recursive function
+}
+
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
     unsigned int numberOfInputPoints,
     unsigned int bucketSize,
-    ADMISSIBILITY_CONDITION admissibilityCondition) {
+    ADMISSIBILITY_CONDITION admissibilityCondition,
+    KDTreeBoundingBoxes BBox1,
+    KDTreeBoundingBoxes BBox2) {
 
         if(admissibilityCondition == WEAK_ADMISSIBILITY) {
             constructWeakAdmissibilityStruct(HMatrixStruct, 
@@ -49,7 +60,11 @@ void constructHMatrixStructure(
                 admissibilityCondition);
         }
         else {
-            // TODO
+            constructMatrixStruct(
+                HMatrixStruct,
+                admissibilityCondition,
+                BBox1,
+                BBox2);
         }
 }
 

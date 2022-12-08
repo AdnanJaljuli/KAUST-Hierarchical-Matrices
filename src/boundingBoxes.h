@@ -8,6 +8,8 @@
 struct BoundingBox {
     H2Opus_Real *dimMax;
     H2Opus_Real *dimMin;
+    unsigned int index;
+    unsigned int level;
 };
 
 struct KDTreeLevelBoundingBoxes {

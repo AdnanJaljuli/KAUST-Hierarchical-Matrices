@@ -3,6 +3,7 @@
 #define HMATRIX_H
 
 #include "HMatrixHelpers.cuh"
+#include "boundingBoxes.h"
 
 struct HMatrixStructure {
     int numLevels;
@@ -14,7 +15,9 @@ void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
     unsigned int numberOfInputPoints, 
     unsigned int bucketSize,
-    ADMISSIBILITY_CONDITION admissibilityCondition);
+    ADMISSIBILITY_CONDITION admissibilityCondition,
+    KDTreeBoundingBoxes BBox1,
+    KDTreeBoundingBoxes BBox2);
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 

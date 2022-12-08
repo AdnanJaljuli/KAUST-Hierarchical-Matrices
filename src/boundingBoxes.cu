@@ -4,8 +4,9 @@
 
 void allocateKDTreeLevelBoundingBox(
     KDTreeLevelBoundingBoxes *boundingBoxLevel, 
-    unsigned int numNodes, 
-    unsigned int dimensionOfInputPoints) {
+    unsigned int numNodes,
+    unsigned int dimensionOfInputPoints,
+    unsigned int level) {
 
         boundingBoxLevel->maxBBData = (H2Opus_Real*)malloc(numNodes*dimensionOfInputPoints*sizeof(H2Opus_Real));
         boundingBoxLevel->minBBData = (H2Opus_Real*)malloc(numNodes*dimensionOfInputPoints*sizeof(H2Opus_Real));
@@ -14,6 +15,8 @@ void allocateKDTreeLevelBoundingBox(
         for(unsigned int node = 0; node < numNodes; ++node) {
             boundingBoxLevel->boundingBoxes[node].dimMax = &boundingBoxLevel->maxBBData[node*dimensionOfInputPoints];
             boundingBoxLevel->boundingBoxes[node].dimMin = &boundingBoxLevel->minBBData[node*dimensionOfInputPoints];
+            boundingBoxLevel->boundingBoxes[node].index = node;
+            boundingBoxLevel->boundingBoxes[node].level = level;
         }
 }
 
@@ -28,7 +31,7 @@ void allocateKDTreeBoundingBoxes(
 
         for(unsigned int level = 0; level < numLevels; ++level) {
             unsigned int numNodes = 1<<level;
-            allocateKDTreeLevelBoundingBox(&boxes->levels[level], numNodes, dimensionOfInputPoints);
+            allocateKDTreeLevelBoundingBox(&boxes->levels[level], numNodes, dimensionOfInputPoints, level);
         }
 }
 

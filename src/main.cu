@@ -86,7 +86,9 @@ int main(int argc, char *argv[]) {
         &hierarchicalMatrix.matrixStructure,
         config.numberOfInputPoints,
         config.bucketSize,
-        config.admissibilityCondition);
+        config.admissibilityCondition,
+        kDTree.boundingBoxes,
+        kDTree.boundingBoxes);
 
     #if 1
 
