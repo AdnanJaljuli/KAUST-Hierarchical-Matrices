@@ -53,6 +53,7 @@ int main(int argc, char *argv[]) {
     endTime(GENERATE_DATASET, &counters);
     #endif
 
+
     // Build the KD-tree
     magma_init();
     #if USE_COUNTERS
@@ -62,7 +63,6 @@ int main(int argc, char *argv[]) {
     allocateKDTree(kDTree, config.numberOfInputPoints, config.bucketSize, config.divMethod);
     KDTreeBoundingBoxes boundingBoxes;
     allocateKDTreeBoundingBoxes(&boundingBoxes, config.numberOfInputPoints, config.bucketSize, config.dimensionOfInputPoints);
-
     constructKDTree(
         config.numberOfInputPoints,
         config.dimensionOfInputPoints,
@@ -71,16 +71,18 @@ int main(int argc, char *argv[]) {
         d_pointCloud,
         config.divMethod,
         boundingBoxes); // TODO: pass a reference to kdtree
+    printf("segment size: %lu\n", kDTree.segmentSize);
+    printf("num segments: %lu\n", kDTree.numSegments);
     #if USE_COUNTERS
     endTime(KDTREE, &counters);
     #endif
 
-    printf("segment size: %lu\n", kDTree.segmentSize);
-    printf("num segments: %lu\n", kDTree.numSegments);
 
     // create HMatrixStructure
-    HMatrixStructure HMatrixStruct;
-    allocateHMatrixStructure(HMatrixStruct, config.numberOfInputPoints, config.bucketSize);
+    HMatrix hierarchicalMatrix;
+    allocateHMatrixStructure(hierarchicalMatrix.matrixStructure, config.numberOfInputPoints, config.bucketSize);
+
+    #if 0
 
     // Build the TLR matrix
     #if USE_COUNTERS
@@ -128,7 +130,6 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     startTime(HMATRIX, &counters);
     #endif
-    HMatrix hierarchicalMatrix;
     allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, HMatrixStruct);
     unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.numLevels - 2)*sizeof(unsigned int));
     generateMaxRanks(hierarchicalMatrix.numLevels, config.bucketSize, maxRanks);
@@ -165,6 +166,8 @@ int main(int argc, char *argv[]) {
     magma_finalize();
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
+    #endif
+
     #endif
 
     #if USE_COUNTERS

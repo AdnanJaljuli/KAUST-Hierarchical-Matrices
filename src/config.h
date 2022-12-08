@@ -11,8 +11,7 @@
 #define USE_COUNTERS 0
 #endif
 
-static void usage()
-{
+static void usage() {
     fprintf(stderr,
             "\n"
             "Arguments :\n"
@@ -46,15 +45,13 @@ static void usage()
 }
 
 // TODO: remove division method
-enum DIVISION_METHOD
-{
+enum DIVISION_METHOD {
     POWER_OF_TWO_ON_LEFT,
     DIVIDE_IN_HALF,
     FULL_TREE,
 };
 
-static DIVISION_METHOD parseDivMethod(const char *s)
-{
+static DIVISION_METHOD parseDivMethod(const char *s) {
     if (strcmp(s, "powerOfTwo") == 0)
     {
         return POWER_OF_TWO_ON_LEFT;
@@ -73,8 +70,7 @@ static DIVISION_METHOD parseDivMethod(const char *s)
     }
 }
 
-static const char *asString(DIVISION_METHOD divMethod)
-{
+static const char *asString(DIVISION_METHOD divMethod) {
     switch (divMethod)
     {
         case POWER_OF_TWO_ON_LEFT:
@@ -89,14 +85,12 @@ static const char *asString(DIVISION_METHOD divMethod)
     }
 }
 
-enum ADMISSIBILITY_CONDITION
-{
+enum ADMISSIBILITY_CONDITION {
     WEAK_ADMISSIBILITY,
     BOX_CENTER_ADMISSIBILITY,
 };
 
-static ADMISSIBILITY_CONDITION parseAdmissibilityCondition(const char *s)
-{
+static ADMISSIBILITY_CONDITION parseAdmissibilityCondition(const char *s) {
     if (strcmp(s, "weak") == 0)
     {
         return WEAK_ADMISSIBILITY;
@@ -112,8 +106,7 @@ static ADMISSIBILITY_CONDITION parseAdmissibilityCondition(const char *s)
     }
 }
 
-struct Config
-{
+struct Config {
     DIVISION_METHOD divMethod;
     ADMISSIBILITY_CONDITION admissibility;
     unsigned int numberOfInputPoints;
@@ -123,10 +116,9 @@ struct Config
     float lowestLevelTolerance;
 };
 
-static Config parseArgs(int argc, char **argv)
-{
+static Config parseArgs(int argc, char **argv) {
     Config config;
-    config.divMethod = POWER_OF_TWO_ON_LEFT;
+    config.divMethod = FULL_TREE;
     config.admissibility = WEAK_ADMISSIBILITY;
     config.numberOfInputPoints = 1024;
     config.dimensionOfInputPoints = 2;
@@ -135,8 +127,7 @@ static Config parseArgs(int argc, char **argv)
     config.lowestLevelTolerance = 1e-5;
 
     int opt;
-    while ((opt = getopt(argc, argv, "n:b:t:m:d:v:h")) >= 0)
-    {
+    while ((opt = getopt(argc, argv, "n:b:t:m:d:v:h")) >= 0) {
         switch (opt)
         {
         case 'm':

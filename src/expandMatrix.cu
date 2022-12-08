@@ -128,12 +128,12 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
 }
 
 void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
-    for(unsigned int level = hierarchicalMatrix.numLevels - 1; level > 0; --level) {
+    for(unsigned int level = hierarchicalMatrix.matrixStructure.numLevels - 1; level > 0; --level) {
         int batchSize = hierarchicalMatrix.levels[level - 1].numTiles;
         if(batchSize == 0) {
             continue;
         }
-        int batchUnitSize = 1 << (hierarchicalMatrix.numLevels - (level + 1));
+        int batchUnitSize = 1 << (hierarchicalMatrix.matrixStructure.numLevels - (level + 1));
         checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix.levels[level - 1], d_denseMatrix);
     }
 }

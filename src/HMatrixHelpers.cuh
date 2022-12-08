@@ -3,19 +3,7 @@
 #define HMATRIX_HELPERS_H
 
 #include "TLRMatrix.cuh"
-
 #include "precision.h"
-
-// TODO: rename to HMatrixStructure
-// TODO: make this part of the HMatrix struct
-struct HMatrixStructure {
-    int numLevels;
-    int* numTiles;
-    int** tileIndices;
-};
-
-void allocateHMatrixStructure(HMatrixStructure &HMatrixStruct, unsigned int numberOfInputPoints, unsigned int bucketSize);
-void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 struct LevelTilePtrs {
     H2Opus_Real **U;

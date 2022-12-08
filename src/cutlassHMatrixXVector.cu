@@ -350,7 +350,7 @@ cudaError_t cutlassHierarchicalXVec(
 		// ptr_C.reset(numSegments);
 
       	// loop over levels
-		for(unsigned int level = hierarchicalMatrix.numLevels - 1; level > 0; --level) {
+		for(unsigned int level = hierarchicalMatrix.matrixStructure.numLevels - 1; level > 0; --level) {
 			// preprocess each level
 			int problemCount = hierarchicalMatrix.levels[level - 1].numTiles;
 
@@ -370,7 +370,7 @@ cudaError_t cutlassHierarchicalXVec(
 			ptr_B.reset(problemCount);
 			ptr_C.reset(problemCount);
 
-			VxVector(numberOfInputPoints, level, hierarchicalMatrix.numLevels,
+			VxVector(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
 				problemCount, bucketSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
 				&h_problemSizes, &d_problemSizes,
@@ -389,7 +389,7 @@ cudaError_t cutlassHierarchicalXVec(
 			ptr_B.reset(problemCount);
 			ptr_C.reset(problemCount);
 
-			UxResult(numberOfInputPoints, level, hierarchicalMatrix.numLevels,
+			UxResult(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
 				problemCount, bucketSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
 				&h_problemSizes, &d_problemSizes,
