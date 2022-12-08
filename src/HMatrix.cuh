@@ -10,10 +10,11 @@ struct HMatrixStructure {
     int** tileIndices;
 };
 
-void allocateHMatrixStructure(
+void constructHMatrixStructure(
     HMatrixStructure &HMatrixStruct, 
     unsigned int numberOfInputPoints, 
-    unsigned int bucketSize);
+    unsigned int bucketSize,
+    ADMISSIBILITY_CONDITION admissibilityCondition);
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 

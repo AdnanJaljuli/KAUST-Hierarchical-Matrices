@@ -80,9 +80,13 @@ int main(int argc, char *argv[]) {
 
     // create HMatrixStructure
     HMatrix hierarchicalMatrix;
-    allocateHMatrixStructure(hierarchicalMatrix.matrixStructure, config.numberOfInputPoints, config.bucketSize);
+    constructHMatrixStructure(
+        hierarchicalMatrix.matrixStructure,
+        config.numberOfInputPoints,
+        config.bucketSize,
+        config.admissibilityCondition);
 
-    #if 0
+    #if 1
 
     // Build the TLR matrix
     #if USE_COUNTERS
@@ -130,10 +134,10 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     startTime(HMATRIX, &counters);
     #endif
-    allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, HMatrixStruct);
-    unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.numLevels - 2)*sizeof(unsigned int));
-    generateMaxRanks(hierarchicalMatrix.numLevels, config.bucketSize, maxRanks);
-    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, HMatrixStruct, maxRanks);
+    allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix.matrixStructure);
+    unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.matrixStructure.numLevels - 2)*sizeof(unsigned int));
+    generateMaxRanks(hierarchicalMatrix.matrixStructure.numLevels, config.bucketSize, maxRanks);
+    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, hierarchicalMatrix.matrixStructure, maxRanks);
     #if USE_COUNTERS
     endTime(HMATRIX, &counters);
     #endif
@@ -142,7 +146,7 @@ int main(int argc, char *argv[]) {
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
     free(maxRanks);
-    freeHMatrixStructure(HMatrixStruct);
+    freeHMatrixStructure(hierarchicalMatrix.matrixStructure);
     freeMatrix(mortonOrderedMatrix);
     
     // TODO: generate random vector

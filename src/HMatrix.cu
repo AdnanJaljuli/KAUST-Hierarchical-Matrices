@@ -1,37 +1,44 @@
 
+#include "config.h"
 #include "HMatrix.cuh"
 #include "helperKernels.cuh"
 #include <cub/cub.cuh>
 
-void allocateHMatrixStructure(
+void constructHMatrixStructure(
     HMatrixStructure &HMatrixStruct, 
     unsigned int numberOfInputPoints, 
-    unsigned int bucketSize) {
+    unsigned int bucketSize,
+    ADMISSIBILITY_CONDITION admissibilityCondition) {
 
-    HMatrixStruct.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
-    HMatrixStruct.numTiles = (int*)malloc((HMatrixStruct.numLevels - 1)*sizeof(int));
-    HMatrixStruct.tileIndices = (int**)malloc((HMatrixStruct.numLevels - 1)*sizeof(int*));
+        if(admissibilityCondition == WEAK_ADMISSIBILITY) {
+            HMatrixStruct.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+            HMatrixStruct.numTiles = (int*)malloc((HMatrixStruct.numLevels - 1)*sizeof(int));
+            HMatrixStruct.tileIndices = (int**)malloc((HMatrixStruct.numLevels - 1)*sizeof(int*));
 
-    unsigned int dim = 2;
-    for(unsigned int level = 0; level < HMatrixStruct.numLevels - 1; ++level) {
-        unsigned int numTiles = 1 << (level + 1);
-        HMatrixStruct.numTiles[level] = numTiles;
-        
-        HMatrixStruct.tileIndices[level] = (int*)malloc(numTiles*sizeof(int));
-        for(unsigned int j = 0; j < numTiles; ++j) {
-            int x;
-            if(j%2 == 0) {
-                x = 1;
+            unsigned int dim = 2;
+            for(unsigned int level = 0; level < HMatrixStruct.numLevels - 1; ++level) {
+                unsigned int numTiles = 1 << (level + 1);
+                HMatrixStruct.numTiles[level] = numTiles;
+                
+                HMatrixStruct.tileIndices[level] = (int*)malloc(numTiles*sizeof(int));
+                for(unsigned int j = 0; j < numTiles; ++j) {
+                    int x;
+                    if(j%2 == 0) {
+                        x = 1;
+                    }
+                    else {
+                        x = -1;
+                    }
+                    unsigned int tileIndex = j*dim + j + x;
+                    HMatrixStruct.tileIndices[level][j + x] = CMIndextoMOIndex(dim, tileIndex);
+                }
+                
+                dim <<= 1;
             }
-            else {
-                x = -1;
-            }
-            unsigned int tileIndex = j*dim + j + x;
-            HMatrixStruct.tileIndices[level][j + x] = CMIndextoMOIndex(dim, tileIndex);
         }
-        
-        dim <<= 1;
-    }
+        else {
+            // TODO
+        }
 }
 
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct) {

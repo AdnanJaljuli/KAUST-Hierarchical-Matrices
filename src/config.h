@@ -108,7 +108,7 @@ static ADMISSIBILITY_CONDITION parseAdmissibilityCondition(const char *s) {
 
 struct Config {
     DIVISION_METHOD divMethod;
-    ADMISSIBILITY_CONDITION admissibility;
+    ADMISSIBILITY_CONDITION admissibilityCondition;
     unsigned int numberOfInputPoints;
     unsigned int dimensionOfInputPoints;
     unsigned int bucketSize;
@@ -119,7 +119,7 @@ struct Config {
 static Config parseArgs(int argc, char **argv) {
     Config config;
     config.divMethod = FULL_TREE;
-    config.admissibility = WEAK_ADMISSIBILITY;
+    config.admissibilityCondition = WEAK_ADMISSIBILITY;
     config.numberOfInputPoints = 1024;
     config.dimensionOfInputPoints = 2;
     config.bucketSize = 32;
@@ -134,7 +134,7 @@ static Config parseArgs(int argc, char **argv) {
             config.divMethod = parseDivMethod(optarg);
             break;
         case 'a':
-            config.admissibility = parseAdmissibilityCondition(optarg);
+            config.admissibilityCondition = parseAdmissibilityCondition(optarg);
             break;
         case 'n':
             config.numberOfInputPoints = atoi(optarg);
