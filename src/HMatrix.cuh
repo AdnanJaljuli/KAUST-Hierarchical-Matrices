@@ -8,7 +8,7 @@
 struct HMatrixStructure {
     int numLevels;
     int* numTiles;
-    int** tileIndices;
+    int** tileIndices; // TODO: do they have to be sorted?
 };
 
 void constructHMatrixStructure(

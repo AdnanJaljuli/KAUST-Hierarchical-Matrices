@@ -62,8 +62,9 @@ void generateRandomVector(unsigned int vectorWidth, unsigned int vectorHeight, H
 }
 
 void generateMaxRanks(unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks) {
-    for(unsigned int i = 0; i < numLevels - 2; ++i) {
-        maxRanks[i] = bucketSize*(1 << i);
+    for(unsigned int i = 0; i < numLevels - 1; ++i) {
+        maxRanks[i] = (bucketSize/2)*(1 << i);
+        printf("max ranks %d\n", maxRanks[i]);
         if(i > 5) {
             maxRanks[i]/=4;
         }

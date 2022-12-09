@@ -8,21 +8,17 @@
 #include <cub/cub.cuh>
 #include <functional>
 
-void constructWeakAdmissibilityStruct(HMatrixStructure *HMatrixStruct, 
+void constructWeakAdmissibilityStruct(
+    HMatrixStructure *HMatrixStruct, 
     unsigned int numberOfInputPoints, 
     unsigned int bucketSize,
     ADMISSIBILITY_CONDITION admissibilityCondition) {
-
-        HMatrixStruct->numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
-        HMatrixStruct->numTiles = (int*)malloc((HMatrixStruct->numLevels - 1)*sizeof(int));
-        HMatrixStruct->tileIndices = (int**)malloc((HMatrixStruct->numLevels - 1)*sizeof(int*));
 
         unsigned int dim = 2;
         for(unsigned int level = 0; level < HMatrixStruct->numLevels - 1; ++level) {
             unsigned int numTiles = 1 << (level + 1);
             HMatrixStruct->numTiles[level] = numTiles;
-            
-            HMatrixStruct->tileIndices[level] = (int*)malloc(numTiles*sizeof(int));
+
             for(unsigned int j = 0; j < numTiles; ++j) {
                 int x;
                 if(j%2 == 0) {
@@ -57,9 +53,17 @@ void constructMatrixStruct_recursive(
         unsigned int,
         float)> isAdmissible) {
 
-            if(isAdmissible(node_u, node_v, dimensionOfInputPoints, currentLevel, maxDepth, epsilon)) {
+            bool isDiagonal = (node_u.index == node_v.index);
+            bool isLeafNode = (currentLevel == maxDepth);
+
+            if(isDiagonal && isLeafNode) {
+                return;
+            }
+            else if(isLeafNode || isAdmissible(node_u, node_v, dimensionOfInputPoints, currentLevel, maxDepth, epsilon)) {
                 // TODO: write to HMatrixStruct
-                
+                unsigned int numRows = 1<<currentLevel;
+                unsigned int tileIndex = CMIndextoMOIndex(numRows, node_u.index*numRows + node_v.index);
+                HMatrixStruct->tileIndices[currentLevel - 1][HMatrixStruct->numTiles[currentLevel - 1]++] = tileIndex;
                 return;
             }
             else {
@@ -122,7 +126,7 @@ void constructMatrixStruct(
     unsigned int numberOfInputPoints,
     unsigned int dimensionOfInputPoints,
     unsigned int bucketSize,
-    float epsilon = 0.1) {
+    float epsilon = 5) {
 
         unsigned int maxDepth = __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/bucketSize);
         printf("max depth %d\n", maxDepth);
@@ -151,6 +155,18 @@ void constructHMatrixStructure(
     KDTreeBoundingBoxes BBox1,
     KDTreeBoundingBoxes BBox2) {
 
+        HMatrixStruct->numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+        HMatrixStruct->numTiles = (int*)malloc((HMatrixStruct->numLevels)*sizeof(int));
+        HMatrixStruct->tileIndices = (int**)malloc((HMatrixStruct->numLevels)*sizeof(int*));
+        
+        // HMatrixStruct->numTiles[0] = 0;
+        for(unsigned int level = 0; level < HMatrixStruct->numLevels; ++level) {
+            HMatrixStruct->numTiles[level] = 0;
+            unsigned int numTiles = 1<<(level + 1);
+            HMatrixStruct->tileIndices[level] = (int*)malloc(numTiles*(numTiles - 1)*sizeof(int));
+
+        }
+
         if(admissibilityCondition == WEAK_ADMISSIBILITY) {
             constructWeakAdmissibilityStruct(HMatrixStruct, 
                 numberOfInputPoints,
@@ -166,6 +182,15 @@ void constructHMatrixStructure(
                 numberOfInputPoints,
                 dimensionOfInputPoints,
                 bucketSize);
+        }
+
+        printf("num levels: %d\n", HMatrixStruct->numLevels);
+        for(unsigned int i = 0; i < HMatrixStruct->numLevels; ++i) {
+            printf("num tiles in level: %d is: %d\n", i, HMatrixStruct->numTiles[i]);
+            for(unsigned int j = 0; j < HMatrixStruct->numTiles[i]; ++j) {
+                printf("    %d ", HMatrixStruct->tileIndices[i][j]);
+            }
+            printf("\n");
         }
 }
 

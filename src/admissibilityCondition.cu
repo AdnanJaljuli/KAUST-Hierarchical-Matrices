@@ -32,10 +32,7 @@ bool BBoxCenterAdmissibility(
     unsigned int maxDepth,
     float epsilon) {
 
-        if(nodeDepth >= maxDepth) {
-            return true;
-        }
-        else if(node_u.level == node_v.level && node_u.index == node_v.index) {
+        if(node_u.index == node_v.index) {
             return false;
         }
         else {

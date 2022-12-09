@@ -9,6 +9,7 @@
 #include "HMatrixVectorMultiplication.cuh"
 #include "constructHMatrixFromStruct.cuh"
 #include "kDTree.cuh"
+#include "kDTreeHelpers.cuh"
 #include "kDTreeConstruction.cuh"
 #include "magma_auxiliary.h"
 #include "TLRMatrix.cuh"
@@ -84,14 +85,12 @@ int main(int argc, char *argv[]) {
     HMatrix hierarchicalMatrix;
     constructHMatrixStructure(
         &hierarchicalMatrix.matrixStructure,
-        config.numberOfInputPoints,
+        upperPowerOfTwo(config.numberOfInputPoints),
         config.dimensionOfInputPoints,
         config.bucketSize,
         config.admissibilityCondition,
         kDTree.boundingBoxes,
         kDTree.boundingBoxes);
-
-    #if 0
 
     // Build the TLR matrix
     #if USE_COUNTERS
@@ -108,6 +107,7 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     endTime(TLR_MATRIX, &counters);
     #endif
+
 
     #if EXPAND_MATRIX
     H2Opus_Real* d_denseMatrix;
@@ -140,19 +140,23 @@ int main(int argc, char *argv[]) {
     startTime(HMATRIX, &counters);
     #endif
     allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix.matrixStructure);
-    unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.matrixStructure.numLevels - 2)*sizeof(unsigned int));
+    unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.matrixStructure.numLevels - 1)*sizeof(unsigned int));
     generateMaxRanks(hierarchicalMatrix.matrixStructure.numLevels, config.bucketSize, maxRanks);
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, hierarchicalMatrix.matrixStructure, maxRanks);
     #if USE_COUNTERS
     endTime(HMATRIX, &counters);
     #endif
 
+    #if 0
+
+    
     #if EXPAND_MATRIX
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
     free(maxRanks);
     freeHMatrixStructure(hierarchicalMatrix.matrixStructure);
     freeMatrix(mortonOrderedMatrix);
+
     
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
