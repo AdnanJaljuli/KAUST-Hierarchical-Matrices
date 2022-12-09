@@ -127,7 +127,7 @@ static Config parseArgs(int argc, char **argv) {
     config.lowestLevelTolerance = 1e-5;
 
     int opt;
-    while ((opt = getopt(argc, argv, "n:b:t:m:d:v:h")) >= 0) {
+    while ((opt = getopt(argc, argv, "m:a:n:d:b:v:t:h")) >= 0) {
         switch (opt)
         {
         case 'm':

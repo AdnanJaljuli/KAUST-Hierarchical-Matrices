@@ -55,44 +55,62 @@ void constructMatrixStruct_recursive(
         unsigned int,
         unsigned int,
         unsigned int,
-        unsigned int)> isAdmissible) {
+        float)> isAdmissible) {
 
             if(isAdmissible(node_u, node_v, dimensionOfInputPoints, currentLevel, maxDepth, epsilon)) {
-                // write to HMatrixStruct
+                // TODO: write to HMatrixStruct
+                
                 return;
             }
             else {
-                isAdmissible(
+                constructMatrixStruct_recursive(
+                    HMatrixStruct,
+                    BBox_u,
+                    BBox_v,
                     BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index],
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon);
+                    epsilon,
+                    isAdmissible);
 
-                isAdmissible(
+                constructMatrixStruct_recursive(
+                    HMatrixStruct,
+                    BBox_u,
+                    BBox_v,
                     BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index + 1],
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon);
+                    epsilon,
+                    isAdmissible);
 
-                isAdmissible(
+                constructMatrixStruct_recursive(
+                    HMatrixStruct,
+                    BBox_u,
+                    BBox_v,
                     BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index],
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon);
+                    epsilon,
+                    isAdmissible);
 
-                isAdmissible(
+                constructMatrixStruct_recursive(
+                    HMatrixStruct,
+                    BBox_u,
+                    BBox_v,
                     BBox_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index + 1],
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon);
+                    epsilon,
+                    isAdmissible);
+
             }
 }
 
@@ -104,9 +122,11 @@ void constructMatrixStruct(
     unsigned int numberOfInputPoints,
     unsigned int dimensionOfInputPoints,
     unsigned int bucketSize,
-    float epsilon = 0.01) {
+    float epsilon = 0.1) {
 
         unsigned int maxDepth = __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/bucketSize);
+        printf("max depth %d\n", maxDepth);
+        printf("epsilon %f\n", epsilon);
 
         // call recursive function
         constructMatrixStruct_recursive(

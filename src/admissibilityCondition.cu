@@ -2,6 +2,7 @@
 #include "admissibilityCondition.cuh"
 #include "boundingBoxes.h"
 #include "precision.h"
+#include <stdio.h>
 
 H2Opus_Real BBoxCenterDistance(BoundingBox node_u, BoundingBox node_v, unsigned int dimension) {
     H2Opus_Real distance = 0;
@@ -29,10 +30,13 @@ bool BBoxCenterAdmissibility(
     unsigned int dimensionOfInputPoints,
     unsigned int nodeDepth,
     unsigned int maxDepth,
-    unsigned int epsilon) {
-        
+    float epsilon) {
+
         if(nodeDepth >= maxDepth) {
             return true;
+        }
+        else if(node_u.level == node_v.level && node_u.index == node_v.index) {
+            return false;
         }
         else {
             // get BBox center distance

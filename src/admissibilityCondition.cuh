@@ -10,6 +10,6 @@ bool BBoxCenterAdmissibility(
     unsigned int dimensionOfInputPoints,
     unsigned int nodeDepth,
     unsigned int maxDepth,
-    unsigned int epsilon);
+    float epsilon);
 
 #endif
