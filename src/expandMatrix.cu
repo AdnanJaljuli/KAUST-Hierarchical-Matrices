@@ -64,9 +64,9 @@ void checkErrorInLRMatrix(unsigned int numSegments, unsigned int maxSegmentSize,
 }
 
 __global__ void expandHMatrix(HMatrixLevel matrixLevel, H2Opus_Real* output, int tileSize) {
-    unsigned int batch = blockIdx.z;
-    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+    unsigned int batch = blockIdx.x;
+    unsigned int col = blockIdx.y*blockDim.y + threadIdx.x;
+    unsigned int row = blockIdx.z*blockDim.z + threadIdx.y;
 
     if(col < tileSize && row < tileSize) {
         H2Opus_Real sum = 0;
@@ -81,9 +81,9 @@ __global__ void expandHMatrix(HMatrixLevel matrixLevel, H2Opus_Real* output, int
 }
 
 __global__ void errorInHMatrix(unsigned int numberOfInputPoints, double* denseMatrix, double* output, int* tileIndices, int batchSize, int batchUnitSize, double* error, double* tmp) {
-    unsigned int batch = blockIdx.z;
-    unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
+    unsigned int batch = blockIdx.x;
+    unsigned int col = blockIdx.y*blockDim.y + threadIdx.x;
+    unsigned int row = blockIdx.z*blockDim.z + threadIdx.y;
 
     if(col < batchUnitSize*32 && row < batchUnitSize*32) {
         uint32_t tileRow, tileColumn;
@@ -107,7 +107,8 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
     H2Opus_Real *d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
     dim3 m_numThreadsPerBlock(32, 32);
-    dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
+    // dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
+    dim3 m_numBlocks(batchSize, batchUnitSize, batchUnitSize);
     expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrixLevel, d_expandedMatrix, batchUnitSize*bucketSize);
 
     // compare expanded H matrix level with dense matrix
