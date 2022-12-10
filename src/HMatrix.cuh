@@ -25,8 +25,9 @@ void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 struct HMatrixLevel {
     // TODO: get rid of tileIndices and numTiles here because the information is redundant with HMatrixStructure
-    int numTiles, level;
-    int* tileIndices;
+    // int numTiles;
+    int level;
+    // int* tileIndices;
     int* tileScanRanks; // inclusive scan
     H2Opus_Real* U;
     H2Opus_Real* V;

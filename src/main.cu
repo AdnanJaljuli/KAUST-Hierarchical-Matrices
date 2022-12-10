@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix.matrixStructure);
     unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.matrixStructure.numLevels - 2)*sizeof(unsigned int));
     generateMaxRanks(hierarchicalMatrix.matrixStructure.numLevels, config.bucketSize, maxRanks);
-    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, hierarchicalMatrix.matrixStructure, maxRanks);
+    generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, maxRanks);
     #if USE_COUNTERS
     endTime(HMATRIX, &counters);
     #endif
@@ -151,7 +151,6 @@ int main(int argc, char *argv[]) {
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
     free(maxRanks);
-    freeHMatrixStructure(hierarchicalMatrix.matrixStructure);
     freeMatrix(mortonOrderedMatrix);
 
     #if 0

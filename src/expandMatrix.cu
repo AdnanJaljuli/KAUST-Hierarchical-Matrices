@@ -96,14 +96,18 @@ __global__ void errorInHMatrix(unsigned int numberOfInputPoints, double* denseMa
     }
 }
 
-void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchUnitSize, int bucketSize, HMatrixLevel matrixLevel, H2Opus_Real *denseMatrix) {
+void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchUnitSize, int bucketSize, HMatrix matrix, H2Opus_Real *denseMatrix, int level) {
     // expand H matrix level
     H2Opus_Real *d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
     dim3 m_numThreadsPerBlock(32, 32);
     dim3 m_numBlocks(batchSize, batchUnitSize, batchUnitSize);
-    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrixLevel, d_expandedMatrix, batchUnitSize*bucketSize);
+    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrix.levels[level - 1], d_expandedMatrix, batchUnitSize*bucketSize);
 
+    int* d_tileIndices;
+    cudaMalloc((void**) &d_tileIndices, batchSize*sizeof(int));
+    cudaMemcpy(d_tileIndices, matrix.matrixStructure.tileIndices[level - 1], batchSize*sizeof(int), cudaMemcpyHostToDevice);
+    
     // compare expanded H matrix level with dense matrix
     H2Opus_Real* d_error;
     H2Opus_Real* d_tmp;
@@ -111,7 +115,7 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
     cudaMalloc((void**) &d_tmp, sizeof(H2Opus_Real));
     cudaMemset(d_error, 0, sizeof(H2Opus_Real));
     cudaMemset(d_tmp, 0, sizeof(H2Opus_Real));
-    errorInHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, denseMatrix, d_expandedMatrix, matrixLevel.tileIndices, batchSize, batchUnitSize, d_error, d_tmp);
+    errorInHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (numberOfInputPoints, denseMatrix, d_expandedMatrix, d_tileIndices, batchSize, batchUnitSize, d_error, d_tmp);
     H2Opus_Real h_error;
     H2Opus_Real h_tmp;
     cudaMemcpy(&h_error, d_error, sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
@@ -119,18 +123,19 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
     cudaFree(d_tmp);
     cudaFree(d_error);
     cudaFree(d_expandedMatrix);
-    printf("error in hierarchical matrix level %d is: %lf\n", matrixLevel.level, sqrt(h_error)/sqrt(h_tmp));
+    cudaFree(d_tileIndices);
+    printf("error in hierarchical matrix level %d is: %lf\n", level, sqrt(h_error)/sqrt(h_tmp));
 }
 
 void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
+    
     for(unsigned int level = hierarchicalMatrix.matrixStructure.numLevels - 1; level > 0; --level) {
-
         int batchSize = hierarchicalMatrix.matrixStructure.numTiles[level - 1];
         if(batchSize == 0) {
             continue;
         }
         int batchUnitSize = 1 << (hierarchicalMatrix.matrixStructure.numLevels - (level + 1));
-        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix.levels[level - 1], d_denseMatrix);
+        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix, d_denseMatrix, level);
     }
 }
 

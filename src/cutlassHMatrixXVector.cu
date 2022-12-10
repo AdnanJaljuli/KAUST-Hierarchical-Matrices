@@ -352,7 +352,8 @@ cudaError_t cutlassHierarchicalXVec(
       	// loop over levels
 		for(unsigned int level = hierarchicalMatrix.matrixStructure.numLevels - 1; level > 0; --level) {
 			// preprocess each level
-			int problemCount = hierarchicalMatrix.levels[level - 1].numTiles;
+			// int problemCount = hierarchicalMatrix.levels[level - 1].numTiles;
+			int problemCount = hierarchicalMatrix.matrixStructure.numTiles[level - 1];
 
 			h_lda.resize(problemCount);
 			h_ldb.resize(problemCount);
