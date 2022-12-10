@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     endTime(HMATRIX, &counters);
     #endif
-    
+
     #if EXPAND_MATRIX
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
     #endif
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
     freeMatrix(mortonOrderedMatrix);
 
     #if 0
-    
+
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
     cudaMalloc((void**) &d_inputVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));

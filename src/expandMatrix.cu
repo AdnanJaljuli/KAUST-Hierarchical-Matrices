@@ -89,13 +89,7 @@ __global__ void errorInHMatrix(unsigned int numberOfInputPoints, double* denseMa
         uint32_t tileRow, tileColumn;
         mortonToCM((uint32_t)tileIndices[batch], tileColumn, tileRow);
 
-        // if(col == 0 && row == 0) {
-        //     printf("tile index of batch: %d  is %d:   tileRow: %d   tileColumn: %d\n", batch, tileIndices[batch], tileRow, tileColumn);
-        // }  
-
-        // double x = denseMatrix[(col + batchUnitSize*32*(batch + diff))*numberOfInputPoints + batchUnitSize*32*batch + row];
         double x = denseMatrix[(tileColumn*batchUnitSize*32 + col)*numberOfInputPoints + tileRow*32*batchUnitSize + row];
-        // double x = 1;
         double y = output[batch*batchUnitSize*32*batchUnitSize*32 + col*batchUnitSize*32 + row];
         atomicAdd(tmp, x*x);
         atomicAdd(error, (x - y)*(x - y));
@@ -107,7 +101,6 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
     H2Opus_Real *d_expandedMatrix;
     cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
     dim3 m_numThreadsPerBlock(32, 32);
-    // dim3 m_numBlocks(batchUnitSize, batchUnitSize, batchSize);
     dim3 m_numBlocks(batchSize, batchUnitSize, batchUnitSize);
     expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrixLevel, d_expandedMatrix, batchUnitSize*bucketSize);
 
@@ -130,16 +123,9 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
 }
 
 void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
-    size_t free, total;
-
     for(unsigned int level = hierarchicalMatrix.matrixStructure.numLevels - 1; level > 0; --level) {
 
-        cudaMemGetInfo( &free, &total );
-        printf("free mem: %zu    total mem: %zu\n", free, total);
-
-        // int batchSize = hierarchicalMatrix.levels[level - 1].numTiles;
         int batchSize = hierarchicalMatrix.matrixStructure.numTiles[level - 1];
-        printf("batchsize: %d   level: %d\n", batchSize, level);
         if(batchSize == 0) {
             continue;
         }

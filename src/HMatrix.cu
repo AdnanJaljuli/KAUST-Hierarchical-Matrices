@@ -164,7 +164,6 @@ void constructHMatrixStructure(
             HMatrixStruct->numTiles[level] = 0;
             unsigned int numTiles = 1<<(level + 1);
             HMatrixStruct->tileIndices[level] = (int*)malloc(numTiles*(numTiles - 1)*sizeof(int));
-
         }
 
         if(admissibilityCondition == WEAK_ADMISSIBILITY) {
