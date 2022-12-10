@@ -158,7 +158,7 @@ void constructHMatrixStructure(
         HMatrixStruct->numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
         HMatrixStruct->numTiles = (int*)malloc((HMatrixStruct->numLevels)*sizeof(int));
         HMatrixStruct->tileIndices = (int**)malloc((HMatrixStruct->numLevels)*sizeof(int*));
-        
+
         // HMatrixStruct->numTiles[0] = 0;
         for(unsigned int level = 0; level < HMatrixStruct->numLevels; ++level) {
             HMatrixStruct->numTiles[level] = 0;
@@ -251,7 +251,7 @@ void allocateHMatrix(HMatrix &matrix, TLR_Matrix mortonOrderedMatrix, int segmen
     // TODO: consolidate bucket size and segment size
     cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
     cudaMemcpy(matrix.diagonalBlocks, mortonOrderedMatrix.diagonal, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-    matrix.matrixStructure.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+    // matrix.matrixStructure.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
     matrix.levels = (HMatrixLevel*)malloc((matrix.matrixStructure.numLevels - 1)*sizeof(HMatrixLevel));
 
     // copy tlr tiles to HMatrix bottom level

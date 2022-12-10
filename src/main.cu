@@ -140,15 +140,12 @@ int main(int argc, char *argv[]) {
     startTime(HMATRIX, &counters);
     #endif
     allocateHMatrix(hierarchicalMatrix, mortonOrderedMatrix, kDTree.segmentSize, kDTree.numSegments, config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix.matrixStructure);
-    unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.matrixStructure.numLevels - 1)*sizeof(unsigned int));
+    unsigned int *maxRanks = (unsigned int*)malloc((hierarchicalMatrix.matrixStructure.numLevels - 2)*sizeof(unsigned int));
     generateMaxRanks(hierarchicalMatrix.matrixStructure.numLevels, config.bucketSize, maxRanks);
     generateHMatrixFromStruct(config.numberOfInputPoints, config.bucketSize, kDTree.numSegments, kDTree.segmentSize, mortonOrderedMatrix, ARA_R, config.lowestLevelTolerance, hierarchicalMatrix, hierarchicalMatrix.matrixStructure, maxRanks);
     #if USE_COUNTERS
     endTime(HMATRIX, &counters);
     #endif
-
-    #if 0
-
     
     #if EXPAND_MATRIX
     checkErrorInHMatrix(config.numberOfInputPoints, config.bucketSize, hierarchicalMatrix, d_denseMatrix);
@@ -157,6 +154,7 @@ int main(int argc, char *argv[]) {
     freeHMatrixStructure(hierarchicalMatrix.matrixStructure);
     freeMatrix(mortonOrderedMatrix);
 
+    #if 0
     
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;

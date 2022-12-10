@@ -19,7 +19,6 @@ __global__ void fillBatchPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_
 void allocateTilePtrs(int batchSize, int batchUnitSize, int segmentSize, int level, int *tileIndices, LevelTilePtrs &tilePtrs, TLR_Matrix mortonOrderedMatrix) {
     cudaMalloc((void**) &tilePtrs.U, batchSize*sizeof(H2Opus_Real*));
     cudaMalloc((void**) &tilePtrs.V, batchSize*sizeof(H2Opus_Real*));
-    printf("level: %d\n", level);
 
     dim3 numThreadsPerBlock(1024);
     dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);

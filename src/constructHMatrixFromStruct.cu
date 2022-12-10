@@ -33,6 +33,8 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         if(batchSize == 0) {
             continue;
         }
+        printf("level: %d  batchSize: %d\n", level, batchSize);
+
         int batchUnitSize = 1 << (matrixStruct.numLevels - (level + 1));
 
         // preprocessing
@@ -43,8 +45,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         // pointers to level tiles in U and V
         LevelTilePtrs tilePtrs;
         allocateTilePtrs(batchSize, batchUnitSize, segmentSize, level, d_tileIndices, tilePtrs, mortonOrderedMatrix);
-        cudaDeviceSynchronize();
-        printf("here 1\n");
 
         // scan the ranks array
         int *d_scanRanks;
@@ -52,8 +52,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
         cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
         generateScanRanks(batchSize, batchUnitSize, mortonOrderedMatrix.blockRanks, d_scanRanks, d_scanRanksPtrs, matrixStruct.tileIndices[level - 1]);
-        cudaDeviceSynchronize();
-        printf("here 2\n");
 
         tolerance *= 2;
         maxRows = batchUnitSize*bucketSize;
@@ -71,28 +69,21 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         unsigned int numThreadsPerBlock = 1024;
         unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
         fillLRARAArrays <<< numBlocks, numThreadsPerBlock >>> (batchSize, maxRows, d_rowsBatch, d_colsBatch, d_LDABatch, d_LDBBatch);
-        cudaDeviceSynchronize();
-        printf("here 3\n");
 
         generateArrayOfPointersT<H2Opus_Real>(d_A, d_APtrs, maxRows*maxRanks[matrixStruct.numLevels - level - 2], batchSize, 0);
         generateArrayOfPointersT<H2Opus_Real>(d_B, d_BPtrs, maxRows*maxRanks[matrixStruct.numLevels - level - 2], batchSize, 0);
         kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, maxRows, batchSize);
         kblasAllocateWorkspace(kblasHandle);
-        cudaDeviceSynchronize();
-        printf("here 4\n");
 
         int LRARAReturnVal = lr_kblas_ara_batch(kblasHandle, segmentSize, batchUnitSize, d_rowsBatch, d_colsBatch, tilePtrs.U, tilePtrs.V, d_scanRanksPtrs,
             d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks,
             tolerance, maxRows, maxCols, maxRanks[matrixStruct.numLevels - level - 2], 16, ARA_R, randState, 0, batchSize
         );
         assert(LRARAReturnVal == 1);
-        cudaDeviceSynchronize();
-        printf("here 5\n");
 
         // allocate HMatrix level
-        allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 2], d_ranks, matrixStruct, level, d_A, d_B, maxRows, maxRanks[matrixStruct.numLevels - level - 2]);
-        cudaDeviceSynchronize();
-        printf("here 6\n");
+        allocateAndCopyToHMatrixLevel(hierarchicalMatrix.levels[level - 1], d_ranks, matrixStruct, level, d_A, d_B, maxRows, maxRanks[matrixStruct.numLevels - level - 2]);
+
         // free memory
         freeLevelTilePtrs(tilePtrs);
         cudaFree(d_tileIndices);
@@ -107,8 +98,6 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         cudaFree(d_BPtrs);
         cudaFree(d_A);
         cudaFree(d_B);
-        cudaDeviceSynchronize();
-        printf("here 7\n");
     }
 
     kblasDestroy(&kblasHandle);

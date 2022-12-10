@@ -119,4 +119,9 @@ static __device__ uint32_t morton1(uint32_t x)
     return x;
 }
 
+static __device__ void mortonToCM(uint32_t d, uint32_t &x, uint32_t &y) {
+    x = morton1(d);
+    y = morton1(d >> 1);
+}
+
 #endif

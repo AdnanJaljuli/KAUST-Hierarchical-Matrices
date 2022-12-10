@@ -8,6 +8,7 @@
 struct HMatrixStructure {
     int numLevels;
     int* numTiles;
+    // TODO: make this a vector instead of a malloced array
     int** tileIndices; // TODO: do they have to be sorted?
 };
 
@@ -23,6 +24,7 @@ void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 
 struct HMatrixLevel {
+    // TODO: get rid of tileIndices and numTiles here because the information is redundant with HMatrixStructure
     int numTiles, level;
     int* tileIndices;
     int* tileScanRanks; // inclusive scan
