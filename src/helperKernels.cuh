@@ -109,7 +109,7 @@ static __host__ __device__ int CMIndextoMOIndex(int numSegments, int n){
 }
 
 // TODO: rename
-static __device__ uint32_t morton1(uint32_t x)
+static __host__ __device__ uint32_t morton1(uint32_t x)
 {
     x = x & 0x55555555;
     x = (x | (x >> 1)) & 0x33333333;
@@ -119,7 +119,7 @@ static __device__ uint32_t morton1(uint32_t x)
     return x;
 }
 
-static __device__ void mortonToCM(uint32_t d, uint32_t &x, uint32_t &y) {
+static __host__ __device__ void mortonToCM(uint32_t d, uint32_t &x, uint32_t &y) {
     x = morton1(d);
     y = morton1(d >> 1);
 }

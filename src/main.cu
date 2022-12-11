@@ -91,6 +91,12 @@ int main(int argc, char *argv[]) {
         kDTree.boundingBoxes,
         kDTree.boundingBoxes);
 
+    #if EXPAND_MATRIX
+    printMatrixStructure(hierarchicalMatrix.matrixStructure);
+    #endif
+
+    return 0;
+
     // Build the TLR matrix
     #if USE_COUNTERS
     startTime(TLR_MATRIX, &counters);

@@ -3,6 +3,7 @@
 #define HELPER_FUNCTIONS_H
 
 #include "TLRMatrix.cuh"
+#include "HMatrix.cuh"
 #include "helperKernels.cuh"
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -19,6 +20,7 @@ void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmen
 __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks);
 void generateRandomVector(unsigned int vectorWidth, unsigned int vetorHeight, H2Opus_Real *vector);
 void generateMaxRanks(unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks);
+void printMatrixStructure(HMatrixStructure HMatrixStruct);
 
 static void printMatrix(int numberOfInputPoints, int numSegments, int segmentSize, TLR_Matrix matrix, int level, int rankSum) {
     // n=512, numLevels=5, level=2, batchSize=4, numTilesInBatch=4

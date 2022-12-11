@@ -1,5 +1,6 @@
 
 #include "helperFunctions.cuh"
+#include "HMatrix.cuh"
 #include <curand.h>
 
 void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
@@ -68,4 +69,25 @@ void generateMaxRanks(unsigned int numLevels, unsigned int bucketSize, unsigned 
             maxRanks[i]/=4;
         }
     }
+}
+
+void printMatrixStructure(HMatrixStructure HMatrixStruct) {
+    char filename[100] = "results/hmatrixstructure.txt";
+    FILE *output_file = fopen(filename, "w");
+    fprintf(output_file, "%d\n", HMatrixStruct.numLevels);
+    fprintf(output_file, "[ ");
+    for(unsigned int i = 0; i < HMatrixStruct.numLevels - 1; ++i) {
+        unsigned int numTiles = 1<<(i + 1);
+        fprintf(output_file, "[ ");
+        for(unsigned int j = 0; j < HMatrixStruct.numTiles[i]; ++j) {
+            uint32_t x, y;
+            mortonToCM((uint32_t)HMatrixStruct.tileIndices[i][j], x, y);
+            fprintf(output_file, "%d, ", x*numTiles + y);
+        }
+        fprintf(output_file, " ], ");
+        // if(i < HMatrixStruct.numLevels - 2) {
+        //     fprintf(output_file, ", ");
+        // }
+    }
+    fprintf(output_file, " ]");
 }
