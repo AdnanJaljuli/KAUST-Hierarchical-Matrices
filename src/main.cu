@@ -153,8 +153,6 @@ int main(int argc, char *argv[]) {
     free(maxRanks);
     freeMatrix(mortonOrderedMatrix);
 
-    #if 0
-
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;
     cudaMalloc((void**) &d_inputVectors, config.vectorWidth*config.numberOfInputPoints*sizeof(H2Opus_Real));
@@ -176,8 +174,6 @@ int main(int argc, char *argv[]) {
     magma_finalize();
     #if EXPAND_MATRIX
     cudaFree(d_denseMatrix);
-    #endif
-
     #endif
 
     #if USE_COUNTERS

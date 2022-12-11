@@ -188,12 +188,12 @@ void constructHMatrixStructure(
             bucketSize);
 
         printf("num levels: %d\n", HMatrixStruct->numLevels);
-        for(unsigned int i = 0; i < HMatrixStruct->numLevels; ++i) {
-            printf("num tiles in level: %d is: %d\n", i, HMatrixStruct->numTiles[i]);
-            for(unsigned int j = 0; j < HMatrixStruct->numTiles[i]; ++j) {
-                printf("    %d ", HMatrixStruct->tileIndices[i][j]);
-            }
-            printf("\n");
+        for(unsigned int i = 0; i < HMatrixStruct->numLevels - 1; ++i) {
+            printf("num tiles in level: %d is: %d\n", i + 1, HMatrixStruct->numTiles[i]);
+            // for(unsigned int j = 0; j < HMatrixStruct->numTiles[i]; ++j) {
+            //     printf("    %d ", HMatrixStruct->tileIndices[i][j]);
+            // }
+            // printf("\n");
         }
 }
 

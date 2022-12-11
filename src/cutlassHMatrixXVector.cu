@@ -180,7 +180,7 @@ void VxVector(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 		dim3 numThreadsPerBlock(32, 32);
 		dim3 numBlocks(((tileDimension/2) + 31)/32, tileDimension/32, problemCount);
 		transposeMatrix <<< numBlocks, numThreadsPerBlock >>> (tileDimension, matrixLevel, d_VTransposed);
-		cudaDeviceSynchronize();
+		// cudaDeviceSynchronize();
 
 		preprocessGroupedGEMM(numberOfInputPoints, level, numLevels,
 			problemCount, bucketSize, vectorWidth,
@@ -335,9 +335,6 @@ cudaError_t cutlassHierarchicalXVec(
 		cutlass::DeviceAllocation<int64_t> d_lda;
 		cutlass::DeviceAllocation<int64_t> d_ldb;
 		cutlass::DeviceAllocation<int64_t> d_ldc;
-		// d_lda.reset(numSegments);
-		// d_ldb.reset(numSegments);
-		// d_ldc.reset(numSegments);
 
 		std::vector<ElementInput*> h_ptrA;
 		std::vector<ElementInput*> h_ptrB;
@@ -345,28 +342,20 @@ cudaError_t cutlassHierarchicalXVec(
 		cutlass::DeviceAllocation<ElementInput *> ptr_A;
 		cutlass::DeviceAllocation<ElementInput *> ptr_B;
 		cutlass::DeviceAllocation<ElementAccumulator *> ptr_C;
-		// ptr_A.reset(numSegments);
-		// ptr_B.reset(numSegments);
-		// ptr_C.reset(numSegments);
 
       	// loop over levels
 		for(unsigned int level = hierarchicalMatrix.matrixStructure.numLevels - 1; level > 0; --level) {
 			// preprocess each level
-			// int problemCount = hierarchicalMatrix.levels[level - 1].numTiles;
 			int problemCount = hierarchicalMatrix.matrixStructure.numTiles[level - 1];
-
 			h_lda.resize(problemCount);
 			h_ldb.resize(problemCount);
 			h_ldc.resize(problemCount);
-
 			h_ptrA.resize(problemCount);
 			h_ptrB.resize(problemCount);
 			h_ptrC.resize(problemCount);
-
 			d_lda.reset(problemCount);
 			d_ldb.reset(problemCount);
 			d_ldc.reset(problemCount);
-
 			ptr_A.reset(problemCount);
 			ptr_B.reset(problemCount);
 			ptr_C.reset(problemCount);
@@ -380,15 +369,7 @@ cudaError_t cutlassHierarchicalXVec(
 				inputVectors, bufferVectors,
 				&h_ptrA, &h_ptrB, &h_ptrC,
 				&ptr_A, &ptr_B, &ptr_C);
-			cudaDeviceSynchronize();
 			h_problemSizes.clear();
-			d_lda.reset(problemCount);
-			d_ldb.reset(problemCount);
-			d_ldc.reset(problemCount);
-
-			ptr_A.reset(problemCount);
-			ptr_B.reset(problemCount);
-			ptr_C.reset(problemCount);
 
 			UxResult(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
 				problemCount, bucketSize, vectorWidth,
@@ -399,7 +380,6 @@ cudaError_t cutlassHierarchicalXVec(
 				bufferVectors, resultVectors,
 				&h_ptrA, &h_ptrB, &h_ptrC,
 				&ptr_A, &ptr_B, &ptr_C);
-			cudaDeviceSynchronize();
 			h_problemSizes.clear();
 		}
 
