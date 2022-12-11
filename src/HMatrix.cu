@@ -129,21 +129,34 @@ void constructMatrixStruct(
     float epsilon = 5) {
 
         unsigned int maxDepth = __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/bucketSize);
-        printf("max depth %d\n", maxDepth);
-        printf("epsilon %f\n", epsilon);
 
         // call recursive function
-        constructMatrixStruct_recursive(
-            HMatrixStruct,
-            BBox1,
-            BBox2,
-            BBox1.levels[0].boundingBoxes[0],
-            BBox2.levels[0].boundingBoxes[0],
-            dimensionOfInputPoints,
-            0,
-            maxDepth,
-            epsilon,
-            &BBoxCenterAdmissibility);
+        if(admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
+            constructMatrixStruct_recursive(
+                HMatrixStruct,
+                BBox1,
+                BBox2,
+                BBox1.levels[0].boundingBoxes[0],
+                BBox2.levels[0].boundingBoxes[0],
+                dimensionOfInputPoints,
+                0,
+                maxDepth,
+                epsilon,
+                &BBoxCenterAdmissibility);
+        }
+        else if(admissibilityCondition == WEAK_ADMISSIBILITY) {
+            constructMatrixStruct_recursive(
+                HMatrixStruct,
+                BBox1,
+                BBox2,
+                BBox1.levels[0].boundingBoxes[0],
+                BBox2.levels[0].boundingBoxes[0],
+                dimensionOfInputPoints,
+                0,
+                maxDepth,
+                epsilon,
+                &weakAdmissibility);
+        }
 }
 
 void constructHMatrixStructure(
@@ -159,37 +172,28 @@ void constructHMatrixStructure(
         HMatrixStruct->numTiles = (int*)malloc((HMatrixStruct->numLevels)*sizeof(int));
         HMatrixStruct->tileIndices = (int**)malloc((HMatrixStruct->numLevels)*sizeof(int*));
 
-        // HMatrixStruct->numTiles[0] = 0;
         for(unsigned int level = 0; level < HMatrixStruct->numLevels; ++level) {
             HMatrixStruct->numTiles[level] = 0;
             unsigned int numTiles = 1<<(level + 1);
             HMatrixStruct->tileIndices[level] = (int*)malloc(numTiles*(numTiles - 1)*sizeof(int));
         }
 
-        if(admissibilityCondition == WEAK_ADMISSIBILITY) {
-            constructWeakAdmissibilityStruct(HMatrixStruct, 
-                numberOfInputPoints,
-                bucketSize,
-                admissibilityCondition);
-        }
-        else {
-            constructMatrixStruct(
-                HMatrixStruct,
-                admissibilityCondition,
-                BBox1,
-                BBox2,
-                numberOfInputPoints,
-                dimensionOfInputPoints,
-                bucketSize);
-        }
+        constructMatrixStruct(
+            HMatrixStruct,
+            admissibilityCondition,
+            BBox1,
+            BBox2,
+            numberOfInputPoints,
+            dimensionOfInputPoints,
+            bucketSize);
 
         printf("num levels: %d\n", HMatrixStruct->numLevels);
         for(unsigned int i = 0; i < HMatrixStruct->numLevels; ++i) {
             printf("num tiles in level: %d is: %d\n", i, HMatrixStruct->numTiles[i]);
-            // for(unsigned int j = 0; j < HMatrixStruct->numTiles[i]; ++j) {
-            //     printf("    %d ", HMatrixStruct->tileIndices[i][j]);
-            // }
-            // printf("\n");
+            for(unsigned int j = 0; j < HMatrixStruct->numTiles[i]; ++j) {
+                printf("    %d ", HMatrixStruct->tileIndices[i][j]);
+            }
+            printf("\n");
         }
 }
 

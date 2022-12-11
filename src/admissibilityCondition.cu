@@ -50,3 +50,19 @@ bool BBoxCenterAdmissibility(
             }
         }
 }
+
+bool weakAdmissibility(
+    BoundingBox node_u,
+    BoundingBox node_v,
+    unsigned int dimensionOfInputPoints,
+    unsigned int nodeDepth,
+    unsigned int maxDepth,
+    float epsilon) {
+
+        if(node_u.index == node_v.index) {
+            return false;
+        }
+        else {
+            return true;
+        }
+}
