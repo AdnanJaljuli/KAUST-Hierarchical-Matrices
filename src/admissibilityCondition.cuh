@@ -10,7 +10,7 @@ bool BBoxCenterAdmissibility(
     unsigned int dimensionOfInputPoints,
     unsigned int nodeDepth,
     unsigned int maxDepth,
-    float epsilon);
+    float eta);
 
 bool weakAdmissibility(
     BoundingBox node_u,
@@ -18,6 +18,6 @@ bool weakAdmissibility(
     unsigned int dimensionOfInputPoints,
     unsigned int nodeDepth,
     unsigned int maxDepth,
-    float epsilon);
+    float eta);
 
 #endif

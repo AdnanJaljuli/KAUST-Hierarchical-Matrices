@@ -52,6 +52,9 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     endTime(GENERATE_DATASET, &counters);
     #endif
+    #if EXPAND_MATRIX
+    printPointCloud(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
+    #endif
 
 
     // Build the KD-tree
@@ -92,10 +95,9 @@ int main(int argc, char *argv[]) {
         kDTree.boundingBoxes);
 
     #if EXPAND_MATRIX
+    printKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.divMethod, config.bucketSize, kDTree, d_pointCloud);
     printMatrixStructure(hierarchicalMatrix.matrixStructure);
     #endif
-
-    return 0;
 
     // Build the TLR matrix
     #if USE_COUNTERS
@@ -157,6 +159,8 @@ int main(int argc, char *argv[]) {
     #endif
     free(maxRanks);
     freeMatrix(mortonOrderedMatrix);
+
+    return 0;
 
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;

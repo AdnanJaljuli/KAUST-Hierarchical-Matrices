@@ -11,13 +11,13 @@ H2Opus_Real BBoxCenterDistance(BoundingBox node_u, BoundingBox node_v, unsigned 
         distance += centerDiff*centerDiff;
     }
 
-    return distance;
+    return sqrt(distance);
 }
 
 H2Opus_Real BBoxDiameter(BoundingBox node, unsigned int dimension) {
     H2Opus_Real diameter = 0;
     for(unsigned int i = 0; i < dimension; ++i) {
-        H2Opus_Real dimensionDiff = node.dimMax[i] + node.dimMin[i];
+        H2Opus_Real dimensionDiff = node.dimMax[i] - node.dimMin[i];
         diameter += dimensionDiff*dimensionDiff;
     }
 
@@ -30,7 +30,7 @@ bool BBoxCenterAdmissibility(
     unsigned int dimensionOfInputPoints,
     unsigned int nodeDepth,
     unsigned int maxDepth,
-    float epsilon) {
+    float eta) {
 
         if(node_u.index == node_v.index) {
             return false;
@@ -46,7 +46,7 @@ bool BBoxCenterAdmissibility(
                 return false;
             }
             else {
-                return (0.5*(diameter_u + diameter_v) <= epsilon*distance);
+                return (0.5*(diameter_u + diameter_v) <= eta*distance);
             }
         }
 }
@@ -57,7 +57,7 @@ bool weakAdmissibility(
     unsigned int dimensionOfInputPoints,
     unsigned int nodeDepth,
     unsigned int maxDepth,
-    float epsilon) {
+    float eta) {
 
         if(node_u.index == node_v.index) {
             return false;

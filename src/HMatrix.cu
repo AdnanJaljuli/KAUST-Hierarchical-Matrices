@@ -44,7 +44,7 @@ void constructMatrixStruct_recursive(
     unsigned int dimensionOfInputPoints,
     unsigned int currentLevel,
     unsigned int maxDepth,
-    float epsilon,
+    float eta,
     std::function<bool(
         BoundingBox,
         BoundingBox,
@@ -59,7 +59,7 @@ void constructMatrixStruct_recursive(
             if(isDiagonal && isLeafNode) {
                 return;
             }
-            else if(isLeafNode || isAdmissible(node_u, node_v, dimensionOfInputPoints, currentLevel, maxDepth, epsilon)) {
+            else if(isLeafNode || isAdmissible(node_u, node_v, dimensionOfInputPoints, currentLevel, maxDepth, eta)) {
                 // TODO: write to HMatrixStruct
                 unsigned int numRows = 1<<currentLevel;
                 unsigned int tileIndex = CMIndextoMOIndex(numRows, node_u.index*numRows + node_v.index);
@@ -76,7 +76,7 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon,
+                    eta,
                     isAdmissible);
 
                 constructMatrixStruct_recursive(
@@ -88,7 +88,7 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon,
+                    eta,
                     isAdmissible);
 
                 constructMatrixStruct_recursive(
@@ -100,7 +100,7 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon,
+                    eta,
                     isAdmissible);
 
                 constructMatrixStruct_recursive(
@@ -112,7 +112,7 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     maxDepth,
-                    epsilon,
+                    eta,
                     isAdmissible);
 
             }
@@ -126,7 +126,7 @@ void constructMatrixStruct(
     unsigned int numberOfInputPoints,
     unsigned int dimensionOfInputPoints,
     unsigned int bucketSize,
-    float epsilon = 5) {
+    float eta = 1 ) {
 
         unsigned int maxDepth = __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/bucketSize);
 
@@ -141,7 +141,7 @@ void constructMatrixStruct(
                 dimensionOfInputPoints,
                 0,
                 maxDepth,
-                epsilon,
+                eta,
                 &BBoxCenterAdmissibility);
         }
         else if(admissibilityCondition == WEAK_ADMISSIBILITY) {
@@ -154,7 +154,7 @@ void constructMatrixStruct(
                 dimensionOfInputPoints,
                 0,
                 maxDepth,
-                epsilon,
+                eta,
                 &weakAdmissibility);
         }
 }

@@ -369,6 +369,7 @@ cudaError_t cutlassHierarchicalXVec(
 			ptr_A.reset(problemCount);
 			ptr_B.reset(problemCount);
 			ptr_C.reset(problemCount);
+			
 			VxVector(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
 				problemCount, bucketSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
@@ -379,13 +380,6 @@ cudaError_t cutlassHierarchicalXVec(
 				&h_ptrA, &h_ptrB, &h_ptrC,
 				&ptr_A, &ptr_B, &ptr_C);
 			h_problemSizes.clear();
-			d_lda.reset(problemCount);
-			d_ldb.reset(problemCount);
-			d_ldc.reset(problemCount);
-
-			ptr_A.reset(problemCount);
-			ptr_B.reset(problemCount);
-			ptr_C.reset(problemCount);
 
 			UxResult(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
 				problemCount, bucketSize, vectorWidth,

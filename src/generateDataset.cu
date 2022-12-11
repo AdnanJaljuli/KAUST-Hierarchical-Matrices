@@ -7,7 +7,7 @@ __global__ void generateDataset_kernel(int numberOfInputPoints, int dimensionOfI
     if(i < numberOfInputPoints*dimensionOfInputPoints) {
         unsigned int seed = i;
         curandState s;
-        curand_init(seed, 0, 0, &s);
+        curand_init(1234, i, 0, &s);
         pointCloud[i] = curand_uniform(&s);
     }
 }
