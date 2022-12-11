@@ -80,7 +80,6 @@ int main(int argc, char *argv[]) {
     endTime(KDTREE, &counters);
     #endif
 
-
     // create HMatrixStructure
     HMatrix hierarchicalMatrix;
     constructHMatrixStructure(
@@ -186,4 +185,3 @@ int main(int argc, char *argv[]) {
     return 0;
 
 }
-

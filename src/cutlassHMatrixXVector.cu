@@ -115,7 +115,7 @@ void preprocessGroupedGEMM(
 		free(h_tileScanRanks);
 }
 
-__global__ void transposeMatrix(int tileDimension, HMatrixLevel matrixLevel, H2Opus_Real *d_VTransposed) {
+__global__ void transposeMatrix_kernel(int tileDimension, HMatrixLevel matrixLevel, H2Opus_Real *d_VTransposed) {
 	unsigned int col = blockIdx.x*blockDim.x + threadIdx.x;
 	unsigned int row = blockIdx.y*blockDim.y + threadIdx.y;
 
@@ -130,6 +130,23 @@ __global__ void transposeMatrix(int tileDimension, HMatrixLevel matrixLevel, H2O
 	if(col < rank) {
 		d_VTransposed[scanRankVal*tileDimension + row*rank + col] = matrixLevel.V[scanRankVal*tileDimension + col*tileDimension + row];
 	}
+}
+
+void transposeMatrix(
+	H2Opus_Real *&d_VTransposed, 
+	HMatrixLevel matrixLevel, 
+	int numLevels, 
+	int level, 
+	int bucketSize, 
+	int problemCount){
+		int tileDimension = (1<<(numLevels - (level + 1)))*bucketSize;
+		int matrixSize;
+		cudaMemcpy(&matrixSize, &matrixLevel.tileScanRanks[problemCount - 1], sizeof(int), cudaMemcpyDeviceToHost);
+
+		cudaMalloc((void**) &d_VTransposed, matrixSize*tileDimension*sizeof(H2Opus_Real));
+		dim3 numThreadsPerBlock(32, 32);
+		dim3 numBlocks(((tileDimension/2) + 31)/32, tileDimension/32, problemCount);
+		transposeMatrix_kernel <<< numBlocks, numThreadsPerBlock >>> (tileDimension, matrixLevel, d_VTransposed);
 }
 
 void VxVector(unsigned int numberOfInputPoints, unsigned int level, int numLevels,
@@ -172,15 +189,8 @@ void VxVector(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 		using Gemm = cutlass::gemm::device::GemmGrouped<GemmKernel>;
 
 		// transpose Vs
-		int tileDimension = (1<<(numLevels - (level + 1)))*bucketSize;
-		int matrixSize;
-		cudaMemcpy(&matrixSize, &matrixLevel.tileScanRanks[problemCount - 1], sizeof(int), cudaMemcpyDeviceToHost);
 		H2Opus_Real *d_VTransposed;
-		cudaMalloc((void**) &d_VTransposed, matrixSize*tileDimension*sizeof(H2Opus_Real));
-		dim3 numThreadsPerBlock(32, 32);
-		dim3 numBlocks(((tileDimension/2) + 31)/32, tileDimension/32, problemCount);
-		transposeMatrix <<< numBlocks, numThreadsPerBlock >>> (tileDimension, matrixLevel, d_VTransposed);
-		// cudaDeviceSynchronize();
+		transposeMatrix(d_VTransposed, matrixLevel, numLevels, level, bucketSize, problemCount);
 
 		preprocessGroupedGEMM(numberOfInputPoints, level, numLevels,
 			problemCount, bucketSize, vectorWidth,
@@ -359,7 +369,6 @@ cudaError_t cutlassHierarchicalXVec(
 			ptr_A.reset(problemCount);
 			ptr_B.reset(problemCount);
 			ptr_C.reset(problemCount);
-
 			VxVector(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
 				problemCount, bucketSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
@@ -370,6 +379,13 @@ cudaError_t cutlassHierarchicalXVec(
 				&h_ptrA, &h_ptrB, &h_ptrC,
 				&ptr_A, &ptr_B, &ptr_C);
 			h_problemSizes.clear();
+			d_lda.reset(problemCount);
+			d_ldb.reset(problemCount);
+			d_ldc.reset(problemCount);
+
+			ptr_A.reset(problemCount);
+			ptr_B.reset(problemCount);
+			ptr_C.reset(problemCount);
 
 			UxResult(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
 				problemCount, bucketSize, vectorWidth,
