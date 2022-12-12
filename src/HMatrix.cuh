@@ -4,24 +4,7 @@
 
 #include "HMatrixHelpers.cuh"
 #include "boundingBoxes.h"
-
-struct HMatrixStructure {
-    int numLevels;
-    int* numTiles;
-    // TODO: make this a vector instead of a malloced array
-    int** tileIndices; // TODO: do they have to be sorted?
-};
-
-void constructHMatrixStructure(
-    HMatrixStructure *HMatrixStruct,
-    unsigned int numberOfInputPoints,
-    unsigned int dimensionOfInputPoints, 
-    unsigned int bucketSize,
-    ADMISSIBILITY_CONDITION admissibilityCondition,
-    KDTreeBoundingBoxes BBox1,
-    KDTreeBoundingBoxes BBox2);
-void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
-
+#include "HMatrixStructure.cuh"
 
 struct HMatrixLevel {
     // TODO: get rid of tileIndices and numTiles here because the information is redundant with HMatrixStructure

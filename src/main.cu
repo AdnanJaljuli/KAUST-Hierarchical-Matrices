@@ -6,6 +6,7 @@
 #include "generateDataset.cuh"
 #include "helperFunctions.cuh"
 #include "HMatrix.cuh"
+#include "HMatrixStructure.cuh"
 #include "HMatrixVectorMultiplication.cuh"
 #include "constructHMatrixFromStruct.cuh"
 #include "kDTree.cuh"
