@@ -15,7 +15,6 @@ void constructMatrixStruct_recursive(
     BoundingBox node_v,
     unsigned int dimensionOfInputPoints,
     unsigned int currentLevel,
-    float eta,
     Admissibility &admissibility) {
 
             unsigned int maxDepth = HMatrixStruct->numLevels - 1;
@@ -43,7 +42,6 @@ void constructMatrixStruct_recursive(
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
                     dimensionOfInputPoints,
                     currentLevel + 1,
-                    eta,
                     admissibility);
 
                 constructMatrixStruct_recursive(
@@ -54,7 +52,6 @@ void constructMatrixStruct_recursive(
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
                     dimensionOfInputPoints,
                     currentLevel + 1,
-                    eta,
                     admissibility);
 
                 constructMatrixStruct_recursive(
@@ -65,7 +62,6 @@ void constructMatrixStruct_recursive(
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
                     dimensionOfInputPoints,
                     currentLevel + 1,
-                    eta,
                     admissibility);
 
                 constructMatrixStruct_recursive(
@@ -76,29 +72,8 @@ void constructMatrixStruct_recursive(
                     BBox_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
                     dimensionOfInputPoints,
                     currentLevel + 1,
-                    eta,
                     admissibility);
             }
-}
-
-void constructMatrixStructure(
-    HMatrixStructure *HMatrixStruct,
-    Admissibility &admissibility,
-    KDTreeBoundingBoxes BBoxTree1,
-    KDTreeBoundingBoxes BBoxTree2,
-    unsigned int dimensionOfInputPoints,
-    float eta = 1.0f ) {
-
-        constructMatrixStruct_recursive(
-            HMatrixStruct,
-            BBoxTree1,
-            BBoxTree2,
-            BBoxTree1.levels[0].boundingBoxes[0],
-            BBoxTree2.levels[0].boundingBoxes[0],
-            dimensionOfInputPoints,
-            0,
-            eta,
-            admissibility);
 }
 
 void constructHMatrixStructure(
@@ -108,12 +83,15 @@ void constructHMatrixStructure(
     KDTree columnTree) {
 
         // TODO: place the mallocs below in their own allocateHMatrixStructure function
-        constructMatrixStructure(
+        constructMatrixStruct_recursive(
             HMatrixStruct,
-            admissibility,
             rowTree.boundingBoxes,
             columnTree.boundingBoxes,
-            rowTree.nDim);
+            columnTree.boundingBoxes.levels[0].boundingBoxes[0],
+            columnTree.boundingBoxes.levels[0].boundingBoxes[0],
+            rowTree.nDim,
+            0,
+            admissibility);
 }
 
 void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numLevels) {
