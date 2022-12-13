@@ -112,6 +112,8 @@ int main(int argc, char *argv[]) {
     printMatrixStructure(hierarchicalMatrix.matrixStructure);
     #endif
 
+    // build TLR piece
+
     freeKDTree(kDTree);
 
     #if USE_COUNTERS
