@@ -54,52 +54,60 @@ void freeHMatrixLevel(HMatrixLevel matrixLevel){
     cudaFree(matrixLevel.V);
 }
 
-void allocateHMatrix(HMatrix &matrix, TLR_Matrix mortonOrderedMatrix, int segmentSize, int numSegments, unsigned int numberOfInputPoints, unsigned int bucketSize, HMatrixStructure HMatrixStruct) {
-    // TODO: consolidate bucket size and segment size
-    cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
-    cudaMemcpy(matrix.diagonalBlocks, mortonOrderedMatrix.diagonal, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-    // matrix.matrixStructure.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
-    matrix.levels = (HMatrixLevel*)malloc((matrix.matrixStructure.numLevels - 1)*sizeof(HMatrixLevel));
+void allocateHMatrix(
+    HMatrix &matrix, 
+    TLR_Matrix mortonOrderedMatrix, 
+    int segmentSize, 
+    int numSegments, 
+    unsigned int numberOfInputPoints, 
+    unsigned int bucketSize, 
+    HMatrixStructure HMatrixStruct) {
+        
+        // TODO: consolidate bucket size and segment size
+        cudaMalloc((void**) &matrix.diagonalBlocks, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real));
+        cudaMemcpy(matrix.diagonalBlocks, mortonOrderedMatrix.diagonal, segmentSize*segmentSize*numSegments*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+        // matrix.matrixStructure.numLevels = __builtin_ctz(numberOfInputPoints/bucketSize) + 1;
+        matrix.levels = (HMatrixLevel*)malloc((matrix.matrixStructure.numLevels - 1)*sizeof(HMatrixLevel));
 
-    // copy tlr tiles to HMatrix bottom level
-    int *h_ranks = (int*)malloc(numSegments*numSegments*sizeof(int));
-    int *h_scanRanks = (int*)malloc(numSegments*numSegments*sizeof(int));
-    int *h_levelRanks = (int*)malloc(HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int));
+        // copy tlr tiles to HMatrix bottom level
+        int *h_ranks = (int*)malloc(numSegments*numSegments*sizeof(int));
+        int *h_scanRanks = (int*)malloc(numSegments*numSegments*sizeof(int));
+        int *h_levelRanks = (int*)malloc(HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int));
 
-    cudaMemcpy(h_ranks, mortonOrderedMatrix.blockRanks, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_scanRanks, mortonOrderedMatrix.blockOffsets, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
-    // matrix.levels[matrix.matrixStructure.numLevels - 2].numTiles = HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2];
-    matrix.levels[matrix.matrixStructure.numLevels - 2].level = matrix.matrixStructure.numLevels - 1;
+        cudaMemcpy(h_ranks, mortonOrderedMatrix.blockRanks, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_scanRanks, mortonOrderedMatrix.blockOffsets, numSegments*numSegments*sizeof(int), cudaMemcpyDeviceToHost);
+        // matrix.levels[matrix.matrixStructure.numLevels - 2].numTiles = HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2];
+        matrix.levels[matrix.matrixStructure.numLevels - 2].level = matrix.matrixStructure.numLevels - 1;
 
-    int rankSum = 0;
-    for(unsigned int i = 0; i < matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]; ++i) {
-        rankSum += h_ranks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]];
-        h_levelRanks[i] = h_ranks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]];
-    }
+        int rankSum = 0;
+        for(unsigned int i = 0; i < matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]; ++i) {
+            rankSum += h_ranks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]];
+            h_levelRanks[i] = h_ranks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]];
+        }
 
-    // cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].tileIndices, matrix.levels[matrix.matrixStructure.numLevels - 2].numTiles*sizeof(int));
-    // cudaMemcpy(matrix.levels[matrix.matrixStructure.numLevels - 2].tileIndices, HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2], matrix.levels[matrix.matrixStructure.numLevels - 2].numTiles*sizeof(int), cudaMemcpyHostToDevice);
+        // cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].tileIndices, matrix.levels[matrix.matrixStructure.numLevels - 2].numTiles*sizeof(int));
+        // cudaMemcpy(matrix.levels[matrix.matrixStructure.numLevels - 2].tileIndices, HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2], matrix.levels[matrix.matrixStructure.numLevels - 2].numTiles*sizeof(int), cudaMemcpyHostToDevice);
 
-    cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].U, rankSum*bucketSize*sizeof(H2Opus_Real));
-    cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].V, rankSum*bucketSize*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].U, rankSum*bucketSize*sizeof(H2Opus_Real));
+        cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].V, rankSum*bucketSize*sizeof(H2Opus_Real));
 
-    cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].tileScanRanks, matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int));    
-    int *d_levelRanks;
-    cudaMalloc((void**) &d_levelRanks, HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int));
-    cudaMemcpy(d_levelRanks, h_levelRanks, HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int), cudaMemcpyHostToDevice);
-    void *d_temp_storage = NULL;
-    size_t temp_storage_bytes = 0;
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_levelRanks, matrix.levels[matrix.matrixStructure.numLevels - 2].tileScanRanks, matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]);
-    cudaMalloc(&d_temp_storage, temp_storage_bytes);
-    cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_levelRanks, matrix.levels[matrix.matrixStructure.numLevels - 2].tileScanRanks, matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]);
+        cudaMalloc((void**) &matrix.levels[matrix.matrixStructure.numLevels - 2].tileScanRanks, matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int));    
+        int *d_levelRanks;
+        cudaMalloc((void**) &d_levelRanks, HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int));
+        cudaMemcpy(d_levelRanks, h_levelRanks, HMatrixStruct.numTiles[matrix.matrixStructure.numLevels - 2]*sizeof(int), cudaMemcpyHostToDevice);
+        void *d_temp_storage = NULL;
+        size_t temp_storage_bytes = 0;
+        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_levelRanks, matrix.levels[matrix.matrixStructure.numLevels - 2].tileScanRanks, matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]);
+        cudaMalloc(&d_temp_storage, temp_storage_bytes);
+        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_levelRanks, matrix.levels[matrix.matrixStructure.numLevels - 2].tileScanRanks, matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]);
 
-    int tmp = 0;
-    for(unsigned int i = 0; i < matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]; ++i) {
-        cudaMemcpy(&matrix.levels[matrix.matrixStructure.numLevels - 2].U[tmp*bucketSize], &mortonOrderedMatrix.U[h_scanRanks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]]*bucketSize], h_levelRanks[i]*bucketSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(&matrix.levels[matrix.matrixStructure.numLevels - 2].V[tmp*bucketSize], &mortonOrderedMatrix.V[h_scanRanks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]]*bucketSize], h_levelRanks[i]*bucketSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+        int tmp = 0;
+        for(unsigned int i = 0; i < matrix.matrixStructure.numTiles[matrix.matrixStructure.numLevels - 2]; ++i) {
+            cudaMemcpy(&matrix.levels[matrix.matrixStructure.numLevels - 2].U[tmp*bucketSize], &mortonOrderedMatrix.U[h_scanRanks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]]*bucketSize], h_levelRanks[i]*bucketSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
+            cudaMemcpy(&matrix.levels[matrix.matrixStructure.numLevels - 2].V[tmp*bucketSize], &mortonOrderedMatrix.V[h_scanRanks[HMatrixStruct.tileIndices[matrix.matrixStructure.numLevels - 2][i]]*bucketSize], h_levelRanks[i]*bucketSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
 
-        tmp += h_levelRanks[i];
-    }
+            tmp += h_levelRanks[i];
+        }
 }
 
 void freeHMatrix(HMatrix &matrix) {

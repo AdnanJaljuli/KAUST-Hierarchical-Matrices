@@ -38,7 +38,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         int batchUnitSize = 1 << (hierarchicalMatrix.matrixStructure.numLevels - (level + 1));
         int* d_tileIndices;
         cudaMalloc((void**) &d_tileIndices, batchSize*sizeof(int));
-        cudaMemcpy(d_tileIndices, hierarchicalMatrix.matrixStructure.tileIndices[level - 1], batchSize*sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_tileIndices, hierarchicalMatrix.matrixStructure.tileIndices[level - 1].data(), batchSize*sizeof(int), cudaMemcpyHostToDevice);
 
         // pointers to level tiles in U and V
         LevelTilePtrs tilePtrs;
@@ -49,7 +49,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         int **d_scanRanksPtrs;
         cudaMalloc((void**) &d_scanRanks, batchSize*batchUnitSize*batchUnitSize*sizeof(int));
         cudaMalloc((void**) &d_scanRanksPtrs, batchSize*sizeof(int*));
-        generateScanRanks(batchSize, batchUnitSize, mortonOrderedMatrix.blockRanks, d_scanRanks, d_scanRanksPtrs, hierarchicalMatrix.matrixStructure.tileIndices[level - 1]);
+        generateScanRanks(batchSize, batchUnitSize, mortonOrderedMatrix.blockRanks, d_scanRanks, d_scanRanksPtrs, hierarchicalMatrix.matrixStructure.tileIndices[level - 1].data());
 
         tolerance *= 2;
         maxRows = batchUnitSize*bucketSize;

@@ -7,12 +7,13 @@
 #include "kDTree.cuh"
 
 #include <functional>
+#include <vector>
 
 struct HMatrixStructure {
     int numLevels;
-    int* numTiles;
+    std::vector<int> numTiles;
     // TODO: make this a vector instead of a malloced array
-    int** tileIndices; // TODO: do they have to be sorted?
+    std::vector<std::vector<int>> tileIndices; // TODO: do they have to be sorted?
 };
 
 void constructHMatrixStructure(

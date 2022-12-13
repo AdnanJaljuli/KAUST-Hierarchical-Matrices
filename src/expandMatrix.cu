@@ -106,7 +106,7 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
 
     int* d_tileIndices;
     cudaMalloc((void**) &d_tileIndices, batchSize*sizeof(int));
-    cudaMemcpy(d_tileIndices, matrix.matrixStructure.tileIndices[level - 1], batchSize*sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_tileIndices, matrix.matrixStructure.tileIndices[level - 1].data(), batchSize*sizeof(int), cudaMemcpyHostToDevice);
     
     // compare expanded H matrix level with dense matrix
     H2Opus_Real* d_error;

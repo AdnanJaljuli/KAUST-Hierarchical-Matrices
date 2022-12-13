@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
             kDTree,
             kDTree);
     }
-
+    
     #if EXPAND_MATRIX
     printKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.divMethod, config.bucketSize, kDTree, d_pointCloud);
     printMatrixStructure(hierarchicalMatrix.matrixStructure);

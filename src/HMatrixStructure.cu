@@ -5,6 +5,7 @@
 #include "kDTreeHelpers.cuh"
 
 #include <functional>
+#include <vector>
 
 #define DEFAULT_ETA 1.0
 
@@ -32,10 +33,11 @@ void constructMatrixStruct_recursive(
                 return;
             }
             else if(isLeafNode || isAdmissible(node_u, node_v, dimensionOfInputPoints, eta)) {
-                // TODO: write to HMatrixStruct
+                // write to HMatrixStruct
                 unsigned int numRows = 1<<currentLevel;
                 unsigned int tileIndex = CMIndextoMOIndex(numRows, node_u.index*numRows + node_v.index);
-                HMatrixStruct->tileIndices[currentLevel - 1][HMatrixStruct->numTiles[currentLevel - 1]++] = tileIndex;
+                HMatrixStruct->tileIndices.at(currentLevel - 1).push_back(tileIndex);
+                ++HMatrixStruct->numTiles[currentLevel - 1];
                 return;
             }
             else {
@@ -131,19 +133,15 @@ void constructHMatrixStructure(
 
 void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numLevels) {
     HMatrixStruct->numLevels = numLevels;
-    HMatrixStruct->numTiles = (int*)malloc((HMatrixStruct->numLevels)*sizeof(int));
-    HMatrixStruct->tileIndices = (int**)malloc((HMatrixStruct->numLevels)*sizeof(int*));
-    for(unsigned int level = 0; level < HMatrixStruct->numLevels; ++level) {
-        HMatrixStruct->numTiles[level] = 0;
-        unsigned int numTiles = 1<<(level + 1);
-        HMatrixStruct->tileIndices[level] = (int*)malloc(numTiles*(numTiles - 1)*sizeof(int));
-    }
+    HMatrixStruct->numTiles.resize(HMatrixStruct->numLevels);
+    HMatrixStruct->tileIndices.resize(HMatrixStruct->numLevels);
+    memset(&HMatrixStruct->numTiles[0], 0, sizeof(HMatrixStruct->numTiles[0]) * HMatrixStruct->numTiles.size());
 }
 
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct) {
-    free(HMatrixStruct.numTiles);
-    for(unsigned int i = 0; i < HMatrixStruct.numLevels - 1; ++i) {
-        free(HMatrixStruct.tileIndices[i]);
-    }
-    free(HMatrixStruct.tileIndices);
+    // free(HMatrixStruct.numTiles);
+    // for(unsigned int i = 0; i < HMatrixStruct.numLevels - 1; ++i) {
+    //     free(HMatrixStruct.tileIndices[i]);
+    // }
+    // free(HMatrixStruct.tileIndices);
 }

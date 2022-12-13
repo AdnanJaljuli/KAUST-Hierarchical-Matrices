@@ -78,12 +78,13 @@ void printMatrixStructure(HMatrixStructure HMatrixStruct) {
     FILE *output_file = fopen(filename, "w");
     fprintf(output_file, "%d\n", HMatrixStruct.numLevels);
     fprintf(output_file, "[ ");
-    for(unsigned int i = 0; i < HMatrixStruct.numLevels - 1; ++i) {
-        unsigned int numTiles = 1<<(i + 1);
+
+     for(auto i = 0; i <  HMatrixStruct.numLevels - 1;  i++) {
         fprintf(output_file, "[ ");
-        for(unsigned int j = 0; j < HMatrixStruct.numTiles[i]; ++j) {
+        int numTiles = HMatrixStruct.numTiles[i];
+        for(auto j = 0; j < HMatrixStruct.numTiles[i]; j++) {
             uint32_t x, y;
-            mortonToCM((uint32_t)HMatrixStruct.tileIndices[i][j], x, y);
+            mortonToCM((uint32_t)(HMatrixStruct.tileIndices[i][j]), x, y);
             fprintf(output_file, "%d, ", x*numTiles + y);
         }
         fprintf(output_file, " ], ");
