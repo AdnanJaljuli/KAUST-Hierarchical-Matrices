@@ -2,19 +2,13 @@
 #include "admissibilityFunctions.cuh"
 #include "config.h"
 #include "counters.h"
-#include "constructTLRMatrix.cuh"
-#include "expandMatrix.cuh"
 #include "generateDataset.cuh"
 #include "helperFunctions.cuh"
 #include "HMatrix.cuh"
 #include "HMatrixStructure.cuh"
-#include "HMatrixVectorMultiplication.cuh"
-#include "constructHMatrixFromStruct.cuh"
 #include "kDTree.cuh"
 #include "kDTreeHelpers.cuh"
 #include "kDTreeConstruction.cuh"
-#include "magma_auxiliary.h"
-#include "TLRMatrix.cuh"
 
 #include <algorithm>
 #include <assert.h>
@@ -88,16 +82,16 @@ int main(int argc, char *argv[]) {
     allocateHMatrixStructure(&hierarchicalMatrix.matrixStructure, kDTree.numLevels);
     if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
         H2Opus_Real eta = 1;
-        BBoxCenterAdmissibility admissibility(eta, kDTree.nDim);
-        constructHMatrixStructure(
+        BBoxCenterAdmissibility<H2Opus_Real> admissibility(eta, kDTree.nDim);
+        constructHMatrixStructure<H2Opus_Real>(
             &hierarchicalMatrix.matrixStructure,
             admissibility,
             kDTree,
             kDTree);
     }
     else if(config.admissibilityCondition == WEAK_ADMISSIBILITY) {
-        WeakAdmissibility admissibility;
-        constructHMatrixStructure(
+        WeakAdmissibility<H2Opus_Real> admissibility;
+        constructHMatrixStructure<H2Opus_Real>(
             &hierarchicalMatrix.matrixStructure,
             admissibility,
             kDTree,

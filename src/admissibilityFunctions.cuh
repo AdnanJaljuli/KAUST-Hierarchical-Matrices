@@ -6,21 +6,23 @@
 #include "admissibilityHelpers.cuh"
 #include "boundingBoxes.h"
 
+template <class T>
 class Admissibility {
     public:
         virtual bool operator()(BoundingBox node_u, BoundingBox node_v) = 0;
 };
 
-class BBoxCenterAdmissibility : public Admissibility {
+template <class T>
+class BBoxCenterAdmissibility : public Admissibility<T> {
     private:
-        H2Opus_Real eta;
+        T eta;
         unsigned int nDim;
 
     public:
         bool operator()(BoundingBox node_u, BoundingBox node_v) {
-            H2Opus_Real distance = BBoxCenterDistance(node_u, node_v, nDim);
-            H2Opus_Real diameter_u = BBoxDiameter(node_u, nDim);
-            H2Opus_Real diameter_v = BBoxDiameter(node_v, nDim);
+            T distance = BBoxCenterDistance(node_u, node_v, nDim);
+            T diameter_u = BBoxDiameter(node_u, nDim);
+            T diameter_v = BBoxDiameter(node_v, nDim);
 
             if (diameter_u == 0 || diameter_v == 0) {
                 return false;
@@ -30,13 +32,14 @@ class BBoxCenterAdmissibility : public Admissibility {
             }
         }
 
-        BBoxCenterAdmissibility(H2Opus_Real eta, unsigned int nDim) {
+        BBoxCenterAdmissibility(T eta, unsigned int nDim) {
             this->eta = eta;
             this->nDim = nDim;
         }
 };
 
-class WeakAdmissibility: public Admissibility {
+template <class T>
+class WeakAdmissibility: public Admissibility<T> {
     public:
         bool operator()(BoundingBox node_u, BoundingBox node_v) {
             if(node_u.index == node_v.index) {

@@ -17,9 +17,10 @@ struct HMatrixStructure {
     std::vector<std::vector<int>> tileIndices; // TODO: do they have to be sorted?
 };
 
+template <class T>
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    Admissibility &admissibility,
+    Admissibility<T> &admissibility,
     KDTree rowTree,
     KDTree columnTree);
 

@@ -3,6 +3,8 @@
 #include "helperKernels.cuh"
 #include "HMatrixHelpers.cuh"
 
+#if 0
+
 __global__ void fillBatchPtrs(H2Opus_Real **d_UPtrs, H2Opus_Real **d_VPtrs, TLR_Matrix mortonOrderedMatrix, int batchSize, int segmentSize, int batchUnitSize, int* tileIndices, int level) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchSize) {
@@ -29,3 +31,5 @@ void freeLevelTilePtrs(LevelTilePtrs tilePtrs) {
     cudaFree(tilePtrs.U);
     cudaFree(tilePtrs.V);
 }
+
+#endif

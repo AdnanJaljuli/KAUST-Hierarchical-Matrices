@@ -5,6 +5,7 @@
 #include "kDTreeHelpers.cuh"
 #include <curand.h>
 
+#if 0
 void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix) {
 
     cudaMalloc((void**) &mortonMatrix.U, rankSum*maxSegmentSize*sizeof(H2Opus_Real));
@@ -47,6 +48,7 @@ void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmen
     cudaMemcpy(mortonMatrix.diagonal, matrix.diagonal, numSegments*maxSegmentSize*maxSegmentSize*sizeof(H2Opus_Real), cudaMemcpyDeviceToDevice);
     gpuErrchk(cudaPeekAtLastError());
 }
+#endif
 
 __global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;

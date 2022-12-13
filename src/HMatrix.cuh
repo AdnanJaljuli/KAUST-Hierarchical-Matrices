@@ -17,6 +17,7 @@ struct HMatrixLevel {
     // TODO: make a double pointer array to U and V
 };
 
+#if 0
 void allocateAndCopyToHMatrixLevel(
     HMatrixLevel &matrixLevel, 
     int* ranks, 
@@ -25,7 +26,7 @@ void allocateAndCopyToHMatrixLevel(
     H2Opus_Real *A, H2Opus_Real *B, 
     int maxRows, int maxRank);
 void freeHMatrixLevel(HMatrixLevel matrixLevel);
-
+#endif
 
 struct HMatrix {
     H2Opus_Real* diagonalBlocks;

@@ -7,6 +7,7 @@
 #include <functional>
 #include <vector>
 
+template <class T>
 void constructMatrixStruct_recursive(
     HMatrixStructure *HMatrixStruct,
     KDTreeBoundingBoxes BBoxTree_u,
@@ -15,7 +16,7 @@ void constructMatrixStruct_recursive(
     BoundingBox node_v,
     unsigned int dimensionOfInputPoints,
     unsigned int currentLevel,
-    Admissibility &admissibility) {
+    Admissibility<T> &admissibility) {
 
             unsigned int maxDepth = HMatrixStruct->numLevels - 1;
 
@@ -76,9 +77,10 @@ void constructMatrixStruct_recursive(
             }
 }
 
+template <class T>
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    Admissibility &admissibility,
+    Admissibility<T> &admissibility,
     KDTree rowTree,
     KDTree columnTree) {
 
@@ -107,3 +109,9 @@ void freeHMatrixStructure(HMatrixStructure *HMatrixStruct) {
     }
     HMatrixStruct->tileIndices.clear();
 }
+
+template void constructHMatrixStructure<double>(
+    HMatrixStructure *HMatrixStruct,
+    Admissibility<double> &admissibility,
+    KDTree rowTree,
+    KDTree columnTree);

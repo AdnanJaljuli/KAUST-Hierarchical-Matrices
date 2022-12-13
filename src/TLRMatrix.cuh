@@ -4,7 +4,8 @@
 #include "kDTree.cuh"
 
 #include <cstdint>
-#include <vector>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
 
 typedef double H2Opus_Real;
 enum Ordering {COLUMN_MAJOR, MORTON};

@@ -9,6 +9,7 @@
 #include <cub/cub.cuh>
 #include <functional>
 
+#if 0
 void allocateAndCopyToHMatrixLevel(
     HMatrixLevel &matrixLevel, 
     int* ranks, 
@@ -116,3 +117,5 @@ void freeHMatrix(HMatrix &matrix) {
         freeHMatrixLevel(matrix.levels[level - 1]);
     }
 }
+
+#endif
