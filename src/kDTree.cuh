@@ -6,6 +6,7 @@
 #include "config.h"
 
 struct KDTree {
+    unsigned int numLevels;
     unsigned int numSegments;
     unsigned int segmentSize;
     int *segmentIndices;
@@ -19,6 +20,7 @@ void allocateKDTree(
     unsigned int dimensionOfInputPoints,
     unsigned int bucketSize,
     DIVISION_METHOD divMethod);
+
 void freeKDTree(KDTree tree);
 
 #endif

@@ -80,6 +80,7 @@ int main(int argc, char *argv[]) {
         config.divMethod); // TODO: pass a reference to kdtree
     printf("segment size: %lu\n", kDTree.segmentSize);
     printf("num segments: %lu\n", kDTree.numSegments);
+    printf("num levels: %d\n", kDTree.numLevels);
     #if USE_COUNTERS
     endTime(KDTREE, &counters);
     #endif
@@ -99,6 +100,8 @@ int main(int argc, char *argv[]) {
     printKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.divMethod, config.bucketSize, kDTree, d_pointCloud);
     printMatrixStructure(hierarchicalMatrix.matrixStructure);
     #endif
+
+    return 0;
 
     // Build the TLR matrix
     #if USE_COUNTERS
@@ -160,8 +163,6 @@ int main(int argc, char *argv[]) {
     #endif
     free(maxRanks);
     freeMatrix(mortonOrderedMatrix);
-
-    return 0;
 
     // TODO: generate random vector
     H2Opus_Real *d_inputVectors, *d_resultVectors;

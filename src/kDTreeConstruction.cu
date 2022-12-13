@@ -208,6 +208,7 @@ void constructKDTree(
         }
 
         kDTree.numSegments = currentNumSegments;
+        kDTree.numLevels = level + 1;
 
         cudaFree(d_dimxNSegmentOffsets);
         cudaFree(d_kDTreePoints);
