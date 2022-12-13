@@ -29,7 +29,6 @@
 using namespace std;
 
 // TODO: template all functions that deal with H2Opus_Real
-// TODO: debug dealing with non-powers of two
 int main(int argc, char *argv[]) {
 
     cudaDeviceSynchronize();
@@ -48,13 +47,13 @@ int main(int argc, char *argv[]) {
     startTime(GENERATE_DATASET, &counters);
     #endif
     H2Opus_Real* d_pointCloud;
-    cudaMalloc((void**) &d_pointCloud, config.numberOfInputPoints*config.dimensionOfInputPoints*sizeof(H2Opus_Real));
-    generateDataset(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
+    cudaMalloc((void**) &d_pointCloud, config.N*config.nDim*sizeof(H2Opus_Real));
+    generateDataset(config.N, config.nDim, d_pointCloud);
     #if USE_COUNTERS
     endTime(GENERATE_DATASET, &counters);
     #endif
     #if EXPAND_MATRIX
-    printPointCloud(config.numberOfInputPoints, config.dimensionOfInputPoints, d_pointCloud);
+    printPointCloud(config.N, config.nDim, d_pointCloud);
     #endif
 
     // Build the KD-tree
@@ -64,19 +63,16 @@ int main(int argc, char *argv[]) {
     KDTree kDTree;
     allocateKDTree(
         kDTree,
-        config.numberOfInputPoints,
-        config.dimensionOfInputPoints,
+        config.N,
+        config.nDim,
         config.leafSize,
         config.divMethod);
 
     constructKDTree(
-        config.numberOfInputPoints,
-        config.dimensionOfInputPoints,
-        config.leafSize,
         kDTree,
         d_pointCloud,
         config.divMethod); // TODO: pass a reference to kdtree
-    printf("segment size: %lu\n", kDTree.segmentSize);
+    printf("segment size: %lu\n", kDTree.leafSize);
     printf("num segments: %lu\n", kDTree.numSegments);
     printf("num levels: %d\n", kDTree.numLevels);
     #if USE_COUNTERS
@@ -89,7 +85,6 @@ int main(int argc, char *argv[]) {
     if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
         H2Opus_Real eta = 1;
         BBoxCenterAdmissibility admissibility(eta, kDTree.nDim);
-
         constructHMatrixStructure(
             &hierarchicalMatrix.matrixStructure,
             admissibility,
@@ -97,7 +92,6 @@ int main(int argc, char *argv[]) {
             kDTree);
     }
     else if(config.admissibilityCondition == WEAK_ADMISSIBILITY) {
-
         WeakAdmissibility admissibility;
         constructHMatrixStructure(
             &hierarchicalMatrix.matrixStructure,
@@ -106,9 +100,8 @@ int main(int argc, char *argv[]) {
             kDTree);
     }
 
-
     #if EXPAND_MATRIX
-    printKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.divMethod, config.leafSize, kDTree, d_pointCloud);
+    printKDTree(config.N, config.nDim, config.divMethod, config.leafSize, kDTree, d_pointCloud);
     printMatrixStructure(hierarchicalMatrix.matrixStructure);
     #endif
 
@@ -120,7 +113,6 @@ int main(int argc, char *argv[]) {
     #endif
 
     printf("done :)\n");
-
 
     return 0;
 

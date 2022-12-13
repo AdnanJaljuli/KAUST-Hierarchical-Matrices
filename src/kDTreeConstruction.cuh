@@ -8,9 +8,6 @@
 typedef double H2Opus_Real;
 
 void constructKDTree(
-    unsigned int numberOfInputPoints, 
-    unsigned int dimensionOfInputPoints, 
-    unsigned int leafSize, 
     KDTree &kDTree, 
     H2Opus_Real* 
     d_pointCloud, 

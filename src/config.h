@@ -109,8 +109,8 @@ static ADMISSIBILITY_CONDITION parseAdmissibilityCondition(const char *s) {
 struct Config {
     DIVISION_METHOD divMethod;
     ADMISSIBILITY_CONDITION admissibilityCondition;
-    unsigned int numberOfInputPoints;
-    unsigned int dimensionOfInputPoints;
+    unsigned int N;
+    unsigned int nDim;
     unsigned int leafSize;
     unsigned int vectorWidth;
     float lowestLevelTolerance;
@@ -120,8 +120,8 @@ static Config parseArgs(int argc, char **argv) {
     Config config;
     config.divMethod = FULL_TREE;
     config.admissibilityCondition = WEAK_ADMISSIBILITY;
-    config.numberOfInputPoints = 1024;
-    config.dimensionOfInputPoints = 2;
+    config.N = 1024;
+    config.nDim = 2;
     config.leafSize = 32;
     config.vectorWidth = 16;
     config.lowestLevelTolerance = 1e-5;
@@ -137,10 +137,10 @@ static Config parseArgs(int argc, char **argv) {
             config.admissibilityCondition = parseAdmissibilityCondition(optarg);
             break;
         case 'n':
-            config.numberOfInputPoints = atoi(optarg);
+            config.N = atoi(optarg);
             break;
         case 'd':
-            config.dimensionOfInputPoints = atoi(optarg);
+            config.nDim = atoi(optarg);
             break;
         case 'b':
             config.leafSize = atoi(optarg);
@@ -167,10 +167,10 @@ static void printArgs(Config config) {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
     printf("\nDevice name: %s\n\n", prop.name);
-    printf("number of points: %d\n", config.numberOfInputPoints);
+    printf("number of points: %d\n", config.N);
     printf("bucket size: %d\n", config.leafSize);
     printf("lowest level tolerance: %f\n", config.lowestLevelTolerance);
-    printf("dimension of input points: %d\n", config.dimensionOfInputPoints);
+    printf("dimension of input points: %d\n", config.nDim);
     printf("vector width: %u\n", config.vectorWidth);
 }
 

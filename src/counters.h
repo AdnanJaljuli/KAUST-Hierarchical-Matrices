@@ -44,7 +44,7 @@ static void printCountersInFile(Config config, Counters *counters) {
     char filename[100] = "results/times.csv";
     FILE *output_file = fopen(filename, "a");
     // NUMBER_OF_INPUT_POINTS = 0, DIMENSTION_OF_INPUT_POINTS, BUCKET_SIZE
-    fprintf(output_file,"%d, ", config.numberOfInputPoints);
+    fprintf(output_file,"%d, ", config.N);
     for(unsigned int i = 0; i < NUM_COUNTERS; ++i){
         fprintf(output_file,"%f, ", counters->totalTime[i]);
         printf("counters total time: %f\n", counters->totalTime[i]);
