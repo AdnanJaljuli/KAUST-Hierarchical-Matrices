@@ -21,8 +21,6 @@ void constructHMatrixStructure(
         BoundingBox,
         BoundingBox,
         unsigned int,
-        unsigned int,
-        unsigned int,
         float)> isAdmissible,
     KDTree rowTree,
     KDTree columnTree);

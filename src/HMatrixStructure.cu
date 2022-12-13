@@ -21,8 +21,6 @@ void constructMatrixStruct_recursive(
         BoundingBox,
         BoundingBox,
         unsigned int,
-        unsigned int,
-        unsigned int,
         float)> isAdmissible) {
 
             unsigned int maxDepth = HMatrixStruct->numLevels - 1;
@@ -33,7 +31,7 @@ void constructMatrixStruct_recursive(
             if(isDiagonal && isLeafNode) {
                 return;
             }
-            else if(isLeafNode || isAdmissible(node_u, node_v, dimensionOfInputPoints, currentLevel, maxDepth, eta)) {
+            else if(isLeafNode || isAdmissible(node_u, node_v, dimensionOfInputPoints, eta)) {
                 // TODO: write to HMatrixStruct
                 unsigned int numRows = 1<<currentLevel;
                 unsigned int tileIndex = CMIndextoMOIndex(numRows, node_u.index*numRows + node_v.index);
@@ -94,8 +92,6 @@ void constructMatrixStructure(
         BoundingBox,
         BoundingBox,
         unsigned int,
-        unsigned int,
-        unsigned int,
         float)> isAdmissible,
     KDTreeBoundingBoxes BBoxTree1,
     KDTreeBoundingBoxes BBoxTree2,
@@ -119,8 +115,6 @@ void constructHMatrixStructure(
     std::function<bool(
         BoundingBox,
         BoundingBox,
-        unsigned int,
-        unsigned int,
         unsigned int,
         float)> isAdmissible,
     KDTree rowTree,
