@@ -6,6 +6,8 @@
 #include "config.h"
 #include "kDTree.cuh"
 
+#include <functional>
+
 struct HMatrixStructure {
     int numLevels;
     int* numTiles;
@@ -15,7 +17,13 @@ struct HMatrixStructure {
 
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    ADMISSIBILITY_CONDITION admissibilityCondition,
+    std::function<bool(
+        BoundingBox,
+        BoundingBox,
+        unsigned int,
+        unsigned int,
+        unsigned int,
+        float)> isAdmissible,
     KDTree rowTree,
     KDTree columnTree);
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);

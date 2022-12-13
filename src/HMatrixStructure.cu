@@ -4,6 +4,8 @@
 #include "helperKernels.cuh"
 #include "kDTreeHelpers.cuh"
 
+#include <functional>
+
 #define DEFAULT_ETA 1.0
 
 void constructMatrixStruct_recursive(
@@ -88,42 +90,39 @@ void constructMatrixStruct_recursive(
 
 void constructMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    ADMISSIBILITY_CONDITION admissibilityCondition,
+    std::function<bool(
+        BoundingBox,
+        BoundingBox,
+        unsigned int,
+        unsigned int,
+        unsigned int,
+        float)> isAdmissible,
     KDTreeBoundingBoxes BBoxTree1,
     KDTreeBoundingBoxes BBoxTree2,
     unsigned int dimensionOfInputPoints,
     float eta = DEFAULT_ETA ) {
 
-        // call recursive function
-        if(admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
-            constructMatrixStruct_recursive(
-                HMatrixStruct,
-                BBoxTree1,
-                BBoxTree2,
-                BBoxTree1.levels[0].boundingBoxes[0],
-                BBoxTree2.levels[0].boundingBoxes[0],
-                dimensionOfInputPoints,
-                0,
-                eta,
-                &BBoxCenterAdmissibility);
-        }
-        else if(admissibilityCondition == WEAK_ADMISSIBILITY) {
-            constructMatrixStruct_recursive(
-                HMatrixStruct,
-                BBoxTree1,
-                BBoxTree2,
-                BBoxTree1.levels[0].boundingBoxes[0],
-                BBoxTree2.levels[0].boundingBoxes[0],
-                dimensionOfInputPoints,
-                0,
-                eta,
-                &weakAdmissibility);
-        }
+        constructMatrixStruct_recursive(
+            HMatrixStruct,
+            BBoxTree1,
+            BBoxTree2,
+            BBoxTree1.levels[0].boundingBoxes[0],
+            BBoxTree2.levels[0].boundingBoxes[0],
+            dimensionOfInputPoints,
+            0,
+            eta,
+            isAdmissible);
 }
 
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    ADMISSIBILITY_CONDITION admissibilityCondition,
+    std::function<bool(
+        BoundingBox,
+        BoundingBox,
+        unsigned int,
+        unsigned int,
+        unsigned int,
+        float)> isAdmissible,
     KDTree rowTree,
     KDTree columnTree) {
 
@@ -139,7 +138,7 @@ void constructHMatrixStructure(
 
         constructMatrixStructure(
             HMatrixStruct,
-            admissibilityCondition,
+            isAdmissible,
             rowTree.boundingBoxes,
             columnTree.boundingBoxes,
             rowTree.nDim);

@@ -1,4 +1,5 @@
 
+#include "admissibilityCondition.cuh"
 #include "config.h"
 #include "counters.h"
 #include "constructTLRMatrix.cuh"
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
     HMatrix hierarchicalMatrix;
     constructHMatrixStructure(
         &hierarchicalMatrix.matrixStructure,
-        config.admissibilityCondition,
+        &BBoxCenterAdmissibility,
         kDTree,
         kDTree);
 
