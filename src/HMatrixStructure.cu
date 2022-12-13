@@ -7,8 +7,6 @@
 #include <functional>
 #include <vector>
 
-#define DEFAULT_ETA 1.0
-
 void constructMatrixStruct_recursive(
     HMatrixStructure *HMatrixStruct,
     KDTreeBoundingBoxes BBox_u,
@@ -98,7 +96,7 @@ void constructMatrixStructure(
     KDTreeBoundingBoxes BBoxTree1,
     KDTreeBoundingBoxes BBoxTree2,
     unsigned int dimensionOfInputPoints,
-    float eta = DEFAULT_ETA ) {
+    float eta = 1.0f ) {
 
         constructMatrixStruct_recursive(
             HMatrixStruct,
