@@ -121,21 +121,23 @@ void constructHMatrixStructure(
     KDTree columnTree) {
 
         // TODO: place the mallocs below in their own allocateHMatrixStructure function
-        HMatrixStruct->numLevels = rowTree.numLevels;
-        HMatrixStruct->numTiles = (int*)malloc((HMatrixStruct->numLevels)*sizeof(int));
-        HMatrixStruct->tileIndices = (int**)malloc((HMatrixStruct->numLevels)*sizeof(int*));
-        for(unsigned int level = 0; level < HMatrixStruct->numLevels; ++level) {
-            HMatrixStruct->numTiles[level] = 0;
-            unsigned int numTiles = 1<<(level + 1);
-            HMatrixStruct->tileIndices[level] = (int*)malloc(numTiles*(numTiles - 1)*sizeof(int));
-        }
-
         constructMatrixStructure(
             HMatrixStruct,
             isAdmissible,
             rowTree.boundingBoxes,
             columnTree.boundingBoxes,
             rowTree.nDim);
+}
+
+void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numLevels) {
+    HMatrixStruct->numLevels = numLevels;
+    HMatrixStruct->numTiles = (int*)malloc((HMatrixStruct->numLevels)*sizeof(int));
+    HMatrixStruct->tileIndices = (int**)malloc((HMatrixStruct->numLevels)*sizeof(int*));
+    for(unsigned int level = 0; level < HMatrixStruct->numLevels; ++level) {
+        HMatrixStruct->numTiles[level] = 0;
+        unsigned int numTiles = 1<<(level + 1);
+        HMatrixStruct->tileIndices[level] = (int*)malloc(numTiles*(numTiles - 1)*sizeof(int));
+    }
 }
 
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct) {

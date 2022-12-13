@@ -88,11 +88,21 @@ int main(int argc, char *argv[]) {
 
     // create HMatrixStructure
     HMatrix hierarchicalMatrix;
-    constructHMatrixStructure(
-        &hierarchicalMatrix.matrixStructure,
-        &BBoxCenterAdmissibility,
-        kDTree,
-        kDTree);
+    allocateHMatrixStructure(&hierarchicalMatrix.matrixStructure, kDTree.numLevels);
+    if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
+        constructHMatrixStructure(
+            &hierarchicalMatrix.matrixStructure,
+            &BBoxCenterAdmissibility,
+            kDTree,
+            kDTree);
+    }
+    else if(config.admissibilityCondition == WEAK_ADMISSIBILITY) {
+        constructHMatrixStructure(
+            &hierarchicalMatrix.matrixStructure,
+            &weakAdmissibility,
+            kDTree,
+            kDTree);
+    }
 
     #if EXPAND_MATRIX
     printKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.divMethod, config.bucketSize, kDTree, d_pointCloud);

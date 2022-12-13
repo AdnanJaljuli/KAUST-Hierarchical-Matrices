@@ -24,6 +24,9 @@ void constructHMatrixStructure(
         float)> isAdmissible,
     KDTree rowTree,
     KDTree columnTree);
+
+void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numLevels);
+
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 #endif
