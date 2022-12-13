@@ -3,6 +3,7 @@
 #include "admissibilityFunctions.cuh"
 #include "helperKernels.cuh"
 #include "kDTreeHelpers.cuh"
+#include "precision.h"
 
 #include <functional>
 #include <vector>
@@ -29,7 +30,7 @@ void constructMatrixStruct_recursive(
             else if(isLeafNode || admissibility(node_u, node_v)) {
                 // write to HMatrixStruct
                 unsigned int numRows = 1<<currentLevel;
-                unsigned int tileIndex = CMIndextoMOIndex(numRows, node_u.index*numRows + node_v.index);
+                unsigned int tileIndex = columnMajor2Morton(numRows, node_u.index*numRows + node_v.index);
                 HMatrixStruct->tileIndices.at(currentLevel - 1).push_back(tileIndex);
                 ++HMatrixStruct->numTiles[currentLevel - 1];
                 return;
@@ -110,8 +111,8 @@ void freeHMatrixStructure(HMatrixStructure *HMatrixStruct) {
     HMatrixStruct->tileIndices.clear();
 }
 
-template void constructHMatrixStructure<double>(
+template void constructHMatrixStructure<H2Opus_Real>(
     HMatrixStructure *HMatrixStruct,
-    Admissibility<double> &admissibility,
+    Admissibility<H2Opus_Real> &admissibility,
     KDTree rowTree,
     KDTree columnTree);

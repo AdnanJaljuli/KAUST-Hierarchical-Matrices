@@ -16,9 +16,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     }
 }
 
-void convertColumnMajorToMorton(unsigned int numSegments, unsigned int maxSegmentSize, uint64_t rankSum, TLR_Matrix matrix, TLR_Matrix &mortonMatrix);
-__global__ void copyCMRanksToMORanks(int num_segments, int maxSegmentSize, int* matrixRanks, int* mortonMatrixRanks);
-void generateRandomVector(unsigned int vectorWidth, unsigned int vetorHeight, H2Opus_Real *vector);
 void generateMaxRanks(unsigned int numLevels, unsigned int leafSize, unsigned int *maxRanks);
 void printMatrixStructure(HMatrixStructure HMatrixStruct);
 void printPointCloud(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, H2Opus_Real *d_pointCloud);

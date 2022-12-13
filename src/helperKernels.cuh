@@ -84,7 +84,7 @@ static void generateArrayOfPointersT(T* original_array, T** array_of_arrays, int
     cudaGetLastError();
 }
 
-static __host__ __device__ int getMOfromXY(unsigned int x, unsigned int y){
+static __host__ __device__ int ij2Morton(unsigned int x, unsigned int y){
     static const unsigned int B[] = {0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF};
     static const unsigned int S[] = {1, 2, 4, 8};
 
@@ -102,14 +102,13 @@ static __host__ __device__ int getMOfromXY(unsigned int x, unsigned int y){
     return z;
 }
 
-static __host__ __device__ int CMIndextoMOIndex(int numSegments, int n){
+static __host__ __device__ int columnMajor2Morton(int numSegments, int n){
     unsigned int i = n%numSegments;
     unsigned int j = n/numSegments;
-    return getMOfromXY(j, i);
+    return ij2Morton(j, i);
 }
 
-// TODO: rename
-static __host__ __device__ uint32_t morton1(uint32_t x)
+static __host__ __device__ uint32_t morton2CM_helper(uint32_t x)
 {
     x = x & 0x55555555;
     x = (x | (x >> 1)) & 0x33333333;
@@ -119,9 +118,9 @@ static __host__ __device__ uint32_t morton1(uint32_t x)
     return x;
 }
 
-static __host__ __device__ void mortonToCM(uint32_t d, uint32_t &x, uint32_t &y) {
-    x = morton1(d);
-    y = morton1(d >> 1);
+static __host__ __device__ void morton2CM(uint32_t d, uint32_t &x, uint32_t &y) {
+    x = morton2CM_helper(d);
+    y = morton2CM_helper(d >> 1);
 }
 
 #endif

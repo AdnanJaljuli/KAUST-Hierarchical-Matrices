@@ -30,8 +30,8 @@ LIB = -lcublas -lcuda -lcudadevrt -lcurand -lcusolver -lkblas-gpu -lmagma_sparse
 CC = nvcc
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
-OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o HMatrix.o HMatrixHelpers.o HMatrixStructure.o generateDataset.o helperFunctions.o boundingBoxes.o admissibilityHelpers.o
-HDR = config.h counters.h HMatrix.cuh HMatrixHelpers.cuh HMatrixStructure.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh boundingBoxes.h admissibilityHelpers.cuh admissibilityFunctions.cuh precision.h
+OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o HMatrixStructure.o generateDataset.o helperFunctions.o boundingBoxes.o admissibilityHelpers.o
+HDR = config.h counters.h HMatrix.cuh HMatrixStructure.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh boundingBoxes.h admissibilityHelpers.cuh admissibilityFunctions.cuh precision.h
 EXE = output
 
 USE_COUNTERS = 0
