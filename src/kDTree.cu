@@ -12,7 +12,7 @@ void allocateKDTree(
 
         tree.N = numberOfInputPoints;
         tree.nDim = dimensionOfInputPoints;
-        tree.numSegments = 1;
+        tree.numLeaves = 1;
         tree.leafSize = leafSize;
         int maxNumSegments;
         if(divMethod == FULL_TREE) {

@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         d_pointCloud,
         config.divMethod); // TODO: pass a reference to kdtree
     printf("segment size: %lu\n", kDTree.leafSize);
-    printf("num segments: %lu\n", kDTree.numSegments);
+    printf("num segments: %lu\n", kDTree.numLeaves);
     printf("num levels: %d\n", kDTree.numLevels);
     #if USE_COUNTERS
     endTime(KDTREE, &counters);

@@ -25,7 +25,7 @@ void buildTLRMatrixPiece(
 
         cudaMalloc((void**) &d_rowsBatch, numTilesInPieceCol*sizeof(int));
         cudaMalloc((void**) &d_colsBatch, numTilesInPieceCol*sizeof(int));
-        cudaMalloc((void**) &d_ranksOutput, numTilesInPieceCol*kdtree.numSegments*sizeof(int));
+        cudaMalloc((void**) &d_ranksOutput, numTilesInPieceCol*kdtree.numLeaves*sizeof(int));
         cudaMalloc((void**) &d_LDMBatch, numTilesInPieceCol*sizeof(int));
         cudaMalloc((void**) &d_LDABatch, numTilesInPieceCol*sizeof(int));
         cudaMalloc((void**) &d_LDBBatch, numTilesInPieceCol*sizeof(int));

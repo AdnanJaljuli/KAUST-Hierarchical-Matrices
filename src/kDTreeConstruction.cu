@@ -204,7 +204,7 @@ void constructKDTree(
             fillOffsets <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
         }
 
-        kDTree.numSegments = currentNumSegments;
+        kDTree.numLeaves = currentNumSegments;
         kDTree.numLevels = level + 1;
 
         cudaFree(d_dimxNSegmentOffsets);
