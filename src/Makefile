@@ -30,8 +30,8 @@ LIB = -lcublas -lcuda -lcudadevrt -lcurand -lcusolver -lkblas-gpu -lmagma_sparse
 CC = nvcc
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
-OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o TLRMatrix.o TLRMatrixHelpers.o HMatrix.o HMatrixHelpers.o HMatrixStructure.o generateDataset.o helperFunctions.o constructTLRMatrix.o constructHMatrixFromStruct.o expandMatrix.o HMatrixVectorMultiplication.o cutlassDiagonalXVector.o cutlassHMatrixXVector.o boundingBoxes.o admissibilityFunctions.o
-HDR = config.h counters.h HMatrix.cuh HMatrixHelpers.cuh HMatrixStructure.cuh constructHMatrixFromStruct.cuh TLRMatrix.cuh TLRMatrixHelpers.cuh constructTLRMatrix.cuh expandMatrix.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh HMatrixVectorMultiplication.cuh cutlassDiagonalXVector.cuh cutlassHMatrixXVector.cuh boundingBoxes.h admissibilityFunctions.cuh precision.h
+OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o TLRMatrix.o TLRMatrixHelpers.o HMatrix.o HMatrixHelpers.o HMatrixStructure.o generateDataset.o helperFunctions.o constructTLRMatrix.o constructHMatrixFromStruct.o expandMatrix.o HMatrixVectorMultiplication.o cutlassDiagonalXVector.o cutlassHMatrixXVector.o boundingBoxes.o admissibilityHelpers.o
+HDR = config.h counters.h HMatrix.cuh HMatrixHelpers.cuh HMatrixStructure.cuh constructHMatrixFromStruct.cuh TLRMatrix.cuh TLRMatrixHelpers.cuh constructTLRMatrix.cuh expandMatrix.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh HMatrixVectorMultiplication.cuh cutlassDiagonalXVector.cuh cutlassHMatrixXVector.cuh boundingBoxes.h admissibilityHelpers.cuh admissibilityFunctions.cuh precision.h
 EXE = output
 
 USE_COUNTERS = 0

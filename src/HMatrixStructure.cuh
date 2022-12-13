@@ -2,6 +2,7 @@
 #ifndef HMATRIX_STRUCTURE_H
 #define HMATRIX_STRUCTURE_H
 
+#include "admissibilityFunctions.cuh"
 #include "boundingBoxes.h"
 #include "config.h"
 #include "kDTree.cuh"
@@ -18,11 +19,7 @@ struct HMatrixStructure {
 
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    std::function<bool(
-        BoundingBox,
-        BoundingBox,
-        unsigned int,
-        float)> isAdmissible,
+    Admissibility &admissibility,
     KDTree rowTree,
     KDTree columnTree);
 

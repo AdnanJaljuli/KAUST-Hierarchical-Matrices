@@ -85,7 +85,8 @@ void printMatrixStructure(HMatrixStructure HMatrixStruct) {
         for(auto j = 0; j < HMatrixStruct.numTiles[i]; j++) {
             uint32_t x, y;
             mortonToCM((uint32_t)(HMatrixStruct.tileIndices[i][j]), x, y);
-            fprintf(output_file, "%d, ", x*numTiles + y);
+            fprintf(output_file, "%d, ", x*(1<<i + 1) + y);
+            // fprintf(output_file, "%d, ", HMatrixStruct.tileIndices[i][j]);
         }
         fprintf(output_file, " ], ");
     }

@@ -90,24 +90,32 @@ int main(int argc, char *argv[]) {
     HMatrix hierarchicalMatrix;
     allocateHMatrixStructure(&hierarchicalMatrix.matrixStructure, kDTree.numLevels);
     if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
+        H2Opus_Real eta = 1;
+        BBoxCenterAdmissibility admissibility(eta, kDTree.nDim);
+
         constructHMatrixStructure(
             &hierarchicalMatrix.matrixStructure,
-            &BBoxCenterAdmissibility,
+            admissibility,
             kDTree,
             kDTree);
     }
     else if(config.admissibilityCondition == WEAK_ADMISSIBILITY) {
+
+        WeakAdmissibility admissibility;
         constructHMatrixStructure(
             &hierarchicalMatrix.matrixStructure,
-            &weakAdmissibility,
+            admissibility,
             kDTree,
             kDTree);
     }
-    
+
+
     #if EXPAND_MATRIX
     printKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.divMethod, config.bucketSize, kDTree, d_pointCloud);
     printMatrixStructure(hierarchicalMatrix.matrixStructure);
     #endif
+
+     #if 0
 
     // Build the TLR matrix
     #if USE_COUNTERS
@@ -184,8 +192,6 @@ int main(int argc, char *argv[]) {
     checkErrorInHmatrixVecMult(config.numberOfInputPoints, config.vectorWidth, kDTree.numSegments, d_denseMatrix, d_inputVectors, d_resultVectors);
     #endif
 
-    return 0;
-
     cudaFree(d_inputVectors);
     cudaFree(d_resultVectors);
     freeKDTree(kDTree);
@@ -200,7 +206,11 @@ int main(int argc, char *argv[]) {
     printCountersInFile(config, &counters);
     #endif
 
+    #endif
+
+
     printf("done :)\n");
+
 
     return 0;
 

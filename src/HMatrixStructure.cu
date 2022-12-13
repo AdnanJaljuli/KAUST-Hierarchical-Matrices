@@ -16,11 +16,7 @@ void constructMatrixStruct_recursive(
     unsigned int dimensionOfInputPoints,
     unsigned int currentLevel,
     float eta,
-    std::function<bool(
-        BoundingBox,
-        BoundingBox,
-        unsigned int,
-        float)> isAdmissible) {
+    Admissibility &admissibility) {
 
             unsigned int maxDepth = HMatrixStruct->numLevels - 1;
 
@@ -30,7 +26,7 @@ void constructMatrixStruct_recursive(
             if(isDiagonal && isLeafNode) {
                 return;
             }
-            else if(isLeafNode || isAdmissible(node_u, node_v, dimensionOfInputPoints, eta)) {
+            else if(isLeafNode || admissibility(node_u, node_v)) {
                 // write to HMatrixStruct
                 unsigned int numRows = 1<<currentLevel;
                 unsigned int tileIndex = CMIndextoMOIndex(numRows, node_u.index*numRows + node_v.index);
@@ -48,7 +44,7 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     eta,
-                    isAdmissible);
+                    admissibility);
 
                 constructMatrixStruct_recursive(
                     HMatrixStruct,
@@ -59,7 +55,7 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     eta,
-                    isAdmissible);
+                    admissibility);
 
                 constructMatrixStruct_recursive(
                     HMatrixStruct,
@@ -70,7 +66,7 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     eta,
-                    isAdmissible);
+                    admissibility);
 
                 constructMatrixStruct_recursive(
                     HMatrixStruct,
@@ -81,17 +77,13 @@ void constructMatrixStruct_recursive(
                     dimensionOfInputPoints,
                     currentLevel + 1,
                     eta,
-                    isAdmissible);
+                    admissibility);
             }
 }
 
 void constructMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    std::function<bool(
-        BoundingBox,
-        BoundingBox,
-        unsigned int,
-        float)> isAdmissible,
+    Admissibility &admissibility,
     KDTreeBoundingBoxes BBoxTree1,
     KDTreeBoundingBoxes BBoxTree2,
     unsigned int dimensionOfInputPoints,
@@ -106,23 +98,19 @@ void constructMatrixStructure(
             dimensionOfInputPoints,
             0,
             eta,
-            isAdmissible);
+            admissibility);
 }
 
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    std::function<bool(
-        BoundingBox,
-        BoundingBox,
-        unsigned int,
-        float)> isAdmissible,
+    Admissibility &admissibility,
     KDTree rowTree,
     KDTree columnTree) {
 
         // TODO: place the mallocs below in their own allocateHMatrixStructure function
         constructMatrixStructure(
             HMatrixStruct,
-            isAdmissible,
+            admissibility,
             rowTree.boundingBoxes,
             columnTree.boundingBoxes,
             rowTree.nDim);
@@ -136,9 +124,4 @@ void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numL
 }
 
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct) {
-    // free(HMatrixStruct.numTiles);
-    // for(unsigned int i = 0; i < HMatrixStruct.numLevels - 1; ++i) {
-    //     free(HMatrixStruct.tileIndices[i]);
-    // }
-    // free(HMatrixStruct.tileIndices);
 }
