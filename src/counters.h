@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include "config.h"
 
-enum counterName { TOTAL_TIME = 0, GENERATE_DATASET, KDTREE, TLR_MATRIX, CMTOMO, HMATRIX, NUM_COUNTERS };
+enum counterName { TOTAL_TIME = 0, HMATRIX_STRUCTURE, GENERATE_DATASET, KDTREE, TLR_MATRIX, CMTOMO, HMATRIX, NUM_COUNTERS };
 
 struct Counters {
     cudaEvent_t startEvent[NUM_COUNTERS];

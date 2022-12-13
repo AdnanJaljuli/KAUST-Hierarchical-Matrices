@@ -25,6 +25,6 @@ void constructHMatrixStructure(
 
 void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numLevels);
 
-void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
+void freeHMatrixStructure(HMatrixStructure *HMatrixStruct);
 
 #endif

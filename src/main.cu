@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
     #if USE_COUNTERS
     endTime(GENERATE_DATASET, &counters);
     #endif
+
     #if EXPAND_MATRIX
     printPointCloud(config.N, config.nDim, d_pointCloud);
     #endif
@@ -80,6 +81,9 @@ int main(int argc, char *argv[]) {
     #endif
 
     // create HMatrixStructure
+    #if USE_COUNTERS
+    startTime(HMATRIX_STRUCTURE, &counters);
+    #endif
     HMatrix hierarchicalMatrix;
     allocateHMatrixStructure(&hierarchicalMatrix.matrixStructure, kDTree.numLevels);
     if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
@@ -99,6 +103,9 @@ int main(int argc, char *argv[]) {
             kDTree,
             kDTree);
     }
+    #if USE_COUNTERS
+    endTime(HMATRIX_STRUCTURE, &counters);
+    #endif
 
     #if EXPAND_MATRIX
     printKDTree(config.N, config.nDim, config.divMethod, config.leafSize, kDTree, d_pointCloud);
