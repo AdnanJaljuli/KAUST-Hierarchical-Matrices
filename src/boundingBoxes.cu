@@ -1,5 +1,6 @@
 
 #include "boundingBoxes.h"
+#include "helperKernels.cuh"
 #include "kDTreeHelpers.cuh"
 
 void allocateKDTreeLevelBoundingBox(

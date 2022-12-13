@@ -25,7 +25,7 @@ void printMatrixStructure(HMatrixStructure HMatrixStruct) {
         int numTiles = HMatrixStruct.numTiles[i];
         for(auto j = 0; j < HMatrixStruct.numTiles[i]; j++) {
             uint32_t x, y;
-            morton2CM((uint32_t)(HMatrixStruct.tileIndices[i][j]), x, y);
+            morton2columnMajor((uint32_t)(HMatrixStruct.tileIndices[i][j]), x, y);
             fprintf(output_file, "%d, ", x*(1<<i + 1) + y);
         }
         fprintf(output_file, " ], ");

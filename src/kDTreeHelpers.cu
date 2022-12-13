@@ -104,17 +104,6 @@ __global__ void fillOffsetsReduce(int n, int dim, unsigned int num_segments, int
     }
 }
 
-__device__ __host__ int upperPowerOfTwo(int v) {
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
-}
-
 std::pair<int, int> getMaxSegmentSize(int n, int bucket_size){
     int it=0;
     while(n > bucket_size){

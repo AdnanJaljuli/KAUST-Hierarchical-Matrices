@@ -108,7 +108,7 @@ static __host__ __device__ int columnMajor2Morton(int numSegments, int n){
     return ij2Morton(j, i);
 }
 
-static __host__ __device__ uint32_t morton2CM_helper(uint32_t x)
+static __host__ __device__ uint32_t morton2columnMajor_helper(uint32_t x)
 {
     x = x & 0x55555555;
     x = (x | (x >> 1)) & 0x33333333;
@@ -118,9 +118,20 @@ static __host__ __device__ uint32_t morton2CM_helper(uint32_t x)
     return x;
 }
 
-static __host__ __device__ void morton2CM(uint32_t d, uint32_t &x, uint32_t &y) {
-    x = morton2CM_helper(d);
-    y = morton2CM_helper(d >> 1);
+static __host__ __device__ void morton2columnMajor(uint32_t d, uint32_t &x, uint32_t &y) {
+    x = morton2columnMajor_helper(d);
+    y = morton2columnMajor_helper(d >> 1);
+}
+
+static __device__ __host__ int upperPowerOfTwo(int v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
 }
 
 #endif

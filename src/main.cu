@@ -1,5 +1,6 @@
 
 #include "admissibilityFunctions.cuh"
+#include "buildTLRMatrixPiece.cuh"
 #include "config.h"
 #include "counters.h"
 #include "generateDataset.cuh"

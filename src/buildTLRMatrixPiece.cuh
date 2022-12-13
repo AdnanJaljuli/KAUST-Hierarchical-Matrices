@@ -10,15 +10,8 @@ template <class T>
 void buildTLRMatrixPiece(
     TLR_Matrix *matrix,
     KDTree kdtree,
-    T* d_dataset,
+    T* d_pointDataset,
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
     T tolerance);
-
-template void buildTLRMatrixPiece<H2Opus_Real>(
-    TLR_Matrix *matrix,
-    KDTree kdtree,
-    H2Opus_Real* d_dataset,
-    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
-    H2Opus_Real tolerance);
 
 #endif
