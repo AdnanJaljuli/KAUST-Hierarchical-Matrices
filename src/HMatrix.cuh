@@ -36,7 +36,7 @@ struct HMatrix {
 void allocateHMatrix(HMatrix &matrix, 
     TLR_Matrix mortonOrderedMatrix, 
     int segmentSize, int numSegments, 
-    unsigned int numberOfInputPoints, unsigned int bucketSize, 
+    unsigned int numberOfInputPoints, unsigned int leafSize, 
     HMatrixStructure HMatrixStruct);
 void freeHMatrix(HMatrix &matrix);
 

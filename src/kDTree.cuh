@@ -20,7 +20,7 @@ void allocateKDTree(
     KDTree &tree, 
     unsigned int numberOfInputPoints, 
     unsigned int dimensionOfInputPoints,
-    unsigned int bucketSize,
+    unsigned int leafSize,
     DIVISION_METHOD divMethod);
 
 void freeKDTree(KDTree tree);

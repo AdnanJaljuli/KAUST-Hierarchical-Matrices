@@ -23,10 +23,10 @@ void allocateKDTreeLevelBoundingBox(
 void allocateKDTreeBoundingBoxes(
     KDTreeBoundingBoxes *boxes,
     unsigned int numberOfInputPoints,
-    unsigned int bucketSize,
+    unsigned int leafSize,
     unsigned int dimensionOfInputPoints) {
 
-        unsigned int numLevels = 1 + __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/bucketSize);
+        unsigned int numLevels = 1 + __builtin_ctz(upperPowerOfTwo(numberOfInputPoints)/leafSize);
         boxes->levels = (KDTreeLevelBoundingBoxes*)malloc(numLevels*sizeof(KDTreeLevelBoundingBoxes));
 
         for(unsigned int level = 0; level < numLevels; ++level) {

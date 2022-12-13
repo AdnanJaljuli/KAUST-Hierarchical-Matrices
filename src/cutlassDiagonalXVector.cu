@@ -52,24 +52,24 @@ cudaError_t cutlass_strided_batched_dgemm(
 }
 
 cudaError_t cutlassDiagonalXVec(
-    unsigned int numberOfInputPoints, unsigned int bucketSize, 
+    unsigned int numberOfInputPoints, unsigned int leafSize, 
     unsigned int numSegments, unsigned int vectorWidth, H2Opus_Real *diagonal,
     H2Opus_Real *inputVectors, H2Opus_Real *resultVectors) {
 
-		int const lda = bucketSize;
+		int const lda = leafSize;
 		int const ldb = numberOfInputPoints;
 		int const ldc = numberOfInputPoints;
 
-		long long int batch_stride_A = static_cast<long long int>(bucketSize)*static_cast<long long int>(bucketSize);
-		long long int batch_stride_B = static_cast<long long int>(bucketSize);
-		long long int batch_stride_C = static_cast<long long int>(bucketSize);
+		long long int batch_stride_A = static_cast<long long int>(leafSize)*static_cast<long long int>(leafSize);
+		long long int batch_stride_B = static_cast<long long int>(leafSize);
+		long long int batch_stride_C = static_cast<long long int>(leafSize);
 
 		double alpha = 1;
 		double beta = 0;
 
 		cudaError_t result = cudaSuccess;
 		result = cutlass_strided_batched_dgemm(
-			bucketSize, vectorWidth, bucketSize, alpha, diagonal, lda, batch_stride_A, inputVectors, ldb, batch_stride_B, resultVectors, ldc, batch_stride_C,
+			leafSize, vectorWidth, leafSize, alpha, diagonal, lda, batch_stride_A, inputVectors, ldb, batch_stride_B, resultVectors, ldc, batch_stride_C,
 			beta, numSegments);
 
 		return result;

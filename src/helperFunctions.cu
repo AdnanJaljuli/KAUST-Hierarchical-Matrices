@@ -64,9 +64,9 @@ void generateRandomVector(unsigned int vectorWidth, unsigned int vectorHeight, H
     curandDestroyGenerator(gen);
 }
 
-void generateMaxRanks(unsigned int numLevels, unsigned int bucketSize, unsigned int *maxRanks) {
+void generateMaxRanks(unsigned int numLevels, unsigned int leafSize, unsigned int *maxRanks) {
     for(unsigned int i = 0; i < numLevels - 2; ++i) {
-        maxRanks[i] = bucketSize*(1 << i);
+        maxRanks[i] = leafSize*(1 << i);
         if(i > 5) {
             maxRanks[i]/=4;
         }
@@ -116,16 +116,16 @@ void printPointCloud(unsigned int numberOfInputPoints, unsigned int dimensionOfI
     fclose(output_file);
 }
 
-void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, DIVISION_METHOD divMethod, unsigned int bucketSize, KDTree tree, H2Opus_Real* d_pointCloud) {
+void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, DIVISION_METHOD divMethod, unsigned int leafSize, KDTree tree, H2Opus_Real* d_pointCloud) {
     int *h_segmentIndices = (int*)malloc(numberOfInputPoints*sizeof(int));
     cudaMemcpy(h_segmentIndices, tree.segmentIndices, numberOfInputPoints*sizeof(int), cudaMemcpyDeviceToHost);
 
     int maxNumSegments;
     if(divMethod == FULL_TREE) {
-        maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
+        maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, leafSize).second);
     }
     else {
-        maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
+        maxNumSegments = (numberOfInputPoints + leafSize - 1)/leafSize;
     }   
     int *h_segmentOffsets = (int*)malloc((maxNumSegments + 1)*sizeof(int));
     cudaMemcpy(h_segmentOffsets, tree.segmentOffsets, (maxNumSegments + 1)*sizeof(int), cudaMemcpyDeviceToHost);
@@ -148,7 +148,7 @@ void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInput
     H2Opus_Real *h_pointCloud = (H2Opus_Real*)malloc(numberOfInputPoints*dimensionOfInputPoints*sizeof(H2Opus_Real));
     cudaMemcpy(h_pointCloud, d_pointCloud, numberOfInputPoints*dimensionOfInputPoints*sizeof(H2Opus_Real), cudaMemcpyDeviceToHost);
     fprintf(output_file, "n = %d\n", numberOfInputPoints);
-    fprintf(output_file, "bs = %d\n", bucketSize);
+    fprintf(output_file, "bs = %d\n", leafSize);
     for(unsigned int i = 0; i < dimensionOfInputPoints; ++i) {
         if(i == 0) {
             fprintf(output_file, "X = [");
@@ -157,10 +157,10 @@ void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInput
             fprintf(output_file, "Y = [");
         }
 
-        for(int j = 0; j < numberOfInputPoints/bucketSize; ++j) {
+        for(int j = 0; j < numberOfInputPoints/leafSize; ++j) {
             fprintf(output_file, "[ ");
-            for(unsigned int k = 0; k < bucketSize; ++k) {
-                fprintf(output_file, "%lf, ", h_pointCloud[i*numberOfInputPoints + h_segmentIndices[j*bucketSize + k]]);
+            for(unsigned int k = 0; k < leafSize; ++k) {
+                fprintf(output_file, "%lf, ", h_pointCloud[i*numberOfInputPoints + h_segmentIndices[j*leafSize + k]]);
             }
             fprintf(output_file, "], ");
         }

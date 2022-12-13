@@ -10,7 +10,7 @@
 
 #include <assert.h>
 
-uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int dimensionOfInputPoints, TLR_Matrix &matrix, KDTree kDTree, H2Opus_Real* &d_dataset, float tolerance, int ARA_R) {
+uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned int leafSize, unsigned int dimensionOfInputPoints, TLR_Matrix &matrix, KDTree kDTree, H2Opus_Real* &d_dataset, float tolerance, int ARA_R) {
 
     int maxRank = kDTree.segmentSize/2;
     int *d_rowsBatch, *d_colsBatch, *d_ranks;
@@ -38,7 +38,7 @@ uint64_t createColumnMajorLRMatrix(unsigned int numberOfInputPoints, unsigned in
     kblasCreate(&kblasHandle);
     kblasInitRandState(kblasHandle, &randState, 1 << 15, 0);
     kblasEnableMagma(kblasHandle);
-    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, bucketSize, kDTree.numSegments - 1);
+    kblas_ara_batch_wsquery<H2Opus_Real>(kblasHandle, leafSize, kDTree.numSegments - 1);
     kblasAllocateWorkspace(kblasHandle);
 
     float ARATotalTime = 0;

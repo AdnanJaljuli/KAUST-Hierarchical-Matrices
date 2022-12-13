@@ -6,6 +6,6 @@
 
 typedef double H2Opus_Real;
 
-cudaError_t cutlassHierarchicalXVec(unsigned int numberOfInputPoints, unsigned int  bucketSize, unsigned int  numSegments, unsigned int  vectorWidth, HMatrix hierarchicalMatrix, H2Opus_Real *inputVectors, H2Opus_Real *bufferVectors, H2Opus_Real *resultVectors);
+cudaError_t cutlassHierarchicalXVec(unsigned int numberOfInputPoints, unsigned int  leafSize, unsigned int  numSegments, unsigned int  vectorWidth, HMatrix hierarchicalMatrix, H2Opus_Real *inputVectors, H2Opus_Real *bufferVectors, H2Opus_Real *resultVectors);
 
 #endif

@@ -10,7 +10,7 @@
 #include "TLRMatrix.cuh"
 
 // TODO: break this code into smaller pieces
-void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bucketSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, unsigned int *maxRanks) {
+void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int leafSize, unsigned int numSegments, unsigned int segmentSize, TLR_Matrix mortonOrderedMatrix, int ARA_R, float tolerance, HMatrix hierarchicalMatrix, unsigned int *maxRanks) {
 
     kblasHandle_t kblasHandle;
     kblasRandState_t randState;
@@ -52,7 +52,7 @@ void generateHMatrixFromStruct(unsigned int numberOfInputPoints, unsigned int bu
         generateScanRanks(batchSize, batchUnitSize, mortonOrderedMatrix.blockRanks, d_scanRanks, d_scanRanksPtrs, hierarchicalMatrix.matrixStructure.tileIndices[level - 1].data());
 
         tolerance *= 2;
-        maxRows = batchUnitSize*bucketSize;
+        maxRows = batchUnitSize*leafSize;
         maxCols = maxRows;
         cudaMalloc((void**) &d_ranks, batchSize*sizeof(int)); // TODO: allocate and free outside loop and reuse memory pools across levels
         cudaMalloc((void**) &d_rowsBatch, batchSize*sizeof(int));

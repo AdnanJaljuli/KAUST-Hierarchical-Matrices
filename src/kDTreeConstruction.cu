@@ -14,17 +14,17 @@
 void constructKDTree(
     unsigned int numberOfInputPoints, 
     unsigned int dimensionOfInputPoints, 
-    unsigned int bucketSize, 
+    unsigned int leafSize, 
     KDTree &kDTree, 
     H2Opus_Real* d_pointCloud,
     DIVISION_METHOD divMethod) {
 
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
-            maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
+            maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, leafSize).second);
         }
         else {
-            maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
+            maxNumSegments = (numberOfInputPoints + leafSize - 1)/leafSize;
         }
 
         int *d_dimxNSegmentOffsets;
@@ -96,7 +96,7 @@ void constructKDTree(
 
         unsigned int level = 0;
 
-        while(currentSegmentSize > bucketSize)
+        while(currentSegmentSize > leafSize)
         {
             if(divMethod == POWER_OF_TWO_ON_LEFT) {
                 numThreadsPerBlock = 1024;

@@ -25,7 +25,7 @@ struct KDTreeBoundingBoxes {
 void allocateKDTreeBoundingBoxes(
     KDTreeBoundingBoxes *boxes,
     unsigned int numberOfInputPoints,
-    unsigned int bucketSize,
+    unsigned int leafSize,
     unsigned int dimensionOfInputPoints);
 
 void freeBoundingBoxes(); // TODO

@@ -7,19 +7,19 @@ void allocateKDTree(
     KDTree &tree, 
     unsigned int numberOfInputPoints, 
     unsigned int dimensionOfInputPoints, 
-    unsigned int bucketSize, 
+    unsigned int leafSize, 
     DIVISION_METHOD divMethod) {
 
         tree.N = numberOfInputPoints;
         tree.nDim = dimensionOfInputPoints;
         tree.numSegments = 1;
-        tree.segmentSize = bucketSize;
+        tree.segmentSize = leafSize;
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
-            maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, bucketSize).second);
+            maxNumSegments = 1<<(getMaxSegmentSize(numberOfInputPoints, leafSize).second);
         }
         else {
-            maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
+            maxNumSegments = (numberOfInputPoints + leafSize - 1)/leafSize;
         }
 
         cudaMalloc((void**) &tree.segmentIndices, numberOfInputPoints*sizeof(int)); // TODO: rename to indexMap
@@ -28,7 +28,7 @@ void allocateKDTree(
         allocateKDTreeBoundingBoxes(
             &tree.boundingBoxes,
             numberOfInputPoints,
-            bucketSize,
+            leafSize,
             dimensionOfInputPoints);
 }
 

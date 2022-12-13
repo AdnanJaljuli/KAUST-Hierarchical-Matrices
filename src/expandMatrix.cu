@@ -96,13 +96,13 @@ __global__ void errorInHMatrix(unsigned int numberOfInputPoints, double* denseMa
     }
 }
 
-void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchUnitSize, int bucketSize, HMatrix matrix, H2Opus_Real *denseMatrix, int level) {
+void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchUnitSize, int leafSize, HMatrix matrix, H2Opus_Real *denseMatrix, int level) {
     // expand H matrix level
     H2Opus_Real *d_expandedMatrix;
-    cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*bucketSize*batchUnitSize*bucketSize*sizeof(H2Opus_Real));
+    cudaMalloc((void**) &d_expandedMatrix, batchSize*batchUnitSize*leafSize*batchUnitSize*leafSize*sizeof(H2Opus_Real));
     dim3 m_numThreadsPerBlock(32, 32);
     dim3 m_numBlocks(batchSize, batchUnitSize, batchUnitSize);
-    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrix.levels[level - 1], d_expandedMatrix, batchUnitSize*bucketSize);
+    expandHMatrix <<< m_numBlocks, m_numThreadsPerBlock >>> (matrix.levels[level - 1], d_expandedMatrix, batchUnitSize*leafSize);
 
     int* d_tileIndices;
     cudaMalloc((void**) &d_tileIndices, batchSize*sizeof(int));
@@ -127,7 +127,7 @@ void checkErrorInHMatrixLevel(int numberOfInputPoints, int batchSize, int batchU
     printf("error in hierarchical matrix level %d is: %lf\n", level, sqrt(h_error)/sqrt(h_tmp));
 }
 
-void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
+void checkErrorInHMatrix(int numberOfInputPoints, int leafSize, HMatrix hierarchicalMatrix, H2Opus_Real* d_denseMatrix) {
     
     for(unsigned int level = hierarchicalMatrix.matrixStructure.numLevels - 1; level > 0; --level) {
         int batchSize = hierarchicalMatrix.matrixStructure.numTiles[level - 1];
@@ -135,7 +135,7 @@ void checkErrorInHMatrix(int numberOfInputPoints, int bucketSize, HMatrix hierar
             continue;
         }
         int batchUnitSize = 1 << (hierarchicalMatrix.matrixStructure.numLevels - (level + 1));
-        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, bucketSize, hierarchicalMatrix, d_denseMatrix, level);
+        checkErrorInHMatrixLevel(numberOfInputPoints, batchSize, batchUnitSize, leafSize, hierarchicalMatrix, d_denseMatrix, level);
     }
 }
 

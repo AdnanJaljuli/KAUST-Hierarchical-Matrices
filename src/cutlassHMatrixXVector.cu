@@ -49,7 +49,7 @@ struct Result {
 
 void preprocessGroupedGEMM(
 	unsigned int numberOfInputPoints, unsigned int level, int numLevels,
-	int problemCount, unsigned int bucketSize, unsigned int vectorWidth,
+	int problemCount, unsigned int leafSize, unsigned int vectorWidth,
 	HMatrixLevel matrixLevel, 
 	std::vector<cutlass::gemm::GemmCoord> *h_problemSizes, cutlass::DeviceAllocation<cutlass::gemm::GemmCoord> *d_problemSizes,
 	std::vector<int64_t> *h_lda, std::vector<int64_t> *h_ldb, std::vector<int64_t> *h_ldc,
@@ -65,7 +65,7 @@ void preprocessGroupedGEMM(
 		int previousTileScanRank = 0;
 		for (unsigned int tile = 0; tile < problemCount; ++tile) {
 			int tileRank = h_tileScanRanks[tile] - previousTileScanRank;
-			unsigned int tileDimension = (1<<(numLevels - (level + 1)))*bucketSize;
+			unsigned int tileDimension = (1<<(numLevels - (level + 1)))*leafSize;
 
 			if(iteration == 0) {
 				cutlass::gemm::GemmCoord problem(tileRank, vectorWidth, tileDimension);
@@ -137,9 +137,9 @@ void transposeMatrix(
 	HMatrixLevel matrixLevel, 
 	int numLevels, 
 	int level, 
-	int bucketSize, 
+	int leafSize, 
 	int problemCount){
-		int tileDimension = (1<<(numLevels - (level + 1)))*bucketSize;
+		int tileDimension = (1<<(numLevels - (level + 1)))*leafSize;
 		int matrixSize;
 		cudaMemcpy(&matrixSize, &matrixLevel.tileScanRanks[problemCount - 1], sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -150,7 +150,7 @@ void transposeMatrix(
 }
 
 void VxVector(unsigned int numberOfInputPoints, unsigned int level, int numLevels,
-	int problemCount, unsigned int bucketSize, unsigned int vectorWidth,
+	int problemCount, unsigned int leafSize, unsigned int vectorWidth,
 	HMatrixLevel matrixLevel,
 	std::vector<cutlass::gemm::GemmCoord> *h_problemSizes, cutlass::DeviceAllocation<cutlass::gemm::GemmCoord> *d_problemSizes,
 	std::vector<int64_t> *h_lda, std::vector<int64_t> *h_ldb, std::vector<int64_t> *h_ldc,
@@ -190,10 +190,10 @@ void VxVector(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 
 		// transpose Vs
 		H2Opus_Real *d_VTransposed;
-		transposeMatrix(d_VTransposed, matrixLevel, numLevels, level, bucketSize, problemCount);
+		transposeMatrix(d_VTransposed, matrixLevel, numLevels, level, leafSize, problemCount);
 
 		preprocessGroupedGEMM(numberOfInputPoints, level, numLevels,
-			problemCount, bucketSize, vectorWidth,
+			problemCount, leafSize, vectorWidth,
 			matrixLevel,
 			h_problemSizes, d_problemSizes,
 			h_lda, h_ldb, h_ldc,
@@ -245,7 +245,7 @@ void VxVector(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 }
 
 void UxResult(unsigned int numberOfInputPoints, unsigned int level, int numLevels,
-	int problemCount, unsigned int bucketSize, unsigned int vectorWidth,
+	int problemCount, unsigned int leafSize, unsigned int vectorWidth,
 	HMatrixLevel matrixLevel,
 	std::vector<cutlass::gemm::GemmCoord> *h_problemSizes, cutlass::DeviceAllocation<cutlass::gemm::GemmCoord> *d_problemSizes,
 	std::vector<int64_t> *h_lda, std::vector<int64_t> *h_ldb, std::vector<int64_t> *h_ldc,
@@ -283,7 +283,7 @@ void UxResult(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 
 		using Gemm = cutlass::gemm::device::GemmGrouped<GemmKernel>;
 		preprocessGroupedGEMM(numberOfInputPoints, level, numLevels,
-			problemCount, bucketSize, vectorWidth,
+			problemCount, leafSize, vectorWidth,
 			matrixLevel,
 			h_problemSizes, d_problemSizes,
 			h_lda, h_ldb, h_ldc,
@@ -328,7 +328,7 @@ void UxResult(unsigned int numberOfInputPoints, unsigned int level, int numLevel
 }
 
 cudaError_t cutlassHierarchicalXVec(
-    unsigned int numberOfInputPoints, unsigned int  bucketSize, 
+    unsigned int numberOfInputPoints, unsigned int  leafSize, 
     unsigned int  numSegments, unsigned int vectorWidth, HMatrix hierarchicalMatrix,
     H2Opus_Real *inputVectors, H2Opus_Real *bufferVectors, H2Opus_Real *resultVectors) {
 
@@ -371,7 +371,7 @@ cudaError_t cutlassHierarchicalXVec(
 			ptr_C.reset(problemCount);
 			
 			VxVector(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
-				problemCount, bucketSize, vectorWidth,
+				problemCount, leafSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
 				&h_problemSizes, &d_problemSizes,
 				&h_lda, &h_ldb, &h_ldc,
@@ -382,7 +382,7 @@ cudaError_t cutlassHierarchicalXVec(
 			h_problemSizes.clear();
 
 			UxResult(numberOfInputPoints, level, hierarchicalMatrix.matrixStructure.numLevels,
-				problemCount, bucketSize, vectorWidth,
+				problemCount, leafSize, vectorWidth,
 				hierarchicalMatrix.levels[level - 1],
 				&h_problemSizes, &d_problemSizes,
 				&h_lda, &h_ldb, &h_ldc,

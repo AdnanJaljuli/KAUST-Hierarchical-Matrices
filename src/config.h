@@ -111,7 +111,7 @@ struct Config {
     ADMISSIBILITY_CONDITION admissibilityCondition;
     unsigned int numberOfInputPoints;
     unsigned int dimensionOfInputPoints;
-    unsigned int bucketSize;
+    unsigned int leafSize;
     unsigned int vectorWidth;
     float lowestLevelTolerance;
 };
@@ -122,7 +122,7 @@ static Config parseArgs(int argc, char **argv) {
     config.admissibilityCondition = WEAK_ADMISSIBILITY;
     config.numberOfInputPoints = 1024;
     config.dimensionOfInputPoints = 2;
-    config.bucketSize = 32;
+    config.leafSize = 32;
     config.vectorWidth = 16;
     config.lowestLevelTolerance = 1e-5;
 
@@ -143,7 +143,7 @@ static Config parseArgs(int argc, char **argv) {
             config.dimensionOfInputPoints = atoi(optarg);
             break;
         case 'b':
-            config.bucketSize = atoi(optarg);
+            config.leafSize = atoi(optarg);
             break;
         case 'v':
             config.vectorWidth = atoi(optarg);
@@ -168,7 +168,7 @@ static void printArgs(Config config) {
     cudaGetDeviceProperties(&prop, 0);
     printf("\nDevice name: %s\n\n", prop.name);
     printf("number of points: %d\n", config.numberOfInputPoints);
-    printf("bucket size: %d\n", config.bucketSize);
+    printf("bucket size: %d\n", config.leafSize);
     printf("lowest level tolerance: %f\n", config.lowestLevelTolerance);
     printf("dimension of input points: %d\n", config.dimensionOfInputPoints);
     printf("vector width: %u\n", config.vectorWidth);
