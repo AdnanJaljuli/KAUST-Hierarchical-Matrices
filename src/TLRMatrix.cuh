@@ -12,9 +12,9 @@ enum Ordering {COLUMN_MAJOR, MORTON};
 
 struct TLR_Matrix {
     Ordering ordering;
-    unsigned int blockSize;
-    unsigned int numBlocksInAxis;
-    thrust::device_vector<int> d_blockOffsets;
+    unsigned int tileSize;
+    unsigned int numTilesInAxis;
+    thrust::device_vector<int> d_tileOffsets;
     thrust::device_vector<H2Opus_Real> d_U;
     thrust::device_vector<H2Opus_Real> d_V;
     thrust::device_vector<H2Opus_Real> d_diagonal;

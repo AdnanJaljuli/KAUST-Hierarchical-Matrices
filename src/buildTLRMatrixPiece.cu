@@ -2,6 +2,7 @@
 #include "buildTLRMatrixPiece.cuh"
 #include "helperKernels.cuh"
 #include "kDTree.cuh"
+#include "magma_auxiliary.h"
 
 bool isPieceDiagonal(unsigned int pieceMortonIndex);
 
@@ -13,11 +14,13 @@ void buildTLRMatrixPiece(
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
     T tolerance) {
 
-        bool isDiagonal = isPieceDiagonal(pieceMortonIndex);
-        unsigned int numTilesInPieceRow = (upperPowerOfTwo(kdtree.N)/numPiecesInAxis)/kdtree.leafSize;
-        unsigned int numTilesInPieceCol = isDiagonal ? numTilesInPieceRow : numTilesInPieceRow - 1;
+        magma_init();
 
-        int maxRank = kdtree.leafSize>>1;
+        matrix->tileSize = kdtree.leafSize;
+        unsigned int numTilesInPieceRow = (upperPowerOfTwo(kdtree.N)/numPiecesInAxis)/matrix->tileSize;
+        unsigned int numTilesInPieceCol = isPieceDiagonal(pieceMortonIndex) ? numTilesInPieceRow : numTilesInPieceRow - 1;
+
+        int maxRank = matrix->tileSize>>1;
         int *d_rowsBatch, *d_colsBatch, *d_ranksOutput;
         int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
         T *d_UOutput, *d_VOutput;
@@ -29,11 +32,21 @@ void buildTLRMatrixPiece(
         cudaMalloc((void**) &d_LDMBatch, numTilesInPieceCol*sizeof(int));
         cudaMalloc((void**) &d_LDABatch, numTilesInPieceCol*sizeof(int));
         cudaMalloc((void**) &d_LDBBatch, numTilesInPieceCol*sizeof(int));
-        cudaMalloc((void**) &d_UOutput, numTilesInPieceCol*kdtree.leafSize*maxRank*sizeof(T));
-        cudaMalloc((void**) &d_VOutput, numTilesInPieceCol*kdtree.leafSize*maxRank*sizeof(T));
+        cudaMalloc((void**) &d_UOutput, numTilesInPieceCol*matrix->tileSize*maxRank*sizeof(T));
+        cudaMalloc((void**) &d_VOutput, numTilesInPieceCol*matrix->tileSize*maxRank*sizeof(T));
         cudaMalloc((void**) &d_MPtrs, numTilesInPieceCol*sizeof(T*));
         cudaMalloc((void**) &d_UOutputPtrs, numTilesInPieceCol*sizeof(T*));
         cudaMalloc((void**) &d_VOutputPtrs, numTilesInPieceCol*sizeof(T*));
+
+        kblasHandle_t kblasHandle;
+        kblasRandState_t randState;
+        kblasCreate(&kblasHandle);
+        kblasInitRandState(kblasHandle, &randState, 1 << 15, 0);
+        kblasEnableMagma(kblasHandle);
+        kblas_ara_batch_wsquery<T>(kblasHandle, matrix->tileSize, numTilesInPieceCol);
+        kblasAllocateWorkspace(kblasHandle);
+
+        magma_finalize();
 }
 
 bool isPieceDiagonal(unsigned int pieceMortonIndex) {
