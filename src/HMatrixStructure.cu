@@ -1,6 +1,6 @@
 
 #include "HMatrixStructure.cuh"
-#include "admissibilityCondition.cuh"
+#include "admissibilityFunctions.cuh"
 #include "helperKernels.cuh"
 #include "kDTreeHelpers.cuh"
 
@@ -82,7 +82,6 @@ void constructMatrixStruct_recursive(
                     currentLevel + 1,
                     eta,
                     isAdmissible);
-
             }
 }
 

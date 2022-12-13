@@ -1,5 +1,5 @@
 
-#include "admissibilityCondition.cuh"
+#include "admissibilityFunctions.cuh"
 #include "boundingBoxes.h"
 #include "precision.h"
 #include <stdio.h>

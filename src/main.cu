@@ -1,5 +1,5 @@
 
-#include "admissibilityCondition.cuh"
+#include "admissibilityFunctions.cuh"
 #include "config.h"
 #include "counters.h"
 #include "constructTLRMatrix.cuh"
@@ -109,8 +109,6 @@ int main(int argc, char *argv[]) {
     printMatrixStructure(hierarchicalMatrix.matrixStructure);
     #endif
 
-    return 0;
-
     // Build the TLR matrix
     #if USE_COUNTERS
     startTime(TLR_MATRIX, &counters);
@@ -185,6 +183,8 @@ int main(int argc, char *argv[]) {
     #if EXPAND_MATRIX
     checkErrorInHmatrixVecMult(config.numberOfInputPoints, config.vectorWidth, kDTree.numSegments, d_denseMatrix, d_inputVectors, d_resultVectors);
     #endif
+
+    return 0;
 
     cudaFree(d_inputVectors);
     cudaFree(d_resultVectors);

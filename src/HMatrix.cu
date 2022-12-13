@@ -1,6 +1,6 @@
 
 #include "HMatrix.cuh"
-#include "admissibilityCondition.cuh"
+#include "admissibilityFunctions.cuh"
 #include "boundingBoxes.h"
 #include "config.h"
 #include "helperKernels.cuh"
