@@ -10,6 +10,8 @@ void allocateKDTree(
     unsigned int bucketSize, 
     DIVISION_METHOD divMethod) {
 
+        tree.N = numberOfInputPoints;
+        tree.nDim = dimensionOfInputPoints;
         tree.numSegments = 1;
         tree.segmentSize = bucketSize;
         int maxNumSegments;
@@ -19,7 +21,7 @@ void allocateKDTree(
         else {
             maxNumSegments = (numberOfInputPoints + bucketSize - 1)/bucketSize;
         }
-        
+
         cudaMalloc((void**) &tree.segmentIndices, numberOfInputPoints*sizeof(int)); // TODO: rename to indexMap
         cudaMalloc((void**) &tree.segmentOffsets, (maxNumSegments + 1)*sizeof(int));
 

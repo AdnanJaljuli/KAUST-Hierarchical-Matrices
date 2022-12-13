@@ -2,8 +2,9 @@
 #ifndef HMATRIX_STRUCTURE_H
 #define HMATRIX_STRUCTURE_H
 
-#include "config.h"
 #include "boundingBoxes.h"
+#include "config.h"
+#include "kDTree.cuh"
 
 struct HMatrixStructure {
     int numLevels;
@@ -14,12 +15,9 @@ struct HMatrixStructure {
 
 void constructHMatrixStructure(
     HMatrixStructure *HMatrixStruct,
-    unsigned int numberOfInputPoints,
-    unsigned int dimensionOfInputPoints, 
-    unsigned int bucketSize,
     ADMISSIBILITY_CONDITION admissibilityCondition,
-    KDTreeBoundingBoxes BBox1,
-    KDTreeBoundingBoxes BBox2);
+    KDTree rowTree,
+    KDTree columnTree);
 void freeHMatrixStructure(HMatrixStructure &HMatrixStruct);
 
 #endif

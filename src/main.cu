@@ -89,12 +89,9 @@ int main(int argc, char *argv[]) {
     HMatrix hierarchicalMatrix;
     constructHMatrixStructure(
         &hierarchicalMatrix.matrixStructure,
-        upperPowerOfTwo(config.numberOfInputPoints),
-        config.dimensionOfInputPoints,
-        config.bucketSize,
         config.admissibilityCondition,
-        kDTree.boundingBoxes,
-        kDTree.boundingBoxes);
+        kDTree,
+        kDTree);
 
     #if EXPAND_MATRIX
     printKDTree(config.numberOfInputPoints, config.dimensionOfInputPoints, config.divMethod, config.bucketSize, kDTree, d_pointCloud);

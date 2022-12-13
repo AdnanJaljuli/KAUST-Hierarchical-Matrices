@@ -7,6 +7,8 @@
 
 struct KDTree {
     unsigned int numLevels;
+    unsigned int N;
+    unsigned int nDim;
     unsigned int numSegments;
     unsigned int segmentSize;
     int *segmentIndices;
