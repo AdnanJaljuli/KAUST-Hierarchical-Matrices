@@ -110,13 +110,16 @@ int main(int argc, char *argv[]) {
     // build TLR piece
     TLR_Matrix TLRMatrix;
     TLRMatrix.ordering = COLUMN_MAJOR;
-    buildTLRMatrixPiece <H2Opus_Real> (
-        &TLRMatrix,
-        kDTree,
-        d_pointCloud,
-        1, 2,
-        config.lowestLevelTolerance);
 
+    for(unsigned int i = 0; i < 4; ++i) {
+        buildTLRMatrixPiece <H2Opus_Real> (
+            &TLRMatrix,
+            kDTree,
+            d_pointCloud,
+            i, 2,
+            config.lowestLevelTolerance);
+
+    }
     freeKDTree(kDTree);
 
     #if USE_COUNTERS

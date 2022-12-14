@@ -17,7 +17,6 @@ struct TLR_Matrix {
     thrust::device_vector<int> d_tileOffsets;
     thrust::device_vector<H2Opus_Real> d_U;
     thrust::device_vector<H2Opus_Real> d_V;
-    thrust::device_vector<H2Opus_Real> d_diagonal;
 };
 
 // TODO: have an allocateMatrix function
