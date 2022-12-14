@@ -5,14 +5,14 @@
 __global__ void initIndexMap(unsigned int numberOfInputPoints, KDTree kDTree) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numberOfInputPoints) {
-        kDTree.segmentIndices[i] = i;
+        kDTree.leafIndices[i] = i;
     }
 }
 
 __global__ void initIndexMap(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, KDTree tree, int* input_search, int *d_dimxNLeafOffsets) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numberOfInputPoints) {
-        tree.segmentIndices[i] = i;
+        tree.leafIndices[i] = i;
         input_search[i] = i;
     }
     

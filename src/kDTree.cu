@@ -22,7 +22,7 @@ void allocateKDTree(
             maxNumSegments = (numberOfInputPoints + leafSize - 1)/leafSize;
         }
 
-        cudaMalloc((void**) &tree.segmentIndices, numberOfInputPoints*sizeof(int)); // TODO: rename to indexMap
+        cudaMalloc((void**) &tree.leafIndices, numberOfInputPoints*sizeof(int)); // TODO: rename to indexMap
         cudaMalloc((void**) &tree.leafOffsets, (maxNumSegments + 1)*sizeof(int));
 
         allocateKDTreeBoundingBoxes(
@@ -33,6 +33,6 @@ void allocateKDTree(
 }
 
 void freeKDTree(KDTree tree){
-    cudaFree(tree.segmentIndices);
+    cudaFree(tree.leafIndices);
     cudaFree(tree.leafOffsets);
 }

@@ -48,8 +48,8 @@ void printPointCloud(unsigned int numberOfInputPoints, unsigned int dimensionOfI
 }
 
 void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, DIVISION_METHOD divMethod, unsigned int leafSize, KDTree tree, H2Opus_Real* d_pointCloud) {
-    int *h_segmentIndices = (int*)malloc(numberOfInputPoints*sizeof(int));
-    cudaMemcpy(h_segmentIndices, tree.segmentIndices, numberOfInputPoints*sizeof(int), cudaMemcpyDeviceToHost);
+    int *h_leafIndices = (int*)malloc(numberOfInputPoints*sizeof(int));
+    cudaMemcpy(h_leafIndices, tree.leafIndices, numberOfInputPoints*sizeof(int), cudaMemcpyDeviceToHost);
 
     int maxNumSegments;
     if(divMethod == FULL_TREE) {
@@ -63,9 +63,9 @@ void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInput
 
     char filename[100] = "results/kdtree.txt";
     FILE *output_file = fopen(filename, "w");
-    fprintf(output_file, "segmentIndices\n");
+    fprintf(output_file, "leafIndices\n");
     for(unsigned int i = 0; i < numberOfInputPoints; ++i) {
-        fprintf(output_file, "%d ", h_segmentIndices[i]);
+        fprintf(output_file, "%d ", h_leafIndices[i]);
     }
     fprintf(output_file, "\n\n");
     fprintf(output_file, "leafOffsets\n");
@@ -89,7 +89,7 @@ void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInput
         for(int j = 0; j < numberOfInputPoints/leafSize; ++j) {
             fprintf(output_file, "[ ");
             for(unsigned int k = 0; k < leafSize; ++k) {
-                fprintf(output_file, "%lf, ", h_pointCloud[i*numberOfInputPoints + h_segmentIndices[j*leafSize + k]]);
+                fprintf(output_file, "%lf, ", h_pointCloud[i*numberOfInputPoints + h_leafIndices[j*leafSize + k]]);
             }
             fprintf(output_file, "], ");
         }

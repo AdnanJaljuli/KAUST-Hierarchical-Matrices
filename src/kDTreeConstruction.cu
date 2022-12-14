@@ -103,7 +103,7 @@ void constructKDTree(
 
             numThreadsPerBlock = 1024;
             numBlocks = (kDTree.N*kDTree.nDim + numThreadsPerBlock - 1)/numThreadsPerBlock;
-            fillReductionArray <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, d_pointCloud, kDTree.segmentIndices, d_reduceIn);
+            fillReductionArray <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, d_pointCloud, kDTree.leafIndices, d_reduceIn);
 
             d_tempStorage = NULL;
             tempStorageBytes = 0;
@@ -149,29 +149,29 @@ void constructKDTree(
             numThreadsPerBlock = 1024;
             numBlocks = (kDTree.N + numThreadsPerBlock - 1)/numThreadsPerBlock;
             if(divMethod == POWER_OF_TWO_ON_LEFT) {
-                fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, currentSegmentSize, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud);
+                fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, currentSegmentSize, d_kDTreePoints, d_segmentSpanReduction, kDTree.leafIndices, d_pointCloud);
             }
             else {
                 thrust::device_ptr<int> A = thrust::device_pointer_cast((int *)kDTree.leafOffsets), B = thrust::device_pointer_cast((int *)d_input_search);
                 thrust::device_vector<int> d_bin_search_output(kDTree.N);
                 thrust::upper_bound(A, A + currentNumSegments + 1, B, B + kDTree.N, d_bin_search_output.begin(), thrust::less<int>());
                 d_thrust_v_bin_search_output = thrust::raw_pointer_cast(&d_bin_search_output[0]);
-                fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud, kDTree.leafOffsets, d_thrust_v_bin_search_output);
+                fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, d_kDTreePoints, d_segmentSpanReduction, kDTree.leafIndices, d_pointCloud, kDTree.leafOffsets, d_thrust_v_bin_search_output);
             }
 
             d_tempStorage = NULL;
             tempStorageBytes = 0;
             cub::DeviceSegmentedRadixSort::SortPairs(d_tempStorage, tempStorageBytes,
-                d_kDTreePoints, d_kDTreePointsOutput, kDTree.segmentIndices, d_indexMapOutput,
+                d_kDTreePoints, d_kDTreePointsOutput, kDTree.leafIndices, d_indexMapOutput,
                 kDTree.N, currentNumSegments, kDTree.leafOffsets, kDTree.leafOffsets + 1);
             cudaMalloc(&d_tempStorage, tempStorageBytes);
             cub::DeviceSegmentedRadixSort::SortPairs(d_tempStorage, tempStorageBytes,
-                d_kDTreePoints, d_kDTreePointsOutput, kDTree.segmentIndices, d_indexMapOutput,
+                d_kDTreePoints, d_kDTreePointsOutput, kDTree.leafIndices, d_indexMapOutput,
                 kDTree.N, currentNumSegments, kDTree.leafOffsets, kDTree.leafOffsets + 1);
             cudaFree(d_tempStorage);
 
-            d_temp = kDTree.segmentIndices;
-            kDTree.segmentIndices = d_indexMapOutput;
+            d_temp = kDTree.leafIndices;
+            kDTree.leafIndices = d_indexMapOutput;
             d_indexMapOutput = d_temp;
 
             if(divMethod == POWER_OF_TWO_ON_LEFT) {
