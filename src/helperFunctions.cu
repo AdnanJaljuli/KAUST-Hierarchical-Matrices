@@ -5,15 +5,6 @@
 #include "kDTreeHelpers.cuh"
 #include <curand.h>
 
-void generateMaxRanks(unsigned int numLevels, unsigned int leafSize, unsigned int *maxRanks) {
-    for(unsigned int i = 0; i < numLevels - 2; ++i) {
-        maxRanks[i] = leafSize*(1 << i);
-        if(i > 5) {
-            maxRanks[i]/=4;
-        }
-    }
-}
-
 void printMatrixStructure(HMatrixStructure HMatrixStruct) {
     char filename[100] = "results/hmatrixstructure.txt";
     FILE *output_file = fopen(filename, "w");
@@ -67,8 +58,8 @@ void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInput
     else {
         maxNumSegments = (numberOfInputPoints + leafSize - 1)/leafSize;
     }   
-    int *h_segmentOffsets = (int*)malloc((maxNumSegments + 1)*sizeof(int));
-    cudaMemcpy(h_segmentOffsets, tree.segmentOffsets, (maxNumSegments + 1)*sizeof(int), cudaMemcpyDeviceToHost);
+    int *h_leafOffsets = (int*)malloc((maxNumSegments + 1)*sizeof(int));
+    cudaMemcpy(h_leafOffsets, tree.leafOffsets, (maxNumSegments + 1)*sizeof(int), cudaMemcpyDeviceToHost);
 
     char filename[100] = "results/kdtree.txt";
     FILE *output_file = fopen(filename, "w");
@@ -77,9 +68,9 @@ void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInput
         fprintf(output_file, "%d ", h_segmentIndices[i]);
     }
     fprintf(output_file, "\n\n");
-    fprintf(output_file, "segmentOffsets\n");
+    fprintf(output_file, "leafOffsets\n");
     for(unsigned int i = 0; i < (maxNumSegments + 1); ++i) {
-        fprintf(output_file, "%d ", h_segmentOffsets[i]);
+        fprintf(output_file, "%d ", h_leafOffsets[i]);
     }
     fprintf(output_file, "\n\n\n");
 

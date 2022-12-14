@@ -24,7 +24,7 @@ void constructKDTree(
             maxNumSegments = (kDTree.N + kDTree.leafSize - 1)/kDTree.leafSize;
         }
 
-        int *d_dimxNSegmentOffsets;
+        int *d_dimxNLeafOffsets;
         H2Opus_Real *d_kDTreePoints;
         H2Opus_Real *d_kDTreePointsOutput;
         int  *d_indexMapOutput;
@@ -42,7 +42,7 @@ void constructKDTree(
         int* d_input_search;
         int* d_aux_offsets_sort;
 
-        cudaMalloc((void**) &d_dimxNSegmentOffsets, (maxNumSegments*kDTree.nDim + 1)*sizeof(int));
+        cudaMalloc((void**) &d_dimxNLeafOffsets, (maxNumSegments*kDTree.nDim + 1)*sizeof(int));
         cudaMalloc((void**) &d_kDTreePoints, kDTree.N*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_kDTreePointsOutput, kDTree.N*sizeof(H2Opus_Real));
         cudaMalloc((void**) &d_indexMapOutput, kDTree.N*sizeof(int));
@@ -88,7 +88,7 @@ void constructKDTree(
             initIndexMap <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree);
         }
         else {
-            initIndexMap <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, kDTree, d_input_search, d_dimxNSegmentOffsets);
+            initIndexMap <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, kDTree, d_input_search, d_dimxNLeafOffsets);
         }
 
         unsigned int level = 0;
@@ -98,7 +98,7 @@ void constructKDTree(
             if(divMethod == POWER_OF_TWO_ON_LEFT) {
                 numThreadsPerBlock = 1024;
                 numBlocks = (currentNumSegments + 1 + numThreadsPerBlock - 1)/numThreadsPerBlock;
-                fillOffsets <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
+                fillOffsets <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, currentSegmentSize, kDTree, d_dimxNLeafOffsets);
             }
 
             numThreadsPerBlock = 1024;
@@ -108,19 +108,19 @@ void constructKDTree(
             d_tempStorage = NULL;
             tempStorageBytes = 0;
             cub::DeviceSegmentedReduce::Min(d_tempStorage, tempStorageBytes, d_reduceIn, d_minSegmentItem,
-                numSegmentsReduce, d_dimxNSegmentOffsets, d_dimxNSegmentOffsets + 1);
+                numSegmentsReduce, d_dimxNLeafOffsets, d_dimxNLeafOffsets + 1);
             cudaMalloc(&d_tempStorage, tempStorageBytes);
             cub::DeviceSegmentedReduce::Min(d_tempStorage, tempStorageBytes, d_reduceIn, d_minSegmentItem,
-                numSegmentsReduce, d_dimxNSegmentOffsets, d_dimxNSegmentOffsets + 1);
+                numSegmentsReduce, d_dimxNLeafOffsets, d_dimxNLeafOffsets + 1);
             cudaFree(d_tempStorage);
 
             d_tempStorage = NULL;
             tempStorageBytes = 0;
             cub::DeviceSegmentedReduce::Max(d_tempStorage, tempStorageBytes, d_reduceIn, d_maxSegmentItem,
-                numSegmentsReduce, d_dimxNSegmentOffsets, d_dimxNSegmentOffsets + 1);
+                numSegmentsReduce, d_dimxNLeafOffsets, d_dimxNLeafOffsets + 1);
             cudaMalloc(&d_tempStorage, tempStorageBytes);
             cub::DeviceSegmentedReduce::Max(d_tempStorage, tempStorageBytes, d_reduceIn, d_maxSegmentItem,
-                numSegmentsReduce, d_dimxNSegmentOffsets, d_dimxNSegmentOffsets + 1);
+                numSegmentsReduce, d_dimxNLeafOffsets, d_dimxNLeafOffsets + 1);
             cudaFree(d_tempStorage);
 
             // copy segmented min and max to bounding boxes
@@ -152,22 +152,22 @@ void constructKDTree(
                 fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, currentSegmentSize, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud);
             }
             else {
-                thrust::device_ptr<int> A = thrust::device_pointer_cast((int *)kDTree.segmentOffsets), B = thrust::device_pointer_cast((int *)d_input_search);
+                thrust::device_ptr<int> A = thrust::device_pointer_cast((int *)kDTree.leafOffsets), B = thrust::device_pointer_cast((int *)d_input_search);
                 thrust::device_vector<int> d_bin_search_output(kDTree.N);
                 thrust::upper_bound(A, A + currentNumSegments + 1, B, B + kDTree.N, d_bin_search_output.begin(), thrust::less<int>());
                 d_thrust_v_bin_search_output = thrust::raw_pointer_cast(&d_bin_search_output[0]);
-                fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud, kDTree.segmentOffsets, d_thrust_v_bin_search_output);
+                fillKeysIn <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, d_kDTreePoints, d_segmentSpanReduction, kDTree.segmentIndices, d_pointCloud, kDTree.leafOffsets, d_thrust_v_bin_search_output);
             }
 
             d_tempStorage = NULL;
             tempStorageBytes = 0;
             cub::DeviceSegmentedRadixSort::SortPairs(d_tempStorage, tempStorageBytes,
                 d_kDTreePoints, d_kDTreePointsOutput, kDTree.segmentIndices, d_indexMapOutput,
-                kDTree.N, currentNumSegments, kDTree.segmentOffsets, kDTree.segmentOffsets + 1);
+                kDTree.N, currentNumSegments, kDTree.leafOffsets, kDTree.leafOffsets + 1);
             cudaMalloc(&d_tempStorage, tempStorageBytes);
             cub::DeviceSegmentedRadixSort::SortPairs(d_tempStorage, tempStorageBytes,
                 d_kDTreePoints, d_kDTreePointsOutput, kDTree.segmentIndices, d_indexMapOutput,
-                kDTree.N, currentNumSegments, kDTree.segmentOffsets, kDTree.segmentOffsets + 1);
+                kDTree.N, currentNumSegments, kDTree.leafOffsets, kDTree.leafOffsets + 1);
             cudaFree(d_tempStorage);
 
             d_temp = kDTree.segmentIndices;
@@ -181,16 +181,16 @@ void constructKDTree(
             else {
                 numThreadsPerBlock = 1024;
                 numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
-                fillOffsetsSort <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, kDTree.segmentOffsets, d_aux_offsets_sort);
+                fillOffsetsSort <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, kDTree.leafOffsets, d_aux_offsets_sort);
 
                 d_temp = d_aux_offsets_sort;
-                d_aux_offsets_sort = kDTree.segmentOffsets;
-                kDTree.segmentOffsets = d_temp;
+                d_aux_offsets_sort = kDTree.leafOffsets;
+                kDTree.leafOffsets = d_temp;
                 currentNumSegments *= 2;
 
                 numThreadsPerBlock = 1024;
                 numBlocks = (currentNumSegments + numThreadsPerBlock - 1)/numThreadsPerBlock;
-                fillOffsetsReduce <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, kDTree.segmentOffsets, d_dimxNSegmentOffsets);
+                fillOffsetsReduce <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, kDTree.leafOffsets, d_dimxNLeafOffsets);
 
                 ++currentSegmentSize;
                 currentSegmentSize >>= 1;
@@ -201,13 +201,13 @@ void constructKDTree(
         }
 
         if(divMethod == POWER_OF_TWO_ON_LEFT) {
-            fillOffsets <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, currentSegmentSize, kDTree, d_dimxNSegmentOffsets);
+            fillOffsets <<< numBlocks, numThreadsPerBlock >>> (kDTree.N, kDTree.nDim, currentNumSegments, currentSegmentSize, kDTree, d_dimxNLeafOffsets);
         }
 
         kDTree.numLeaves = currentNumSegments;
         kDTree.numLevels = level + 1;
 
-        cudaFree(d_dimxNSegmentOffsets);
+        cudaFree(d_dimxNLeafOffsets);
         cudaFree(d_kDTreePoints);
         cudaFree(d_kDTreePointsOutput);
         cudaFree(d_indexMapOutput);

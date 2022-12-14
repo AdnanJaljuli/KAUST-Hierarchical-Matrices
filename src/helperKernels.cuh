@@ -19,45 +19,14 @@
 #include <thrust/functional.h>
 #include <thrust/execution_policy.h>
 
-static __global__ void calcMemNeeded(int maxSegmentSize, unsigned int* K, H2Opus_Real* S, float eps){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-
-    __shared__ int k;
-    if(threadIdx.x == 0){
-        k = 0;
-    }
-    __syncthreads();
-
-    if(threadIdx.x < maxSegmentSize){
-        if((S[maxSegmentSize*blockIdx.x + threadIdx.x] / S[maxSegmentSize*blockIdx.x]) > eps){
-            atomicAdd(&k, 1);
-        }
-    }
-    __syncthreads();
-
-    if(threadIdx.x == 0){
-        K[blockIdx.x] = k;
-    }
-}
-
-static __global__ void fillBitVector(int num_segments, uint64_t* bit_vector, int* offsets_sort, int bucket_size){
-    unsigned int i = threadIdx.x + blockDim.x*blockIdx.x;
-    if(i < num_segments){
-        unsigned int pos = i%(sizeof(uint64_t)*8);
-        unsigned int sub = i/(sizeof(uint64_t)*8);
-        if(offsets_sort[i+1] - offsets_sort[i] > bucket_size){
-            atomicOr((unsigned long long*)&bit_vector[sub], 1ULL<<(sizeof(uint64_t)*8-1-pos));
-        }
-    }
-}
-
-static __global__ void printK(int* K, int num_segments){
-    printf("ks\n");
-    for(int i=0; i<num_segments; ++i){
-        printf("%d ", K[i]);
-    }
-    printf("\n");
-}
+// void generateMaxRanks(unsigned int numLevels, unsigned int leafSize, unsigned int *maxRanks) {
+//     for(unsigned int i = 0; i < numLevels - 2; ++i) {
+//         maxRanks[i] = leafSize*(1 << i);
+//         if(i > 5) {
+//             maxRanks[i]/=4;
+//         }
+//     }
+// }
 
 template<class T>
 struct UnaryAoAAssign : public thrust::unary_function<int, T*>

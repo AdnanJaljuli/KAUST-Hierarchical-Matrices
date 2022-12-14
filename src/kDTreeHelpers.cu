@@ -9,7 +9,7 @@ __global__ void initIndexMap(unsigned int numberOfInputPoints, KDTree kDTree) {
     }
 }
 
-__global__ void initIndexMap(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, KDTree tree, int* input_search, int *d_dimxNSegmentOffsets) {
+__global__ void initIndexMap(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, KDTree tree, int* input_search, int *d_dimxNLeafOffsets) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numberOfInputPoints) {
         tree.segmentIndices[i] = i;
@@ -17,26 +17,26 @@ __global__ void initIndexMap(unsigned int numberOfInputPoints, unsigned int dime
     }
     
     if(threadIdx.x == 0 && blockIdx.x == 0){
-        tree.segmentOffsets[0] = 0;
-        tree.segmentOffsets[1] = numberOfInputPoints;
+        tree.leafOffsets[0] = 0;
+        tree.leafOffsets[1] = numberOfInputPoints;
         for(unsigned int j = 0; j < dimensionOfInputPoints + 1; ++j) { //TODO: might have to be <dim+1
-            d_dimxNSegmentOffsets[j] = j*numberOfInputPoints;
+            d_dimxNLeafOffsets[j] = j*numberOfInputPoints;
         }
     }
 }
 
-__global__ void fillOffsets(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int currentNumSegments, unsigned int currentSegmentSize, KDTree kDTree, int* dimxNSegmentOffsets) {
+__global__ void fillOffsets(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, unsigned int currentNumSegments, unsigned int currentSegmentSize, KDTree kDTree, int* dimxNLeafOffsets) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < currentNumSegments + 1){
-        kDTree.segmentOffsets[i] = (i < currentNumSegments) ? (i*currentSegmentSize) : numberOfInputPoints;
+        kDTree.leafOffsets[i] = (i < currentNumSegments) ? (i*currentSegmentSize) : numberOfInputPoints;
 
         if(threadIdx.x == 0 && blockIdx.x == 0){
-            dimxNSegmentOffsets[0] = 0;
+            dimxNLeafOffsets[0] = 0;
         }
 
         for(unsigned int j = 0; j < dimensionOfInputPoints; ++j){
             if(i < currentNumSegments){
-                dimxNSegmentOffsets[j*currentNumSegments + i + 1] = (i + 1 < currentNumSegments) ? ((i + 1)*currentSegmentSize + numberOfInputPoints*j) : numberOfInputPoints*(j + 1);
+                dimxNLeafOffsets[j*currentNumSegments + i + 1] = (i + 1 < currentNumSegments) ? ((i + 1)*currentSegmentSize + numberOfInputPoints*j) : numberOfInputPoints*(j + 1);
             }
         }
     }

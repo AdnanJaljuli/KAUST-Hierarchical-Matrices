@@ -16,7 +16,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     }
 }
 
-void generateMaxRanks(unsigned int numLevels, unsigned int leafSize, unsigned int *maxRanks);
 void printMatrixStructure(HMatrixStructure HMatrixStruct);
 void printPointCloud(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, H2Opus_Real *d_pointCloud);
 void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, DIVISION_METHOD divMethod, unsigned int leafSize, KDTree tree, H2Opus_Real* d_pointCloud);

@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     allocateHMatrixStructure(&hierarchicalMatrix.matrixStructure, kDTree.numLevels);
     if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
         H2Opus_Real eta = 1;
-        BBoxCenterAdmissibility<H2Opus_Real> admissibility(eta, kDTree.nDim);
+        BBoxCenterAdmissibility <H2Opus_Real> admissibility(eta, kDTree.nDim);
         constructHMatrixStructure<H2Opus_Real>(
             &hierarchicalMatrix.matrixStructure,
             admissibility,
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
             kDTree);
     }
     else if(config.admissibilityCondition == WEAK_ADMISSIBILITY) {
-        WeakAdmissibility<H2Opus_Real> admissibility;
+        WeakAdmissibility <H2Opus_Real> admissibility;
         constructHMatrixStructure<H2Opus_Real>(
             &hierarchicalMatrix.matrixStructure,
             admissibility,
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
     // build TLR piece
     TLR_Matrix TLRMatrix;
     TLRMatrix.ordering = COLUMN_MAJOR;
-    buildTLRMatrixPiece<H2Opus_Real> (
+    buildTLRMatrixPiece <H2Opus_Real> (
         &TLRMatrix,
         kDTree,
         d_pointCloud,
