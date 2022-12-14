@@ -23,5 +23,11 @@ void generateDenseTileCol(
     unsigned int numTilesInAxis,
     bool isDiagonal);
 
+__global__ void fillSortBits(
+    unsigned int totalNumElements, 
+    unsigned int numElementsInTile, 
+    int *sortBits, 
+    int *ranks);
+
 
 #endif

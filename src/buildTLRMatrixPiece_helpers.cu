@@ -149,6 +149,19 @@ void generateDenseTileCol(
             isDiagonal);
 }
 
+__global__ void fillSortBits(unsigned int totalNumElements, unsigned int numElementsInTile, int *sortBits, int *ranks) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < totalNumElements) {
+        unsigned int batch = i/numElementsInTile;
+        unsigned int idxInBatch = i%numElementsInTile;
+        if(idxInBatch < ranks[batch]) {
+            sortBits[i] = 1;
+        }
+        else{
+            sortBits[i] = 0;
+        }
+    }
+}
 
 // _______________________________________________Explicit Instantiations_______________________________________________
 
