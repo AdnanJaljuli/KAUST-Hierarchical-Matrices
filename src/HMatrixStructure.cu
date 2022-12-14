@@ -19,63 +19,37 @@ void constructMatrixStruct_recursive(
     unsigned int currentLevel,
     Admissibility<T> &admissibility) {
 
-            unsigned int maxDepth = HMatrixStruct->numLevels - 1;
+        unsigned int maxDepth = HMatrixStruct->numLevels - 1;
 
-            bool isDiagonal = (node_u.index == node_v.index);
-            bool isLeafNode = (currentLevel == maxDepth);
+        bool isDiagonal = (node_u.index == node_v.index);
+        bool isLeafNode = (currentLevel == maxDepth);
 
-            if(isDiagonal && isLeafNode) {
-                return;
+        if(isDiagonal && isLeafNode) {
+            return;
+        }
+        else if(isLeafNode || admissibility(node_u, node_v)) {
+            // write to HMatrixStruct
+            unsigned int numRows = 1<<currentLevel;
+            unsigned int tileIndex = columnMajor2Morton(numRows, node_u.index*numRows + node_v.index);
+            HMatrixStruct->tileIndices.at(currentLevel - 1).push_back(tileIndex);
+            ++HMatrixStruct->numTiles[currentLevel - 1];
+            return;
+        }
+        else {
+            for(unsigned int i = 0; i < 2; ++i) {
+                for(unsigned int j = 0; j < 2; ++j) {
+                    constructMatrixStruct_recursive(
+                        HMatrixStruct,
+                        BBoxTree_u,
+                        BBoxTree_v,
+                        BBoxTree_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index + i],
+                        BBoxTree_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + j],
+                        dimensionOfInputPoints,
+                        currentLevel + 1,
+                        admissibility);
+                }
             }
-            else if(isLeafNode || admissibility(node_u, node_v)) {
-                // write to HMatrixStruct
-                unsigned int numRows = 1<<currentLevel;
-                unsigned int tileIndex = columnMajor2Morton(numRows, node_u.index*numRows + node_v.index);
-                HMatrixStruct->tileIndices.at(currentLevel - 1).push_back(tileIndex);
-                ++HMatrixStruct->numTiles[currentLevel - 1];
-                return;
-            }
-            else {
-                constructMatrixStruct_recursive(
-                    HMatrixStruct,
-                    BBoxTree_u,
-                    BBoxTree_v,
-                    BBoxTree_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index],
-                    BBoxTree_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
-                    dimensionOfInputPoints,
-                    currentLevel + 1,
-                    admissibility);
-
-                constructMatrixStruct_recursive(
-                    HMatrixStruct,
-                    BBoxTree_u,
-                    BBoxTree_v,
-                    BBoxTree_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index + 1],
-                    BBoxTree_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index],
-                    dimensionOfInputPoints,
-                    currentLevel + 1,
-                    admissibility);
-
-                constructMatrixStruct_recursive(
-                    HMatrixStruct,
-                    BBoxTree_u,
-                    BBoxTree_v,
-                    BBoxTree_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index],
-                    BBoxTree_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
-                    dimensionOfInputPoints,
-                    currentLevel + 1,
-                    admissibility);
-
-                constructMatrixStruct_recursive(
-                    HMatrixStruct,
-                    BBoxTree_u,
-                    BBoxTree_v,
-                    BBoxTree_u.levels[currentLevel + 1].boundingBoxes[2*node_u.index + 1],
-                    BBoxTree_v.levels[currentLevel + 1].boundingBoxes[2*node_v.index + 1],
-                    dimensionOfInputPoints,
-                    currentLevel + 1,
-                    admissibility);
-            }
+        }
 }
 
 template <class T>
