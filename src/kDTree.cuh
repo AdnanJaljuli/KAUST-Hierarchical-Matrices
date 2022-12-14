@@ -10,7 +10,7 @@ struct KDTree {
     unsigned int N;
     unsigned int nDim;
     unsigned int numLeaves;
-    unsigned int leafSize;
+    unsigned int maxLeafSize;
     int *leafIndices;
     int *leafOffsets;
     KDTreeBoundingBoxes boundingBoxes;

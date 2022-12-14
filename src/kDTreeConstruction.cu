@@ -18,10 +18,10 @@ void constructKDTree(
 
         int maxNumSegments;
         if(divMethod == FULL_TREE) {
-            maxNumSegments = 1<<(getMaxSegmentSize(kDTree.N, kDTree.leafSize).second);
+            maxNumSegments = 1<<(getMaxSegmentSize(kDTree.N, kDTree.maxLeafSize).second);
         }
         else {
-            maxNumSegments = (kDTree.N + kDTree.leafSize - 1)/kDTree.leafSize;
+            maxNumSegments = (kDTree.N + kDTree.maxLeafSize - 1)/kDTree.maxLeafSize;
         }
 
         int *d_dimxNLeafOffsets;
@@ -93,7 +93,7 @@ void constructKDTree(
 
         unsigned int level = 0;
 
-        while(currentSegmentSize > kDTree.leafSize)
+        while(currentSegmentSize > kDTree.maxLeafSize)
         {
             if(divMethod == POWER_OF_TWO_ON_LEFT) {
                 numThreadsPerBlock = 1024;

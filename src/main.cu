@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
         kDTree,
         d_pointCloud,
         config.divMethod); // TODO: pass a reference to kdtree
-    printf("segment size: %lu\n", kDTree.leafSize);
+    printf("segment size: %lu\n", kDTree.maxLeafSize);
     printf("num segments: %lu\n", kDTree.numLeaves);
     printf("num levels: %d\n", kDTree.numLevels);
     #if USE_COUNTERS
@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
         &TLRMatrix,
         kDTree,
         d_pointCloud,
-        0, 2,
+        1, 2,
         config.lowestLevelTolerance);
 
     freeKDTree(kDTree);

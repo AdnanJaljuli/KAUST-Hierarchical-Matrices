@@ -20,7 +20,6 @@ void constructMatrixStruct_recursive(
     Admissibility<T> &admissibility) {
 
         unsigned int maxDepth = HMatrixStruct->numLevels - 1;
-
         bool isDiagonal = (node_u.index == node_v.index);
         bool isLeafNode = (currentLevel == maxDepth);
 
@@ -38,7 +37,7 @@ void constructMatrixStruct_recursive(
         else {
             for(unsigned int i = 0; i < 2; ++i) {
                 for(unsigned int j = 0; j < 2; ++j) {
-                    constructMatrixStruct_recursive(
+                    constructMatrixStruct_recursive <T> (
                         HMatrixStruct,
                         BBoxTree_u,
                         BBoxTree_v,
@@ -59,11 +58,11 @@ void constructHMatrixStructure(
     KDTree rowTree,
     KDTree columnTree) {
 
-        constructMatrixStruct_recursive(
+        constructMatrixStruct_recursive <T> (
             HMatrixStruct,
             rowTree.boundingBoxes,
             columnTree.boundingBoxes,
-            columnTree.boundingBoxes.levels[0].boundingBoxes[0],
+            rowTree.boundingBoxes.levels[0].boundingBoxes[0],
             columnTree.boundingBoxes.levels[0].boundingBoxes[0],
             rowTree.nDim,
             0,

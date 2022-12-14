@@ -12,6 +12,6 @@ void buildTLRMatrixPiece(
     KDTree kdtree,
     T* d_pointDataset,
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
-    T tolerance);
+    T tol);
 
 #endif
