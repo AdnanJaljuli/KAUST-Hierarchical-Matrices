@@ -3,6 +3,7 @@
 #define BUILD_TLR_MATRIX_PIECE_HELPERS_H
 
 #include "kDTree.cuh"
+#include "TLRMatrix.cuh"
 
 bool isPieceDiagonal(unsigned int pieceMortonIndex);
 
@@ -23,12 +24,12 @@ void generateDenseTileCol(
     unsigned int numTilesInAxis,
     bool isDiagonal);
 
-__global__ void fillSortBits(
-    unsigned int totalNumElements, 
-    unsigned int numElementsInTile, 
-    unsigned int tileSize, 
-    int *sortBits, 
-    int *ranks);
-
+template <class T>
+void copyTiles(
+    TLR_Matrix *matrix, 
+    T *d_UOutput, T *d_VOutput, 
+    int *d_scannedRanks, 
+    int maxRank, 
+    int batchCount);
 
 #endif

@@ -118,7 +118,6 @@ int main(int argc, char *argv[]) {
             d_pointCloud,
             i, 1,
             config.lowestLevelTolerance);
-
     }
     freeKDTree(kDTree);
 

@@ -163,8 +163,46 @@ __global__ void fillSortBits(unsigned int totalNumElements, unsigned int numElem
     }
 }
 
-// _______________________________________________Explicit Instantiations_______________________________________________
+template <class T>
+__global__ void copyTiles(
+    T *UPtr, T *UOutput,
+    T *VPtr, T *VOutput,
+    int *scannedRanks,
+    unsigned int tileSize,
+    unsigned int maxRank) {
 
+        unsigned int previousBlockScanRank = (blockIdx.x == 0) ? 0 : scannedRanks[blockIdx.x - 1];
+        unsigned int blockRank = scannedRanks[blockIdx.x] - previousBlockScanRank;
+        unsigned int numElementsInTile = blockRank*tileSize;
+ 
+        for(unsigned int i = threadIdx.x; i < numElementsInTile; i += blockDim.x) {
+            UPtr[previousBlockScanRank*tileSize + i] = UOutput[blockIdx.x*tileSize*maxRank + i];
+        }
+}
+
+template <class T>
+void copyTiles(
+    TLR_Matrix *matrix, T *d_UOutput, T *d_VOutput, int *d_scannedRanks, int maxRank, int batchCount) {
+
+        T *d_UPtr = thrust::raw_pointer_cast(matrix->d_U.data());
+        T *d_VPtr = thrust::raw_pointer_cast(matrix->d_V.data());
+
+        unsigned int numThreadsPerBlock = matrix->tileSize*2;
+        unsigned int numBlocks = batchCount;
+        copyTiles <T> <<< numBlocks, numThreadsPerBlock >>> (
+            d_UPtr, d_UOutput,
+            d_VPtr, d_VOutput,
+            d_scannedRanks,
+            matrix->tileSize,
+            maxRank);
+}
+
+template void copyTiles <H2Opus_Real> (
+    TLR_Matrix *matrix,
+    H2Opus_Real *d_UOutput, H2Opus_Real *d_VOutput,
+    int *d_scannedRanks,
+    int maxRank,
+    int batchCount);
 
 template void generateDenseTileCol <H2Opus_Real> (
     H2Opus_Real *d_denseTileCol, 

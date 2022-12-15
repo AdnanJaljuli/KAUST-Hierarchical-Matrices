@@ -32,11 +32,7 @@ void buildTLRMatrixPiece(
 
         magma_init();
 
-        int *d_tmpRankSum, *d_tmpRankSum2;
-        cudaMalloc((void**) &d_tmpRankSum, sizeof(int));
-        cudaMalloc((void**) &d_tmpRankSum2, sizeof(int));
-        uint64_t rankSum = 0;
-        int totalMem;
+        uint64_t totalRankSum = 0;
         int ARA_R = 10;
         matrix->tileSize = kdtree.maxLeafSize;
         matrix->numTilesInAxis = (upperPowerOfTwo(kdtree.N)/numPiecesInAxis)/matrix->tileSize;
@@ -46,8 +42,6 @@ void buildTLRMatrixPiece(
         assert(numPiecesInAxis <= matrix->numTilesInAxis);
         printf("maxrank : %d\n", maxRank);
         printf("batch count: %d  isDiagonal: %d  tile size: %d  numTilesInAxis: %d\n", batchCount, isDiagonal, matrix->tileSize, matrix->numTilesInAxis);
-
-        thrust::device_vector<int> d_sortBits(batchCount*maxRank*matrix->tileSize);
 
         int *d_rowsBatch, *d_colsBatch, *d_ranksOutput;
         int *d_LDMBatch, *d_LDABatch, *d_LDBBatch;
@@ -79,9 +73,9 @@ void buildTLRMatrixPiece(
         kblasAllocateWorkspace(kblasHandle);
 
         T *d_denseTileCol;
-        int* d_colScanRanks;
+        int* d_scannedRanks;
         cudaMalloc((void**) &d_denseTileCol, batchCount*matrix->tileSize*matrix->tileSize*sizeof(T));
-        cudaMalloc((void**) &d_colScanRanks, batchCount*sizeof(int));
+        cudaMalloc((void**) &d_scannedRanks, batchCount*sizeof(int));
 
         for(unsigned int tileColIdx = 0; tileColIdx < matrix->numTilesInAxis; ++tileColIdx) {
             generateDenseTileCol <T> (
@@ -106,58 +100,31 @@ void buildTLRMatrixPiece(
                 tol, matrix->tileSize, matrix->tileSize, maxRank, 16, ARA_R, randState, 0, batchCount);
             assert(kblas_ara_return == 1);
 
-            unsigned int numThreadsPerBlock = 1024;
-            unsigned int numBlocks = (batchCount*maxRank*matrix->tileSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
-            int *d_sortBitsPtr = thrust::raw_pointer_cast(d_sortBits.data());
-            fillSortBits <<< numBlocks, numThreadsPerBlock >>> 
-                (batchCount*maxRank*matrix->tileSize, maxRank*matrix->tileSize, matrix->tileSize, d_sortBitsPtr, d_ranksOutput + tileColIdx*batchCount);
-
-            void *d_temp_storage = nullptr;
+            void *d_temp_storage = NULL;
             size_t temp_storage_bytes = 0;
-            cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, d_ranksOutput + tileColIdx*batchCount, d_tmpRankSum, batchCount);
+            cub::DeviceScan::InclusiveSum(
+                d_temp_storage, temp_storage_bytes, d_ranksOutput + tileColIdx*batchCount, d_scannedRanks, batchCount);
             cudaMalloc(&d_temp_storage, temp_storage_bytes);
-            cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, d_ranksOutput + tileColIdx*batchCount, d_tmpRankSum, batchCount);
-            cudaFree(d_temp_storage);
-            int tmpRankSum;
-            cudaMemcpy(&tmpRankSum, d_tmpRankSum, sizeof(int), cudaMemcpyDeviceToHost);
-            printf("tmp rank sum: %d\n", tmpRankSum);
-            printf("rank sum: %d\n", rankSum);
+            cub::DeviceScan::InclusiveSum(
+                d_temp_storage, temp_storage_bytes, d_ranksOutput + tileColIdx*batchCount, d_scannedRanks, batchCount);
 
-            matrix->d_U.resize((rankSum + tmpRankSum)*matrix->tileSize);
-            T *d_UPtr = thrust::raw_pointer_cast(matrix->d_U.data());
-            d_temp_storage = nullptr;
-            temp_storage_bytes = 0;
-            cub::DeviceSelect::Flagged(
-                d_temp_storage, temp_storage_bytes,
-                d_UOutput, d_sortBitsPtr, d_UPtr + rankSum*matrix->tileSize, d_tmpRankSum2, batchCount*maxRank*matrix->tileSize);
-            cudaMalloc(&d_temp_storage, temp_storage_bytes);
-            cub::DeviceSelect::Flagged(
-                d_temp_storage, temp_storage_bytes,
-                d_UOutput, d_sortBitsPtr, d_UPtr + rankSum*matrix->tileSize, d_tmpRankSum2, batchCount*maxRank*matrix->tileSize);
-            cudaFree(d_temp_storage);
+            int colRankSum;
+            cudaMemcpy(&colRankSum, &d_scannedRanks[batchCount - 1], sizeof(int), cudaMemcpyDeviceToHost);
+            printf("tmp rank sum: %d\n", colRankSum);
+            printf("rank sum: %d\n", totalRankSum);
 
-            // int h_tmpRankSum2;
-            // cudaMemcpy(&h_tmpRankSum2, d_tmpRankSum2, sizeof(int), cudaMemcpyDeviceToHost);
-            // printf("tmp rank sum2: %d\n\n", h_tmpRankSum2);
+            matrix->d_U.resize((totalRankSum + colRankSum)*matrix->tileSize);
+            matrix->d_V.resize((totalRankSum + colRankSum)*matrix->tileSize);
 
-            matrix->d_V.resize((rankSum + tmpRankSum)*matrix->tileSize);
-            T *d_VPtr = thrust::raw_pointer_cast(matrix->d_V.data());
-            d_temp_storage = NULL;
-            temp_storage_bytes = 0;
-            cub::DevicePartition::Flagged(
-                d_temp_storage, temp_storage_bytes,
-                d_VOutput, d_sortBitsPtr, d_VPtr + rankSum*matrix->tileSize, d_tmpRankSum2, batchCount*maxRank*matrix->tileSize);
-            cudaMalloc(&d_temp_storage, temp_storage_bytes);
-            cub::DevicePartition::Flagged(
-                d_temp_storage, temp_storage_bytes,
-                d_VOutput, d_sortBitsPtr, d_VPtr + rankSum*matrix->tileSize, d_tmpRankSum2, batchCount*maxRank*matrix->tileSize);
+            assert(matrix->tileSize <= 512);
 
-            // printK <<< 1, 1 >>> (d_ranksOutput + tileColIdx*batchCount, batchCount);
-            rankSum += tmpRankSum;
+            copyTiles <T> (matrix, d_UOutput, d_VOutput, d_scannedRanks, maxRank, batchCount);
+
+            totalRankSum += colRankSum;
         }
 
         cudaFree(d_denseTileCol);
-        cudaFree(d_colScanRanks);
+        cudaFree(d_scannedRanks);
         cudaFree(d_rowsBatch);
         cudaFree(d_colsBatch);
         cudaFree(d_ranksOutput);
@@ -169,9 +136,6 @@ void buildTLRMatrixPiece(
         cudaFree(d_VOutputPtrs);
         cudaFree(d_UOutput);
         cudaFree(d_VOutput);
-        cudaFree(d_tmpRankSum);
-        cudaFree(d_tmpRankSum2);
-        d_sortBits.clear();
 
         kblasFreeWorkspace(kblasHandle);
         kblasDestroy(&kblasHandle);
@@ -180,7 +144,7 @@ void buildTLRMatrixPiece(
         magma_finalize();
 }
 
-template void buildTLRMatrixPiece<H2Opus_Real>(
+template void buildTLRMatrixPiece <H2Opus_Real> (
     TLR_Matrix *matrix,
     KDTree kdtree,
     H2Opus_Real* d_dataset,
