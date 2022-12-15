@@ -70,6 +70,7 @@ void constructHMatrixStructure(
 }
 
 void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numLevels) {
+    // TODO: fix this. a reserve should be neough for tileIndices. and a numLevels should take 0 as a second param instead of the memset
     HMatrixStruct->numLevels = numLevels;
     HMatrixStruct->numTiles.resize(HMatrixStruct->numLevels);
     HMatrixStruct->tileIndices.resize(HMatrixStruct->numLevels);

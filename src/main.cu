@@ -111,12 +111,12 @@ int main(int argc, char *argv[]) {
     TLR_Matrix TLRMatrix;
     TLRMatrix.ordering = COLUMN_MAJOR;
 
-    for(unsigned int i = 0; i < 4; ++i) {
+    for(unsigned int i = 0; i < 1; ++i) {
         buildTLRMatrixPiece <H2Opus_Real> (
             &TLRMatrix,
             kDTree,
             d_pointCloud,
-            i, 2,
+            i, 1,
             config.lowestLevelTolerance);
 
     }

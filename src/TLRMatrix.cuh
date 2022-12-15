@@ -2,6 +2,7 @@
 #define TLR_MATRIX_H
 
 #include "kDTree.cuh"
+#include "precision.h"
 
 #include <cstdint>
 #include <thrust/host_vector.h>

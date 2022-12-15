@@ -26,6 +26,7 @@ void generateDenseTileCol(
 __global__ void fillSortBits(
     unsigned int totalNumElements, 
     unsigned int numElementsInTile, 
+    unsigned int tileSize, 
     int *sortBits, 
     int *ranks);
 
