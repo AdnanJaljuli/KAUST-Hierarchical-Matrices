@@ -22,6 +22,6 @@ struct TLR_Matrix {
 
 // TODO: have an allocateMatrix function
 
-void freeMatrix(TLR_Matrix *matrix);
+void freeTLRMatrix(TLR_Matrix *matrix);
 
 #endif

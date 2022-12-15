@@ -15,13 +15,6 @@
 #include <thrust/device_vector.h>
 #include <thrust/execution_policy.h>
 
-__global__ void printK(int *ranksOutput, int batchCount) {
-    for(unsigned int i = 0; i < batchCount; ++i) {
-        printf("%d ", ranksOutput[i]);
-    }
-    printf("\n");
-}
-
 template <class T>
 void buildTLRMatrixPiece(
     TLR_Matrix *matrix,
@@ -35,11 +28,12 @@ void buildTLRMatrixPiece(
         uint64_t totalRankSum = 0;
         int ARA_R = 10;
         matrix->tileSize = kdtree.maxLeafSize;
+        assert(upperPowerOfTwo(kdtree.N)/numPiecesInAxis >= matrix->tileSize);
+
         matrix->numTilesInAxis = (upperPowerOfTwo(kdtree.N)/numPiecesInAxis)/matrix->tileSize;
         bool isDiagonal = isPieceDiagonal(pieceMortonIndex);
         unsigned int batchCount = isDiagonal ? matrix->numTilesInAxis - 1: matrix->numTilesInAxis;
         unsigned int maxRank = matrix->tileSize/2;
-        assert(numPiecesInAxis <= matrix->numTilesInAxis);
         printf("maxrank : %d\n", maxRank);
         printf("batch count: %d  isDiagonal: %d  tile size: %d  numTilesInAxis: %d\n", batchCount, isDiagonal, matrix->tileSize, matrix->numTilesInAxis);
 
@@ -110,8 +104,6 @@ void buildTLRMatrixPiece(
 
             int colRankSum;
             cudaMemcpy(&colRankSum, &d_scannedRanks[batchCount - 1], sizeof(int), cudaMemcpyDeviceToHost);
-            printf("tmp rank sum: %d\n", colRankSum);
-            printf("rank sum: %d\n", totalRankSum);
 
             matrix->d_U.resize((totalRankSum + colRankSum)*matrix->tileSize);
             matrix->d_V.resize((totalRankSum + colRankSum)*matrix->tileSize);
@@ -122,6 +114,7 @@ void buildTLRMatrixPiece(
 
             totalRankSum += colRankSum;
         }
+        printf("rank sum: %d\n", totalRankSum);
 
         cudaFree(d_denseTileCol);
         cudaFree(d_scannedRanks);
@@ -150,3 +143,41 @@ template void buildTLRMatrixPiece <H2Opus_Real> (
     H2Opus_Real* d_dataset,
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
     H2Opus_Real tol);
+
+
+template <class T>
+void checkErrorInTLRPiece(
+    TLR_Matrix matrix,
+    KDTree kdtree,
+    T* d_pointCloud,
+    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis) {
+
+        bool isDiagonal = isPieceDiagonal(pieceMortonIndex);
+        unsigned int numTilesInCol = isDiagonal ? matrix.numTilesInAxis - 1: matrix.numTilesInAxis;
+
+        T *d_densePiece;
+        cudaMalloc(
+            (void**) &d_densePiece,matrix.numTilesInAxis*numTilesInCol*matrix.tileSize*matrix.tileSize*sizeof(T));
+        generateDensePiece <T> (
+            d_densePiece,
+            kdtree,
+            d_pointCloud,
+            pieceMortonIndex, numPiecesInAxis,
+            matrix.numTilesInAxis, numTilesInCol,
+            isDiagonal);
+
+        H2Opus_Real* d_expandedTLRPiece;
+        cudaMalloc(
+            (void**) &d_expandedTLRPiece,
+            matrix.numTilesInAxis*numTilesInCol*matrix.tileSize*matrix.tileSize*sizeof(T));
+
+        dim3 numBlocks(matrix.numTilesInAxis, numTilesInCol);
+        dim3 numThreadsPerBlock(32, 32);
+        expandTLRPiece <<< numBlocks, numThreadsPerBlock >>> (matrix.numTilesInAxis, numTilesInCol, d_expandedTLRPiece, matrix);
+}
+
+template void checkErrorInTLRPiece <H2Opus_Real> (
+    TLR_Matrix matrix,
+    KDTree kdtree,
+    H2Opus_Real* d_pointCloud,
+    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis);

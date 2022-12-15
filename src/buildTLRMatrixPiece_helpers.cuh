@@ -32,4 +32,13 @@ void copyTiles(
     int maxRank, 
     int batchCount);
 
+template <class T>
+void generateDensePiece(
+    T *d_densePiece, 
+    KDTree kdtree, 
+    T *d_pointCloud, 
+    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
+    unsigned int numTilesInAxis, unsigned int numTilesInCol,
+    bool isDiagonal);
+
 #endif

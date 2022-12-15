@@ -68,6 +68,7 @@ __device__ T interaction(int N, int nDim, int col, int row, T* pointCloud) {
         diff += (x - y)*(x - y);
     }
     T dist = sqrt(diff);
+
     return exp(-dist/getCorrelationLength(nDim));
 }
 
@@ -149,19 +150,17 @@ void generateDenseTileCol(
             isDiagonal);
 }
 
-__global__ void fillSortBits(unsigned int totalNumElements, unsigned int numElementsInTile, unsigned int tileSize, int *sortBits, int *ranks) {
-    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    if(i < totalNumElements) {
-        unsigned int batch = i/numElementsInTile;
-        unsigned int idxInBatch = i%numElementsInTile;
-        if(idxInBatch < ranks[batch]*tileSize) {
-            sortBits[i] = 1;
-        }
-        else{
-            sortBits[i] = 0;
-        }
-    }
-}
+template void generateDenseTileCol <H2Opus_Real> (
+    H2Opus_Real *d_denseTileCol, 
+    H2Opus_Real *d_pointCloud, 
+    KDTree kdtree, 
+    unsigned int tileColIdx, 
+    unsigned int tileSize, 
+    unsigned int batchCount,
+    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
+    unsigned int numTilesInAxis,
+    bool isDiagonal);
+
 
 template <class T>
 __global__ void copyTiles(
@@ -204,13 +203,59 @@ template void copyTiles <H2Opus_Real> (
     int maxRank,
     int batchCount);
 
-template void generateDenseTileCol <H2Opus_Real> (
-    H2Opus_Real *d_denseTileCol, 
-    H2Opus_Real *d_pointCloud, 
+
+template <class T>
+void generateDensePiece(
+    T *d_densePiece, 
     KDTree kdtree, 
-    unsigned int tileColIdx, 
-    unsigned int tileSize, 
-    unsigned int batchCount,
+    T *d_pointCloud, 
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
-    unsigned int numTilesInAxis,
+    unsigned int numTilesInAxis, unsigned int numTilesInCol,
+    bool isDiagonal) {
+
+        for(unsigned int tileColIdx = 0; tileColIdx < numTilesInAxis; ++tileColIdx) {
+            generateDenseTileCol <T> (
+                &d_densePiece[numTilesInCol*kdtree.maxLeafSize*kdtree.maxLeafSize],
+                d_pointCloud,
+                kdtree,
+                tileColIdx,
+                kdtree.maxLeafSize,
+                numTilesInCol,
+                pieceMortonIndex, numPiecesInAxis,
+                numTilesInAxis,
+                isDiagonal);
+        }
+}
+
+template void generateDensePiece <H2Opus_Real> (
+    H2Opus_Real *d_densePiece, 
+    KDTree kdtree, 
+    H2Opus_Real *d_pointCloud, 
+    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
+    unsigned int numTilesInAxis, unsigned int numTilesInCol,
     bool isDiagonal);
+
+
+template <class T>
+__global__ void expandTLRPiece(
+    TLR_Matrix matrix,
+    H2Opus_Real* expandedPiece,
+    unsigned int numTilesInAxis, unsigned int numTilesInCol) {
+
+        unsigned int index;
+        if(matrix.ordering == MORTON) {
+            index = CMIndextoMOIndex(num_segments, blockIdx.x*num_segments + blockIdx.y);
+        }
+        else if(matrix.ordering == COLUMN_MAJOR) {
+            index = blockIdx.x*numTilesInCol + blockIdx.y;
+        }
+
+        unsigned int previousBlockScanRank = (index == 0) ? 0 : scannedRanks[index - 1];
+        unsigned int blockRank = scannedRanks[index] - previousBlockScanRank;
+
+        H2Opus_Real sum = 0;
+        for(unsigned int i = 0; i < matrix.blockRanks[index]; ++i) {
+            sum += matrix.U[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.y]*matrix.V[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.x];
+        }
+        expandedPiece[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
+}

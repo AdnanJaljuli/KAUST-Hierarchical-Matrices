@@ -10,6 +10,7 @@
 #include "kDTree.cuh"
 #include "kDTreeHelpers.cuh"
 #include "kDTreeConstruction.cuh"
+#include "TLRMatrix.cuh"
 
 #include <algorithm>
 #include <assert.h>
@@ -108,16 +109,25 @@ int main(int argc, char *argv[]) {
     #endif
 
     // build TLR piece
-    TLR_Matrix TLRMatrix;
-    TLRMatrix.ordering = COLUMN_MAJOR;
+    int numPiecesInAxis = 8;
+    for(unsigned int piece = 0; piece < numPiecesInAxis*numPiecesInAxis; ++piece) {
+        TLR_Matrix TLRMatrix;
+        TLRMatrix.ordering = COLUMN_MAJOR;
 
-    for(unsigned int i = 0; i < 1; ++i) {
         buildTLRMatrixPiece <H2Opus_Real> (
             &TLRMatrix,
             kDTree,
             d_pointCloud,
-            i, 1,
+            piece, numPiecesInAxis,
             config.lowestLevelTolerance);
+
+        checkErrorInTLRPiece <H2Opus_Real> (
+            TLRMatrix,
+            kDTree,
+            d_pointCloud,
+            piece, numPiecesInAxis);
+
+        freeTLRMatrix(&TLRMatrix);
     }
     freeKDTree(kDTree);
 

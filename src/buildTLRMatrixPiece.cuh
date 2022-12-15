@@ -14,4 +14,11 @@ void buildTLRMatrixPiece(
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
     T tol);
 
+template <class T>
+void checkErrorInTLRPiece(
+    TLR_Matrix matrix,
+    KDTree kdtree,
+    T* d_pointCloud,
+    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis);
+
 #endif
