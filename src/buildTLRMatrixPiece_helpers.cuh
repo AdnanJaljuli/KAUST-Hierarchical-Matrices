@@ -32,6 +32,13 @@ void copyTiles(
     int maxRank, 
     int batchCount);
 
+__global__ void copyScannedRanks(
+    unsigned int numElements,
+    int* fromScannedRanks,
+    int* toScannedRanks,
+    unsigned int tileColIdx,
+    bool isDiagonal);
+
 template <class T>
 void generateDensePiece(
     T *d_densePiece, 

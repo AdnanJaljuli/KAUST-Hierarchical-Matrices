@@ -15,7 +15,7 @@ struct TLR_Matrix {
     Ordering ordering;
     unsigned int tileSize;
     unsigned int numTilesInAxis;
-    thrust::device_vector<int> d_tileOffsets;
+    int *d_tileOffsets;
     thrust::device_vector<H2Opus_Real> d_U;
     thrust::device_vector<H2Opus_Real> d_V;
 };

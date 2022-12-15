@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
     #endif
 
     // build TLR piece
-    int numPiecesInAxis = 8;
+    int numPiecesInAxis = 2;
     for(unsigned int piece = 0; piece < numPiecesInAxis*numPiecesInAxis; ++piece) {
         TLR_Matrix TLRMatrix;
         TLRMatrix.ordering = COLUMN_MAJOR;

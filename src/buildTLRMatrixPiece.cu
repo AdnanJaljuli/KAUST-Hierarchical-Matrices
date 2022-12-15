@@ -15,6 +15,17 @@
 #include <thrust/device_vector.h>
 #include <thrust/execution_policy.h>
 
+__global__ void printScannedRanks(int *array, int size) {
+    printf("scanned ranks:\n");
+    for(unsigned int i = 0; i < size; ++i) {
+        for(unsigned int j = 0; j < size; ++j) {
+            printf("%d ", array[i*size + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
 template <class T>
 void buildTLRMatrixPiece(
     TLR_Matrix *matrix,
@@ -34,6 +45,7 @@ void buildTLRMatrixPiece(
         bool isDiagonal = isPieceDiagonal(pieceMortonIndex);
         unsigned int batchCount = isDiagonal ? matrix->numTilesInAxis - 1: matrix->numTilesInAxis;
         unsigned int maxRank = matrix->tileSize/2;
+        cudaMalloc((void**) &matrix->d_tileOffsets, matrix->numTilesInAxis*matrix->numTilesInAxis*sizeof(int));
         printf("maxrank : %d\n", maxRank);
         printf("batch count: %d  isDiagonal: %d  tile size: %d  numTilesInAxis: %d\n", batchCount, isDiagonal, matrix->tileSize, matrix->numTilesInAxis);
 
@@ -112,9 +124,18 @@ void buildTLRMatrixPiece(
 
             copyTiles <T> (matrix, d_UOutput, d_VOutput, d_scannedRanks, maxRank, batchCount);
 
+            unsigned int numThreadsPerBlock = 1024;
+            unsigned int numBlocks = (batchCount + numThreadsPerBlock - 1)/numThreadsPerBlock;
+            copyScannedRanks <<< numBlocks, numThreadsPerBlock >>> (
+                batchCount,
+                d_scannedRanks,
+                &matrix->d_tileOffsets[tileColIdx*matrix->numTilesInAxis],
+                tileColIdx,
+                isDiagonal);
+
             totalRankSum += colRankSum;
         }
-        printf("rank sum: %d\n", totalRankSum);
+
 
         cudaFree(d_denseTileCol);
         cudaFree(d_scannedRanks);
@@ -130,11 +151,15 @@ void buildTLRMatrixPiece(
         cudaFree(d_UOutput);
         cudaFree(d_VOutput);
 
+        printf("rank sum: %d\n", totalRankSum);
+
         kblasFreeWorkspace(kblasHandle);
         kblasDestroy(&kblasHandle);
         kblasHandle = NULL;
         kblasDestroyRandState(randState);
         magma_finalize();
+
+        printScannedRanks <<< 1, 1 >>> (matrix->d_tileOffsets, matrix->numTilesInAxis);
 }
 
 template void buildTLRMatrixPiece <H2Opus_Real> (
@@ -166,14 +191,14 @@ void checkErrorInTLRPiece(
             matrix.numTilesInAxis, numTilesInCol,
             isDiagonal);
 
-        H2Opus_Real* d_expandedTLRPiece;
+        T* d_expandedTLRPiece;
         cudaMalloc(
             (void**) &d_expandedTLRPiece,
             matrix.numTilesInAxis*numTilesInCol*matrix.tileSize*matrix.tileSize*sizeof(T));
 
         dim3 numBlocks(matrix.numTilesInAxis, numTilesInCol);
         dim3 numThreadsPerBlock(32, 32);
-        expandTLRPiece <<< numBlocks, numThreadsPerBlock >>> (matrix.numTilesInAxis, numTilesInCol, d_expandedTLRPiece, matrix);
+        // expandTLRPiece <<< numBlocks, numThreadsPerBlock >>> (matrix.numTilesInAxis, numTilesInCol, d_expandedTLRPiece, matrix);
 }
 
 template void checkErrorInTLRPiece <H2Opus_Real> (

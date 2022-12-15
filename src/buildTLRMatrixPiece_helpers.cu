@@ -227,6 +227,29 @@ void generateDensePiece(
         }
 }
 
+__global__ void copyScannedRanks(
+    unsigned int numElements,
+    int* fromScannedRanks,
+    int* toScannedRanks,
+    unsigned int tileColIdx,
+    bool isDiagonal) {
+
+        int i = blockIdx.x*blockDim.x + threadIdx.x;
+
+        if(i < numElements) {
+            if(!isDiagonal) {
+                toScannedRanks[i] = fromScannedRanks[i];
+            }
+            else {
+                int diff = (i >= tileColIdx) ? 1 : 0;
+                toScannedRanks[i + diff] = fromScannedRanks[i];
+                if(i == 0) {
+                    toScannedRanks[tileColIdx] = (tileColIdx == 0) ? 0 : fromScannedRanks[tileColIdx - 1];
+                }
+            }
+        }
+}
+
 template void generateDensePiece <H2Opus_Real> (
     H2Opus_Real *d_densePiece, 
     KDTree kdtree, 
@@ -239,23 +262,23 @@ template void generateDensePiece <H2Opus_Real> (
 template <class T>
 __global__ void expandTLRPiece(
     TLR_Matrix matrix,
-    H2Opus_Real* expandedPiece,
+    T* expandedPiece,
     unsigned int numTilesInAxis, unsigned int numTilesInCol) {
 
-        unsigned int index;
-        if(matrix.ordering == MORTON) {
-            index = CMIndextoMOIndex(num_segments, blockIdx.x*num_segments + blockIdx.y);
-        }
-        else if(matrix.ordering == COLUMN_MAJOR) {
-            index = blockIdx.x*numTilesInCol + blockIdx.y;
-        }
+        // unsigned int index;
+        // if(matrix.ordering == MORTON) {
+        //     // index = CMIndextoMOIndex(num_segments, blockIdx.x*num_segments + blockIdx.y);
+        // }
+        // else if(matrix.ordering == COLUMN_MAJOR) {
+        //     index = blockIdx.x*numTilesInCol + blockIdx.y;
+        // }
 
-        unsigned int previousBlockScanRank = (index == 0) ? 0 : scannedRanks[index - 1];
-        unsigned int blockRank = scannedRanks[index] - previousBlockScanRank;
+        // unsigned int previousBlockScanRank = (index == 0) ? 0 : scannedRanks[index - 1];
+        // unsigned int blockRank = scannedRanks[index] - previousBlockScanRank;
 
-        H2Opus_Real sum = 0;
-        for(unsigned int i = 0; i < matrix.blockRanks[index]; ++i) {
-            sum += matrix.U[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.y]*matrix.V[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.x];
-        }
-        expandedPiece[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
+        // T sum = 0;
+        // for(unsigned int i = 0; i < matrix.blockRanks[index]; ++i) {
+        //     sum += matrix.U[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.y]*matrix.V[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.x];
+        // }
+//         expandedPiece[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
 }
