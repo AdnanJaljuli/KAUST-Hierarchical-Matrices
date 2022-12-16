@@ -176,12 +176,13 @@ __global__ void copyTiles(
  
         for(unsigned int i = threadIdx.x; i < numElementsInTile; i += blockDim.x) {
             UPtr[previousBlockScanRank*tileSize + i] = UOutput[blockIdx.x*tileSize*maxRank + i];
+            VPtr[previousBlockScanRank*tileSize + i] = VOutput[blockIdx.x*tileSize*maxRank + i];
         }
 }
 
 template <class T>
 void copyTiles(
-    TLR_Matrix *matrix, T *d_UOutput, T *d_VOutput, int *d_scannedRanks, int maxRank, int batchCount) {
+    TLR_Matrix *matrix, T *d_UOutput, T *d_VOutput, int *d_scannedRanks, int maxRank, unsigned int totalRankSum, int batchCount) {
 
         T *d_UPtr = thrust::raw_pointer_cast(matrix->d_U.data());
         T *d_VPtr = thrust::raw_pointer_cast(matrix->d_V.data());
@@ -189,8 +190,8 @@ void copyTiles(
         unsigned int numThreadsPerBlock = matrix->tileSize*2;
         unsigned int numBlocks = batchCount;
         copyTiles <T> <<< numBlocks, numThreadsPerBlock >>> (
-            d_UPtr, d_UOutput,
-            d_VPtr, d_VOutput,
+            &d_UPtr[totalRankSum*matrix->tileSize], d_UOutput,
+            &d_VPtr[totalRankSum*matrix->tileSize], d_VOutput,
             d_scannedRanks,
             matrix->tileSize,
             maxRank);
@@ -201,8 +202,32 @@ template void copyTiles <H2Opus_Real> (
     H2Opus_Real *d_UOutput, H2Opus_Real *d_VOutput,
     int *d_scannedRanks,
     int maxRank,
+    unsigned int totalRankSum,
     int batchCount);
 
+
+__global__ void copyRanks(
+    unsigned int numElements,
+    int* fromRanks,
+    int* toRanks,
+    unsigned int tileColIdx,
+    bool isDiagonal) {
+
+        int i = blockIdx.x*blockDim.x + threadIdx.x;
+
+        if(i < numElements) {
+            if(!isDiagonal) {
+                toRanks[i] = fromRanks[i];
+            }
+            else {
+                int diff = (i >= tileColIdx) ? 1 : 0;
+                toRanks[i + diff] = fromRanks[i];
+                if(i == 0) {
+                    toRanks[tileColIdx] = 0;
+                }
+            }
+        }
+}
 
 template <class T>
 void generateDensePiece(
@@ -215,7 +240,7 @@ void generateDensePiece(
 
         for(unsigned int tileColIdx = 0; tileColIdx < numTilesInAxis; ++tileColIdx) {
             generateDenseTileCol <T> (
-                &d_densePiece[numTilesInCol*kdtree.maxLeafSize*kdtree.maxLeafSize],
+                &d_densePiece[tileColIdx*numTilesInCol*kdtree.maxLeafSize*kdtree.maxLeafSize],
                 d_pointCloud,
                 kdtree,
                 tileColIdx,
@@ -224,29 +249,6 @@ void generateDensePiece(
                 pieceMortonIndex, numPiecesInAxis,
                 numTilesInAxis,
                 isDiagonal);
-        }
-}
-
-__global__ void copyScannedRanks(
-    unsigned int numElements,
-    int* fromScannedRanks,
-    int* toScannedRanks,
-    unsigned int tileColIdx,
-    bool isDiagonal) {
-
-        int i = blockIdx.x*blockDim.x + threadIdx.x;
-
-        if(i < numElements) {
-            if(!isDiagonal) {
-                toScannedRanks[i] = fromScannedRanks[i];
-            }
-            else {
-                int diff = (i >= tileColIdx) ? 1 : 0;
-                toScannedRanks[i + diff] = fromScannedRanks[i];
-                if(i == 0) {
-                    toScannedRanks[tileColIdx] = (tileColIdx == 0) ? 0 : fromScannedRanks[tileColIdx - 1];
-                }
-            }
         }
 }
 
@@ -261,24 +263,71 @@ template void generateDensePiece <H2Opus_Real> (
 
 template <class T>
 __global__ void expandTLRPiece(
-    TLR_Matrix matrix,
+    T *UPtr, T *VPtr,
+    int *tileOffsets,
     T* expandedPiece,
-    unsigned int numTilesInAxis, unsigned int numTilesInCol) {
+    unsigned int numTilesInAxis,
+    unsigned int numTilesInCol,
+    unsigned int tileSize,
+    bool isDiagonal) {
 
-        // unsigned int index;
-        // if(matrix.ordering == MORTON) {
-        //     // index = CMIndextoMOIndex(num_segments, blockIdx.x*num_segments + blockIdx.y);
-        // }
-        // else if(matrix.ordering == COLUMN_MAJOR) {
-        //     index = blockIdx.x*numTilesInCol + blockIdx.y;
-        // }
+        unsigned int col = blockIdx.x;
+        unsigned int row;
+        if(isDiagonal) {
+            if(blockIdx.y < blockIdx.x) {
+                row = blockIdx.y;
+            }
+            else {
+                row = blockIdx.y + 1;
+            }
+        }
+        else {
+            row = blockIdx.y;
+        }
 
-        // unsigned int previousBlockScanRank = (index == 0) ? 0 : scannedRanks[index - 1];
-        // unsigned int blockRank = scannedRanks[index] - previousBlockScanRank;
+        unsigned int index = col*numTilesInAxis + row;
 
-        // T sum = 0;
-        // for(unsigned int i = 0; i < matrix.blockRanks[index]; ++i) {
-        //     sum += matrix.U[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.y]*matrix.V[matrix.blockOffsets[index]*maxSegmentSize + i*maxSegmentSize + threadIdx.x];
-        // }
-//         expandedPiece[blockIdx.x*num_segments*maxSegmentSize*maxSegmentSize + blockIdx.y*maxSegmentSize*maxSegmentSize + threadIdx.x*maxSegmentSize + threadIdx.y] = sum;
+        unsigned int previousBlockScanRank = (index == 0) ? 0 : tileOffsets[index - 1];
+        unsigned int tileRank = tileOffsets[index] - previousBlockScanRank;
+
+        T sum = 0;
+        for(unsigned int i = 0; i < tileRank; ++i) {
+            T u = UPtr[previousBlockScanRank*tileSize + i*tileSize + threadIdx.y];
+            T v = VPtr[previousBlockScanRank*tileSize + i*tileSize + threadIdx.x];
+            sum += u*v;
+        }
+        expandedPiece[col*numTilesInCol*tileSize*tileSize + 
+                      blockIdx.y*tileSize*tileSize + 
+                      threadIdx.x*tileSize + 
+                      threadIdx.y] = sum;
 }
+
+template __global__ void expandTLRPiece <H2Opus_Real> (
+    H2Opus_Real *UPtr, H2Opus_Real *VPtr,
+    int *tileOffsets,
+    H2Opus_Real* expandedPiece,
+    unsigned int numTilesInAxis,
+    unsigned int numTilesInCol,
+    unsigned int tileSize,
+    bool isDiagonal);
+
+
+template <class T>
+__global__ void calcErrorInPiece (T *expandedTLRPiece, T *densePiece, unsigned int numTilesInCol, unsigned int tileSize, T *error, T *tmp) {
+
+    T x = densePiece[blockIdx.x*numTilesInCol*tileSize*tileSize +
+                      blockIdx.y*tileSize*tileSize +
+                      threadIdx.x*tileSize +
+                      threadIdx.y];
+
+    T y = expandedTLRPiece[blockIdx.x*numTilesInCol*tileSize*tileSize +
+                      blockIdx.y*tileSize*tileSize +
+                      threadIdx.x*tileSize +
+                      threadIdx.y];
+
+    // printf("%lf: x          %lf: y          %d %d %d %d\n", x, y, blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y);
+    atomicAdd(tmp, x*x);
+    atomicAdd(error, (x - y)*(x - y));
+}
+
+template __global__ void calcErrorInPiece <H2Opus_Real> (H2Opus_Real *expandedTLRPiece, H2Opus_Real *densePiece, unsigned int numTilesInCol, unsigned int tileSize, H2Opus_Real *error, H2Opus_Real *tmp);

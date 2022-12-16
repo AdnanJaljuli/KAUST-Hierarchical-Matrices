@@ -29,13 +29,14 @@ void copyTiles(
     TLR_Matrix *matrix, 
     T *d_UOutput, T *d_VOutput, 
     int *d_scannedRanks, 
-    int maxRank, 
+    int maxRank,
+    unsigned int totalRankSum,
     int batchCount);
 
-__global__ void copyScannedRanks(
+__global__ void copyRanks(
     unsigned int numElements,
-    int* fromScannedRanks,
-    int* toScannedRanks,
+    int* fromRanks,
+    int* toRanks,
     unsigned int tileColIdx,
     bool isDiagonal);
 
@@ -47,5 +48,23 @@ void generateDensePiece(
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis,
     unsigned int numTilesInAxis, unsigned int numTilesInCol,
     bool isDiagonal);
+
+template <class T>
+__global__ void expandTLRPiece(
+    T *UPtr, T *VPtr,
+    int *tileOffsets,
+    T* expandedPiece,
+    unsigned int numTilesInAxis,
+    unsigned int numTilesInCol,
+    unsigned int tileSize,
+    bool isDiagonal);
+
+template <class T>
+__global__ void calcErrorInPiece (
+    T *expandedTLRPiece,
+    T *densePiece,
+    unsigned int numTilesInCol,
+    unsigned int tileSize,
+    T *error, T *tmp);
 
 #endif
