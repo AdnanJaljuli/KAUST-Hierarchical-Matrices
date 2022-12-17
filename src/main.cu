@@ -109,8 +109,8 @@ int main(int argc, char *argv[]) {
     #endif
 
     // build TLR piece
-    int numPiecesInAxis = 4;
-    for(unsigned int piece = 0; piece < numPiecesInAxis*numPiecesInAxis; ++piece) {
+    // int numPiecesInAxis = 4;s
+    for(unsigned int piece = 0; piece < config.numPiecesInAxis*config.numPiecesInAxis; ++piece) {
         TLR_Matrix TLRMatrix;
         TLRMatrix.ordering = COLUMN_MAJOR;
 
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
             &TLRMatrix,
             kDTree,
             d_pointCloud,
-            piece, numPiecesInAxis,
+            piece, config.numPiecesInAxis,
             config.lowestLevelTolerance);
 
         #if EXPAND_MATRIX
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
             TLRMatrix,
             kDTree,
             d_pointCloud,
-            piece, numPiecesInAxis);
+            piece, config.numPiecesInAxis);
         #endif
 
         freeTLRMatrix(&TLRMatrix);

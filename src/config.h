@@ -111,6 +111,7 @@ struct Config {
     ADMISSIBILITY_CONDITION admissibilityCondition;
     unsigned int N;
     unsigned int nDim;
+    unsigned int numPiecesInAxis;
     unsigned int leafSize;
     unsigned int vectorWidth;
     float lowestLevelTolerance;
@@ -122,12 +123,13 @@ static Config parseArgs(int argc, char **argv) {
     config.admissibilityCondition = WEAK_ADMISSIBILITY;
     config.N = 1024;
     config.nDim = 2;
+    config.numPiecesInAxis = 1;
     config.leafSize = 32;
     config.vectorWidth = 16;
     config.lowestLevelTolerance = 1e-5;
 
     int opt;
-    while ((opt = getopt(argc, argv, "m:a:n:d:b:v:t:h")) >= 0) {
+    while ((opt = getopt(argc, argv, "m:a:n:d:p:b:v:t:h")) >= 0) {
         switch (opt)
         {
         case 'm':
@@ -141,6 +143,9 @@ static Config parseArgs(int argc, char **argv) {
             break;
         case 'd':
             config.nDim = atoi(optarg);
+            break;
+        case 'p':
+            config.numPiecesInAxis = atoi(optarg);
             break;
         case 'b':
             config.leafSize = atoi(optarg);
@@ -171,6 +176,7 @@ static void printArgs(Config config) {
     printf("bucket size: %d\n", config.leafSize);
     printf("lowest level tolerance: %f\n", config.lowestLevelTolerance);
     printf("dimension of input points: %d\n", config.nDim);
+    printf("number of pieces in TLR axis: %d\n", config.numPiecesInAxis);
     printf("vector width: %u\n", config.vectorWidth);
 }
 
