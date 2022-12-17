@@ -1,6 +1,6 @@
 
 #include "admissibilityFunctions.cuh"
-#include "buildTLRMatrixPiece.cuh"
+#include "buildTLRPiece.cuh"
 #include "config.h"
 #include "counters.h"
 #include "generateDataset.cuh"
@@ -109,23 +109,25 @@ int main(int argc, char *argv[]) {
     #endif
 
     // build TLR piece
-    int numPiecesInAxis = 2;
+    int numPiecesInAxis = 4;
     for(unsigned int piece = 0; piece < numPiecesInAxis*numPiecesInAxis; ++piece) {
         TLR_Matrix TLRMatrix;
         TLRMatrix.ordering = COLUMN_MAJOR;
 
-        buildTLRMatrixPiece <H2Opus_Real> (
+        buildTLRPiece <H2Opus_Real> (
             &TLRMatrix,
             kDTree,
             d_pointCloud,
             piece, numPiecesInAxis,
             config.lowestLevelTolerance);
 
+        #if EXPAND_MATRIX
         checkErrorInTLRPiece <H2Opus_Real> (
             TLRMatrix,
             kDTree,
             d_pointCloud,
             piece, numPiecesInAxis);
+        #endif
 
         freeTLRMatrix(&TLRMatrix);
     }

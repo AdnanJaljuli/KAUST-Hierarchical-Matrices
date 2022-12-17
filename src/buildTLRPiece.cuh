@@ -7,7 +7,7 @@
 #include "precision.h"
 
 template <class T>
-void buildTLRMatrixPiece(
+void buildTLRPiece(
     TLR_Matrix *matrix,
     KDTree kdtree,
     T* d_pointDataset,

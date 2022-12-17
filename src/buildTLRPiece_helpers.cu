@@ -1,5 +1,5 @@
 
-#include "buildTLRMatrixPiece_helpers.cuh"
+#include "buildTLRPiece_helpers.cuh"
 #include "helperKernels.cuh"
 #include "kDTree.cuh"
 #include "TLRMatrix.cuh"

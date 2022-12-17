@@ -1,6 +1,6 @@
 
-#include "buildTLRMatrixPiece.cuh"
-#include "buildTLRMatrixPiece_helpers.cuh"
+#include "buildTLRPiece.cuh"
+#include "buildTLRPiece_helpers.cuh"
 #include "helperKernels.cuh"
 #include "kDTree.cuh"
 #include "cublas_v2.h"
@@ -27,7 +27,7 @@ __global__ void printScannedRanks(int *array, int size) {
 }
 
 template <class T>
-void buildTLRMatrixPiece(
+void buildTLRPiece(
     TLR_Matrix *matrix,
     KDTree kdtree,
     T* d_pointCloud,
@@ -174,7 +174,7 @@ void buildTLRMatrixPiece(
         // printScannedRanks <<< 1, 1 >>> (matrix->d_tileOffsets, matrix->numTilesInAxis);
 }
 
-template void buildTLRMatrixPiece <H2Opus_Real> (
+template void buildTLRPiece <H2Opus_Real> (
     TLR_Matrix *matrix,
     KDTree kdtree,
     H2Opus_Real* d_dataset,
