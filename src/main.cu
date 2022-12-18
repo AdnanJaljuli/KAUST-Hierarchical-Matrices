@@ -82,13 +82,13 @@ int main(int argc, char *argv[]) {
     startTime(HMATRIX_STRUCTURE, &counters);
     #endif
     HMatrix <H2Opus_Real> hierarchicalMatrix;
-    allocateHMatrixStructure(&hierarchicalMatrix.matrixStructure, kDTree.numLevels);
+    allocateHMatrixStructure(&hierarchicalMatrix.structure, kDTree.numLevels);
 
     if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
         H2Opus_Real eta = 1;
         BBoxCenterAdmissibility <H2Opus_Real> admissibility(eta, kDTree.nDim);
         constructHMatrixStructure <H2Opus_Real>(
-            &hierarchicalMatrix.matrixStructure,
+            &hierarchicalMatrix.structure,
             admissibility,
             kDTree,
             kDTree);
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     else if(config.admissibilityCondition == WEAK_ADMISSIBILITY) {
         WeakAdmissibility <H2Opus_Real> admissibility;
         constructHMatrixStructure <H2Opus_Real>(
-            &hierarchicalMatrix.matrixStructure,
+            &hierarchicalMatrix.structure,
             admissibility,
             kDTree,
             kDTree);
@@ -107,13 +107,13 @@ int main(int argc, char *argv[]) {
 
     #if EXPAND_MATRIX
     printKDTree(config.N, config.nDim, config.divMethod, config.leafSize, kDTree, d_pointCloud);
-    printMatrixStructure(hierarchicalMatrix.matrixStructure);
+    printMatrixStructure(hierarchicalMatrix.structure);
     #endif
 
     // build TLR and Hmatrix piece
     allocateHMatrix <H2Opus_Real> (hierarchicalMatrix, kDTree.maxLeafSize, kDTree.numLeaves);
     vector<unsigned int> maxRanks;
-    generateHMatMaxRanks(hierarchicalMatrix.matrixStructure.numLevels, kDTree.maxLeafSize, maxRanks);
+    generateHMatMaxRanks(hierarchicalMatrix.structure.numLevels, kDTree.maxLeafSize, maxRanks);
 
     for(unsigned int piece = 0; piece < config.numPiecesInAxis*config.numPiecesInAxis; ++piece) {
         TLR_Matrix TLRMatrix;

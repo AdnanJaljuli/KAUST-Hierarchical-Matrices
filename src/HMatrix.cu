@@ -61,8 +61,8 @@ void allocateHMatrix(
     unsigned int lowestLevelTileSize,
     unsigned int numLeaves) {
 
-        cudaMalloc((void**) &matrix.diagonalBlocks, lowestLevelTileSize*lowestLevelTileSize*numLeaves*sizeof(T));
-        matrix.levels = (HMatrixLevel <T> *)malloc((matrix.matrixStructure.numLevels - 1)*sizeof(T));
+        cudaMalloc((void**) &matrix.diagonal, lowestLevelTileSize*lowestLevelTileSize*numLeaves*sizeof(T));
+        matrix.levels = (HMatrixLevel <T> *)malloc((matrix.structure.numLevels - 1)*sizeof(T));
 }
 
 template void allocateHMatrix <H2Opus_Real> (

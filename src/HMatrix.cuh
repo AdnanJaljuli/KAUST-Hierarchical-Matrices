@@ -5,13 +5,15 @@
 #include "boundingBoxes.h"
 #include "HMatrixStructure.cuh"
 
+#include <thrust/device_vector.h>
+
 template <class T>
 struct HMatrixLevel {
     int level;
     unsigned int rankSum;
     int* scannedBLockRanks; // inclusive scan
-    T* U;
-    T* V;
+    thrust::device_vector<T> U;
+    thrust::device_vector<T> V;
     // TODO: make a double pointer array to U and V
 };
 
@@ -19,9 +21,9 @@ void copyToHMatrixLevel(); // TODO
 
 template <class T>
 struct HMatrix {
-    T* diagonalBlocks;
+    T* diagonal;
     HMatrixLevel <T> *levels;
-    HMatrixStructure matrixStructure;
+    HMatrixStructure structure;
 };
 
 template <class T>
