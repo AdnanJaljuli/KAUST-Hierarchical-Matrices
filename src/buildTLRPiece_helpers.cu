@@ -140,7 +140,7 @@ void generateDenseTileCol(
 
         dim3 m_numThreadsPerBlock(min(32, tileSize), min(32, tileSize));
         dim3 m_numBlocks(1, batchCount);
-        generateDenseTileColumn_kernel<T><<< m_numBlocks, m_numThreadsPerBlock >>> (
+        generateDenseTileColumn_kernel <T> <<< m_numBlocks, m_numThreadsPerBlock >>> (
             d_denseTileCol, 
             d_pointCloud, 
             kdtree, 

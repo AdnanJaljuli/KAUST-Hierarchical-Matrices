@@ -1,6 +1,7 @@
 
 #include "admissibilityFunctions.cuh"
 #include "buildTLRPiece.cuh"
+#include "buildHMatrix.cuh"
 #include "config.h"
 #include "counters.h"
 #include "generateDataset.cuh"
@@ -82,6 +83,7 @@ int main(int argc, char *argv[]) {
     #endif
     HMatrix hierarchicalMatrix;
     allocateHMatrixStructure(&hierarchicalMatrix.matrixStructure, kDTree.numLevels);
+
     if(config.admissibilityCondition == BOX_CENTER_ADMISSIBILITY) {
         H2Opus_Real eta = 1;
         BBoxCenterAdmissibility <H2Opus_Real> admissibility(eta, kDTree.nDim);
@@ -108,8 +110,13 @@ int main(int argc, char *argv[]) {
     printMatrixStructure(hierarchicalMatrix.matrixStructure);
     #endif
 
-    // build TLR piece
-    // int numPiecesInAxis = 4;s
+    #if 1
+
+    // build TLR and Hmatrix piece
+    allocateHMatrix <H2Opus_Real> (hierarchicalMatrix, kDTree.maxLeafSize, kDTree.numLeaves);
+    vector<unsigned int> maxRanks;
+    generateHMatMaxRanks(hierarchicalMatrix.matrixStructure.numLevels, kDTree.maxLeafSize, maxRanks);
+
     for(unsigned int piece = 0; piece < config.numPiecesInAxis*config.numPiecesInAxis; ++piece) {
         TLR_Matrix TLRMatrix;
         TLRMatrix.ordering = COLUMN_MAJOR;
@@ -129,9 +136,13 @@ int main(int argc, char *argv[]) {
             piece, config.numPiecesInAxis);
         #endif
 
-        freeTLRMatrix(&TLRMatrix);
+        freeTLRPiece(&TLRMatrix);
     }
+
+    maxRanks.clear();
     freeKDTree(kDTree);
+
+    #endif
 
     #if USE_COUNTERS
     endTime(TOTAL_TIME, &counters);

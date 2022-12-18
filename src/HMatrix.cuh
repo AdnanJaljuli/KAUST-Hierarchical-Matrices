@@ -7,11 +7,14 @@
 
 struct HMatrixLevel {
     int level;
-    int* tileScanRanks; // inclusive scan
+    unsigned int rankSum;
+    int* scannedBLockRanks; // inclusive scan
     H2Opus_Real* U;
     H2Opus_Real* V;
     // TODO: make a double pointer array to U and V
 };
+
+void copyToHMatrixLevel(); // TODO
 
 struct HMatrix {
     H2Opus_Real* diagonalBlocks;
@@ -19,11 +22,12 @@ struct HMatrix {
     HMatrixStructure matrixStructure;
 };
 
-void allocateHMatrix(HMatrix &matrix, 
-    TLR_Matrix mortonOrderedMatrix, 
-    int segmentSize, int numSegments, 
-    unsigned int numberOfInputPoints, unsigned int leafSize, 
-    HMatrixStructure HMatrixStruct);
+template <class T>
+void allocateHMatrix(
+    HMatrix &matrix,
+    unsigned int lowestLevelTileSize,
+    unsigned int numLeaves);
+
 void freeHMatrix(HMatrix &matrix);
 
 #endif
