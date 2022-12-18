@@ -5,6 +5,7 @@
 #include "TLRMatrix.cuh"
 
 #include <vector>
+#include <utility>
 
 void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> maxRanks);
 

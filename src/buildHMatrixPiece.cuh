@@ -13,7 +13,7 @@ void buildHMatrixPiece (
     TLR_Matrix TLRMatrix,
     std::vector<unsigned int> maxRanks,
     float lowestLevelTolerance,
-    unsigned int pieceMortonIndex, unsigned int numPiecesInAxis);
+    unsigned int pieceMortonIndex, unsigned int pieceLevel);
 
 void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> maxRanks);
 

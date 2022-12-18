@@ -134,13 +134,13 @@ int main(int argc, char *argv[]) {
             d_pointCloud,
             piece, config.numPiecesInAxis);
         #endif
-
+        unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
         buildHMatrixPiece <H2Opus_Real> (
             hierarchicalMatrix,
             TLRMatrix,
             maxRanks,
             config.lowestLevelTolerance,
-            piece, config.numPiecesInAxis
+            piece, pieceLevel
         );
 
         freeTLRPiece(&TLRMatrix);
@@ -157,5 +157,4 @@ int main(int argc, char *argv[]) {
     printf("done :)\n");
 
     return 0;
-
 }
