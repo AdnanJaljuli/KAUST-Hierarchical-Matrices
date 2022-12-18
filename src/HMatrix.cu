@@ -50,29 +50,31 @@ void allocateAndCopyToHMatrixLevel(
 
 #endif
 
-void freeHMatrixLevel(HMatrixLevel matrixLevel) { 
+template <class T>
+void freeHMatrixLevel(HMatrixLevel <T> matrixLevel) { 
     // TODO
 }
 
 template <class T>
 void allocateHMatrix(
-    HMatrix &matrix,
+    HMatrix <T> &matrix,
     unsigned int lowestLevelTileSize,
     unsigned int numLeaves) {
 
         cudaMalloc((void**) &matrix.diagonalBlocks, lowestLevelTileSize*lowestLevelTileSize*numLeaves*sizeof(T));
-        matrix.levels = (HMatrixLevel*)malloc((matrix.matrixStructure.numLevels - 1)*sizeof(T));
+        matrix.levels = (HMatrixLevel <T> *)malloc((matrix.matrixStructure.numLevels - 1)*sizeof(T));
 }
 
 template void allocateHMatrix <H2Opus_Real> (
-    HMatrix &matrix,
+    HMatrix <H2Opus_Real> &matrix,
     unsigned int lowestLevelTileSize,
     unsigned int numLeaves);
 
 
-void freeHMatrix(HMatrix &matrix) {
+template <class T>
+void freeHMatrix(HMatrix <T> &matrix) {
     cudaFree(matrix.diagonalBlocks);
     for(unsigned int level = 1; level < matrix.matrixStructure.numLevels - 1; ++level) {
-        freeHMatrixLevel(matrix.levels[level - 1]);
+        freeHMatrixLevel <T> (matrix.levels[level - 1]);
     }
 }

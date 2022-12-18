@@ -5,29 +5,32 @@
 #include "boundingBoxes.h"
 #include "HMatrixStructure.cuh"
 
+template <class T>
 struct HMatrixLevel {
     int level;
     unsigned int rankSum;
     int* scannedBLockRanks; // inclusive scan
-    H2Opus_Real* U;
-    H2Opus_Real* V;
+    T* U;
+    T* V;
     // TODO: make a double pointer array to U and V
 };
 
 void copyToHMatrixLevel(); // TODO
 
+template <class T>
 struct HMatrix {
-    H2Opus_Real* diagonalBlocks;
-    HMatrixLevel* levels;
+    T* diagonalBlocks;
+    HMatrixLevel <T> *levels;
     HMatrixStructure matrixStructure;
 };
 
 template <class T>
 void allocateHMatrix(
-    HMatrix &matrix,
+    HMatrix <T> &matrix,
     unsigned int lowestLevelTileSize,
     unsigned int numLeaves);
 
-void freeHMatrix(HMatrix &matrix);
+template <class T>
+void freeHMatrix(HMatrix <T> &matrix);
 
 #endif
