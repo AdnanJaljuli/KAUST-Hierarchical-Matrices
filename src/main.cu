@@ -119,6 +119,7 @@ int main(int argc, char *argv[]) {
         TLR_Matrix TLRMatrix;
         TLRMatrix.ordering = COLUMN_MAJOR;
 
+        // TODO: pass level instead of numPiecesInAxis
         buildTLRPiece <H2Opus_Real> (
             &TLRMatrix,
             kDTree,
@@ -133,6 +134,14 @@ int main(int argc, char *argv[]) {
             d_pointCloud,
             piece, config.numPiecesInAxis);
         #endif
+
+        buildHMatrixPiece <H2Opus_Real> (
+            hierarchicalMatrix,
+            TLRMatrix,
+            maxRanks,
+            config.lowestLevelTolerance,
+            piece, config.numPiecesInAxis
+        );
 
         freeTLRPiece(&TLRMatrix);
     }
