@@ -77,8 +77,7 @@ static __host__ __device__ int columnMajor2Morton(int numSegments, int n){
     return ij2Morton(j, i);
 }
 
-static __host__ __device__ uint32_t morton2columnMajor_helper(uint32_t x)
-{
+static __host__ __device__ uint32_t morton2columnMajor_helper(uint32_t x) {
     x = x & 0x55555555;
     x = (x | (x >> 1)) & 0x33333333;
     x = (x | (x >> 2)) & 0x0F0F0F0F;

@@ -1,5 +1,6 @@
 
-#include "buildHMatrix.cuh"
+#include "buildHMatrixPiece.cuh"
+#include "cublas_v2.h"
 #include "HMatrix.cuh"
 #include "TLRMatrix.cuh"
 #include "precision.h"
@@ -36,6 +37,7 @@ void buildHMatrixPiece (
         // TODO: use multiple streams
 
         for(unsigned int tileLevel = hierarchicalMatrix.structure.numLevels - 2; tileLevel > 0; --tileLevel) {
+            #if 0
             assert(pieceLevel <= tileLevel);
             pair<int, int> tilesInPiece = getTilesInPiece(
                 hierarchicalMatrix.structure.tileIndices[tileLevel],
@@ -60,9 +62,10 @@ void buildHMatrixPiece (
                     segmentSize,
                     level,
                     d_tileIndices,
-                    tilePtrs,
+                    &tilePtrs,
                     mortonOrderedMatrix);
             }
+            #endif
         }
 }
 

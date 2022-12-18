@@ -30,8 +30,8 @@ LIB = -lcublas -lcuda -lcudadevrt -lcurand -lcusolver -lkblas-gpu -lmagma_sparse
 CC = nvcc
 NVCC_FLAGS = -O3 -maxrregcount=32 -w -rdc=true -gencode $(NVOPTS) -std=c++11
 DEBUG_FLAGS = -g -G -lineinfo
-OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o HMatrix.o HMatrixStructure.o generateDataset.o helperFunctions.o boundingBoxes.o admissibilityHelpers.o TLRMatrix.o buildTLRPiece.o buildTLRPiece_helpers.o buildHMatrix.o
-HDR = config.h counters.h HMatrix.cuh HMatrixStructure.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh boundingBoxes.h admissibilityHelpers.cuh admissibilityFunctions.cuh TLRMatrix.cuh buildTLRPiece.cuh buildTLRPiece_helpers.cuh buildHMatrix.cuh precision.h
+OBJ = main.o kDTree.o kDTreeConstruction.o kDTreeHelpers.o HMatrix.o HMatrixStructure.o generateDataset.o helperFunctions.o boundingBoxes.o admissibilityHelpers.o TLRMatrix.o buildTLRPiece.o buildTLRPiece_helpers.o buildHMatrixPiece.o buildHMatrix_helpers.o
+HDR = config.h counters.h HMatrix.cuh HMatrixStructure.cuh generateDataset.cuh kDTree.cuh kDTreeHelpers.cuh kDTreeConstruction.cuh helperFunctions.cuh helperKernels.cuh boundingBoxes.h admissibilityHelpers.cuh admissibilityFunctions.cuh TLRMatrix.cuh buildTLRPiece.cuh buildTLRPiece_helpers.cuh buildHMatrixPiece.cuh buildHMatrix_helpers.cuh precision.h
 EXE = output
 
 USE_COUNTERS = 0

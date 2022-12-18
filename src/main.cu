@@ -1,7 +1,7 @@
 
 #include "admissibilityFunctions.cuh"
 #include "buildTLRPiece.cuh"
-#include "buildHMatrix.cuh"
+#include "buildHMatrixPiece.cuh"
 #include "config.h"
 #include "counters.h"
 #include "generateDataset.cuh"
