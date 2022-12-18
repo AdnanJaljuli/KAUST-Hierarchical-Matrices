@@ -47,7 +47,21 @@ void buildHMatrixPiece (
                 unsigned int batchUnitSize = 1 << (hierarchicalMatrix.structure.numLevels - (tileLevel + 1));
                 int* d_tileIndices;
                 cudaMalloc((void**) &d_tileIndices, tilesInPiece.first*sizeof(int));
-                cudaMemcpy(d_tileIndices, hierarchicalMatrix.structure.tileIndices[tileLevel - 1][tilesInPiece.second], tilesInPiece.first*sizeof(int), cudaMemcpyHostToDevice);
+                cudaMemcpy(
+                    d_tileIndices,
+                    hierarchicalMatrix.structure.tileIndices[tileLevel - 1][tilesInPiece.second],
+                    tilesInPiece.first*sizeof(int),
+                    cudaMemcpyHostToDevice);
+
+                LevelTilePtrs tilePtrs;
+                allocateTilePtrs(
+                    batchSize,
+                    batchUnitSize,
+                    segmentSize,
+                    level,
+                    d_tileIndices,
+                    tilePtrs,
+                    mortonOrderedMatrix);
             }
         }
 }
@@ -59,29 +73,3 @@ template void buildHMatrixPiece <H2Opus_Real> (
     float lowestLevelTolerance,
     unsigned int pieceMortonIndex, unsigned int numPiecesInAxis);
 
-void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> maxRanks) {
-    for(unsigned int i = 0; i < numLevels - 2; ++i) {
-        maxRanks.push_back(tileSize*(1 << i));
-    }
-}
-
-std::pair<int, int> getTilesInPiece(
-    std::vector<int> tileIndices,
-    unsigned int tileLevel,
-    unsigned int pieceMortonIndex, unsigned int pieceLevel) {
-
-        unsigned int levelDiff = tileLevel/pieceLevel;
-        unsigned int numBLocksInPieceAxis = 1<<(levelDiff - 1);
-        unsigned int left = pieceMortonIndex*numBLocksInPieceAxis*numBLocksInPieceAxis;
-        unsigned int right = (pieceMortonIndex + 1)*numBLocksInPieceAxis*numBLocksInPieceAxis - 1;
-
-        // binary search
-        std::vector<int>::iterator lower = lower_bound(tileIndices.begin(), tileIndices.end(), left);
-        std::vector<int>::iterator upper = upper_bound(tileIndices.begin(), tileIndices.end(), right);
-
-        std::pair<int, int> ans;
-        ans.first = upper - lower;
-        ans.second = lower - tileIndices.begin();
-
-        return ans;
-}
