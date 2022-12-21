@@ -16,6 +16,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
     }
 }
 
+template <class T>
+void convertColumnMajorToMorton(TLR_Matrix matrix, TLR_Matrix *mortonMatrix);
+
 void printMatrixStructure(HMatrixStructure HMatrixStruct);
 void printPointCloud(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, H2Opus_Real *d_pointCloud);
 void printKDTree(unsigned int numberOfInputPoints, unsigned int dimensionOfInputPoints, DIVISION_METHOD divMethod, unsigned int leafSize, KDTree tree, H2Opus_Real* d_pointCloud);

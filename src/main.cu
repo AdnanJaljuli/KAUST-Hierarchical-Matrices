@@ -134,14 +134,19 @@ int main(int argc, char *argv[]) {
             d_pointCloud,
             piece, config.numPiecesInAxis);
         #endif
-        unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
-        buildHMatrixPiece <H2Opus_Real> (
-            hierarchicalMatrix,
-            TLRMatrix,
-            maxRanks,
-            config.lowestLevelTolerance,
-            piece, pieceLevel
-        );
+
+        TLR_Matrix mortonOrderedMatrix;
+        mortonOrderedMatrix.ordering = MORTON;
+        convertColumnMajorToMorton <H2Opus_Real> (TLRMatrix, &mortonOrderedMatrix);
+
+        // unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
+        // buildHMatrixPiece <H2Opus_Real> (
+        //     hierarchicalMatrix,
+        //     TLRMatrix,
+        //     maxRanks,
+        //     config.lowestLevelTolerance,
+        //     piece, pieceLevel
+        // );
 
         freeTLRPiece(&TLRMatrix);
     }

@@ -139,6 +139,8 @@ void buildTLRPiece(
             totalRankSum += colRankSum;
         }
 
+        matrix->rankSum = totalRankSum;
+
         void *d_temp_storage = NULL;
         size_t temp_storage_bytes = 0;
         cub::DeviceScan::InclusiveSum(

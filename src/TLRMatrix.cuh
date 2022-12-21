@@ -13,6 +13,7 @@ enum Ordering {COLUMN_MAJOR, MORTON};
 
 struct TLR_Matrix {
     Ordering ordering;
+    int rankSum;
     unsigned int tileSize;
     unsigned int numTilesInAxis;
     int *d_tileOffsets;

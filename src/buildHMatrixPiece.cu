@@ -69,7 +69,7 @@ void buildHMatrixPiece (
                     TLRMatrix);
 
                 int **d_scanRanksPtrs;
-                generateScanRanks(tilesInPiece.first, batchUnitSize, TLRMatrix.d_tileOffsets, d_scanRanksPtrs, d_tileIndices) {
+                // generateScanRanks(tilesInPiece.first, batchUnitSize, TLRMatrix.d_tileOffsets, d_scanRanksPtrs, d_tileIndices);
 
                 int ldRanks = TLRMatrix.numTilesInAxis;
                 thrust::device_vector<int> d_ldUBatch(tilesInPiece.first, TLRMatrix.numTilesInAxis*TLRMatrix.tileSize);
@@ -137,7 +137,7 @@ template void buildHMatrixPiece <H2Opus_Real> (
 __global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize, int batchSize) {
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < batchSize) {
-        d_scanRanksPtrs[i] = &d_scanRanks[];
+        // d_scanRanksPtrs[i] = &d_scanRanks[];
     }
 }
 
