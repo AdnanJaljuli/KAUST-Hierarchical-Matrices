@@ -269,7 +269,8 @@ __global__ void expandTLRPiece(
     unsigned int numTilesInAxis,
     unsigned int numTilesInCol,
     unsigned int tileSize,
-    bool isDiagonal) {
+    bool isDiagonal,
+    int ordering) {
 
         unsigned int col = blockIdx.x;
         unsigned int row;
@@ -285,7 +286,15 @@ __global__ void expandTLRPiece(
             row = blockIdx.y;
         }
 
-        unsigned int index = col*numTilesInAxis + row;
+        // unsigned int index = col*numTilesInAxis + row;
+
+        unsigned int index;
+        if(ordering == 1) {
+            index = columnMajor2Morton(numTilesInAxis, col*numTilesInAxis + row);
+        }
+        else {
+            index = col*numTilesInAxis + row;
+        }
 
         unsigned int previousBlockScanRank = (index == 0) ? 0 : tileOffsets[index - 1];
         unsigned int tileRank = tileOffsets[index] - previousBlockScanRank;
@@ -309,7 +318,8 @@ template __global__ void expandTLRPiece <H2Opus_Real> (
     unsigned int numTilesInAxis,
     unsigned int numTilesInCol,
     unsigned int tileSize,
-    bool isDiagonal);
+    bool isDiagonal,
+    int ordering);
 
 
 template <class T>

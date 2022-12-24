@@ -11,6 +11,7 @@
 typedef double H2Opus_Real;
 enum Ordering {COLUMN_MAJOR, MORTON};
 
+// TODO: template this struct and use a class instead
 struct TLR_Matrix {
     Ordering ordering;
     int rankSum;

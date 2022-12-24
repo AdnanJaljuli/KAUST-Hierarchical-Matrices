@@ -57,7 +57,8 @@ __global__ void expandTLRPiece(
     unsigned int numTilesInAxis,
     unsigned int numTilesInCol,
     unsigned int tileSize,
-    bool isDiagonal);
+    bool isDiagonal,
+    int ordering);
 
 template <class T>
 __global__ void calcErrorInPiece (

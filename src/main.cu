@@ -139,6 +139,14 @@ int main(int argc, char *argv[]) {
         mortonOrderedMatrix.ordering = MORTON;
         convertColumnMajorToMorton <H2Opus_Real> (TLRMatrix, &mortonOrderedMatrix);
 
+        #if EXPAND_MATRIX
+        checkErrorInTLRPiece <H2Opus_Real> (
+            mortonOrderedMatrix,
+            kDTree,
+            d_pointCloud,
+            piece, config.numPiecesInAxis);
+        #endif
+
         // unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
         // buildHMatrixPiece <H2Opus_Real> (
         //     hierarchicalMatrix,

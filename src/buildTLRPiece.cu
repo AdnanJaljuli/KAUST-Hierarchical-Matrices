@@ -215,8 +215,9 @@ void checkErrorInTLRPiece(
 
         dim3 numBlocks(matrix.numTilesInAxis, numTilesInCol);
         dim3 numThreadsPerBlock(32, 32);
+        int ordering = (matrix.ordering == COLUMN_MAJOR) ? 0 : 1;
         expandTLRPiece <T> <<< numBlocks, numThreadsPerBlock >>>
-            (d_UPtr, d_VPtr, matrix.d_tileOffsets, d_expandedTLRPiece, matrix.numTilesInAxis, numTilesInCol, matrix.tileSize, isDiagonal);
+            (d_UPtr, d_VPtr, matrix.d_tileOffsets, d_expandedTLRPiece, matrix.numTilesInAxis, numTilesInCol, matrix.tileSize, isDiagonal, ordering);
 
         T *d_error, *d_tmp;
         cudaMalloc((void**) &d_error, sizeof(T));

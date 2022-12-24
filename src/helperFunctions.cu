@@ -9,14 +9,18 @@ __global__ void copyCMRanksToMORanks(int numLeaves, int tileSize, int* tileScanR
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i < numLeaves*numLeaves) {
         int MOIndex = columnMajor2Morton(numLeaves, i);
-        int prevScanRanks = (i == 0) ? : tileScanRanks[i - 1];
-        int rank = tileScanRanks[i] - tileScanRanks[i - 1];
+        int prevScanRanks = (i == 0) ? 0 : tileScanRanks[i - 1];
+        int rank = tileScanRanks[i] - prevScanRanks;
         mortonTileRanks[MOIndex] = rank;
     }
 }
 
 template <class T>
 void convertColumnMajorToMorton(TLR_Matrix matrix, TLR_Matrix *mortonMatrix) {
+
+    mortonMatrix->tileSize = matrix.tileSize;
+    mortonMatrix->numTilesInAxis = matrix.numTilesInAxis;
+    mortonMatrix->rankSum = matrix.rankSum;
 
     mortonMatrix->d_U.resize(matrix.rankSum*matrix.tileSize);
     mortonMatrix->d_V.resize(matrix.rankSum*matrix.tileSize);
@@ -48,8 +52,8 @@ void convertColumnMajorToMorton(TLR_Matrix matrix, TLR_Matrix *mortonMatrix) {
     cudaMemcpy(h_matrix_offsets, matrix.d_tileOffsets, matrix.numTilesInAxis*matrix.numTilesInAxis*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(h_mortonMatrix_offsets, mortonMatrix->d_tileOffsets, matrix.numTilesInAxis*matrix.numTilesInAxis*sizeof(int), cudaMemcpyDeviceToHost);
 
-    T *d_UPtr_CM = thrust::raw_pointer_cast(mortonMatrix->d_U.data());
-    T *d_VPtr_CM = thrust::raw_pointer_cast(mortonMatrix->d_V.data());
+    T *d_UPtr_CM = thrust::raw_pointer_cast(matrix.d_U.data());
+    T *d_VPtr_CM = thrust::raw_pointer_cast(matrix.d_V.data());
 
     T *d_UPtr_MO = thrust::raw_pointer_cast(mortonMatrix->d_U.data());
     T *d_VPtr_MO = thrust::raw_pointer_cast(mortonMatrix->d_V.data());
@@ -58,7 +62,7 @@ void convertColumnMajorToMorton(TLR_Matrix matrix, TLR_Matrix *mortonMatrix) {
         int MOIndex = columnMajor2Morton(matrix.numTilesInAxis, i);
         int CMScanRank = (i == 0) ? 0 : h_matrix_offsets[i - 1];
         int mortonScanRank = (MOIndex == 0) ? 0 : h_mortonMatrix_offsets[MOIndex - 1];
-        int rank = h_mortonMatrix_offsets[MOIndex] - h_mortonMatrix_offsets[MOIndex - 1];
+        int rank = h_mortonMatrix_offsets[MOIndex] - mortonScanRank;
 
         assert(rank >= 0);
         if(rank > 0){
