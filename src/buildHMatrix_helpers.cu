@@ -17,8 +17,10 @@ std::pair<int, int> getTilesInPiece(
     unsigned int tileLevel,
     unsigned int pieceMortonIndex, unsigned int pieceLevel) {
 
-        unsigned int levelDiff = tileLevel/pieceLevel;
-        unsigned int numBLocksInPieceAxis = 1<<(levelDiff - 1);
+        // unsigned int levelDiff = tileLevel/pieceLevel;
+        // unsigned int numBLocksInPieceAxis = 1<<(levelDiff - 1);
+        unsigned int numBLocksInPieceAxis = (1<<tileLevel)/(1<<pieceLevel);
+        printf("numBLocksInPieceAxis: %d\n", numBLocksInPieceAxis);
         unsigned int left = pieceMortonIndex*numBLocksInPieceAxis*numBLocksInPieceAxis;
         unsigned int right = (pieceMortonIndex + 1)*numBLocksInPieceAxis*numBLocksInPieceAxis - 1;
 
@@ -42,28 +44,37 @@ __global__ void fillBatchPtrs(
     int batchSize,
     int tileSize,
     int batchUnitSize,
-    int* tileIndices,
+    int *tileIndices,
     int tileLevel) {
 
         unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
         if(i < batchSize) {
             unsigned int numTilesInAxis = 1<<tileLevel;
-            unsigned int tileCol, tileRow;
-            morton2columnMajor(tileIndices[i], tileCol, tileRow);
+            // unsigned int tileCol, tileRow;
+            // morton2columnMajor(tileIndices[i], tileCol, tileRow);
 
             if(blockIdx.y == 0) {
+                // tilePtrs->d_U[i] = &UPtr[
+                //     static_cast<uint64_t>(
+                //         tileOffsets[tileCol*numTilesInAxis*batchUnitSize*batchUnitSize + 
+                //         tileRow*batchUnitSize*batchUnitSize])*
+                //     tileSize];
                 tilePtrs->d_U[i] = &UPtr[
-                    static_cast<uint64_t>(
-                        tileOffsets[tileCol*numTilesInAxis*batchUnitSize*batchUnitSize + 
-                        tileRow*batchUnitSize*batchUnitSize])*
-                    tileSize];
+                    static_cast<uint64_t>(tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize])
+                    *tileSize
+                ];
             }
             else {
+                // tilePtrs->d_V[i] = &VPtr[
+                //     static_cast<uint64_t>(
+                //         tileOffsets[tileCol*numTilesInAxis*batchUnitSize*batchUnitSize + 
+                //         tileRow*batchUnitSize*batchUnitSize])*
+                //     tileSize];
                 tilePtrs->d_V[i] = &VPtr[
                     static_cast<uint64_t>(
-                        tileOffsets[tileCol*numTilesInAxis*batchUnitSize*batchUnitSize + 
-                        tileRow*batchUnitSize*batchUnitSize])*
-                    tileSize];
+                        tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]
+                    )*tileSize
+                ];
             }
         }
 }
@@ -102,4 +113,42 @@ template <class T>
 void freeLevelTilePtrs(LevelTilePtrs <T> tilePtrs) {
     cudaFree(tilePtrs.d_U);
     cudaFree(tilePtrs.d_V);
+}
+
+__global__ void getRanks_kernel(int *blockRanks, int *blockScanRanks, int size) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < size) {
+        int prevScanRanks = (i == 0) ? 0 : blockScanRanks[i - 1];
+        blockRanks[i] = blockScanRanks[i] - prevScanRanks;
+    }
+}
+
+void getRanks(int *d_blockRanks, int *d_blockScanRanks, int size) {
+    unsigned int numThreadsPerBlock = 1024;
+    unsigned int numBlocks = (size + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    getRanks_kernel <<< numBlocks, numThreadsPerBlock >>> (d_blockRanks, d_blockScanRanks, size);
+}
+
+__global__ void fillScanRankPtrs(int **d_scanRanksPtrs, int *d_scanRanks, int batchUnitSize, int batchSize) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < batchSize) {
+        d_scanRanksPtrs[i] = &d_scanRanks[i*batchUnitSize*batchUnitSize];
+    }
+}
+
+void generateScanRanks(int batchSize, int batchUnitSize, int *ranks, int *scanRanks, int **scanRanksPtrs, int *levelTileIndices) {
+    // TODO: we already have a scanRanks array of all the ranks in the MOMatrix. Use that one instead of this
+    for(unsigned int batch = 0; batch < batchSize; ++batch) {
+        void *d_temp_storage = NULL;
+        size_t temp_storage_bytes = 0;
+        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks + levelTileIndices[batch]*batchUnitSize*batchUnitSize, scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
+        cudaMalloc(&d_temp_storage, temp_storage_bytes);
+        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, ranks + levelTileIndices[batch]*batchUnitSize*batchUnitSize, scanRanks + batch*batchUnitSize*batchUnitSize, batchUnitSize*batchUnitSize);
+        cudaFree(d_temp_storage);
+    }
+
+    // fillScanRanksPtrs
+    unsigned int numThreadsPerBlock = 1024;
+    unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
+    fillScanRankPtrs <<< numBlocks, numThreadsPerBlock >>> (scanRanksPtrs, scanRanks, batchUnitSize, batchSize);
 }

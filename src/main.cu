@@ -147,14 +147,15 @@ int main(int argc, char *argv[]) {
             piece, config.numPiecesInAxis);
         #endif
 
-        // unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
-        // buildHMatrixPiece <H2Opus_Real> (
-        //     hierarchicalMatrix,
-        //     TLRMatrix,
-        //     maxRanks,
-        //     config.lowestLevelTolerance,
-        //     piece, pieceLevel
-        // );
+        unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
+        printf("piece level: %d\n", pieceLevel);
+        buildHMatrixPiece <H2Opus_Real> (
+            hierarchicalMatrix,
+            mortonOrderedMatrix,
+            maxRanks,
+            config.lowestLevelTolerance,
+            piece, pieceLevel
+        );
 
         freeTLRPiece(&TLRMatrix);
     }

@@ -33,4 +33,8 @@ void allocateTilePtrs(
 template <class T>
 void freeLevelTilePtrs(LevelTilePtrs <T> tilePtrs);
 
+void getRanks(int *d_blockRanks, int *d_blockScanRanks, int size);
+
+void generateScanRanks(int batchSize, int batchUnitSize, int *ranks, int *scanRanks, int **scanRanksPtrs, int *levelTileIndices);
+
 #endif
