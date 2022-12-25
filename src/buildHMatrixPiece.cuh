@@ -9,7 +9,7 @@
 
 template <class T>
 void buildHMatrixPiece (
-    HMatrix <T> hierarchicalMatrix,
+    HMatrix <T> *hierarchicalMatrix,
     TLR_Matrix TLRMatrix,
     std::vector<unsigned int> maxRanks,
     float lowestLevelTolerance,

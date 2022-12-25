@@ -60,8 +60,11 @@ void convertColumnMajorToMorton(TLR_Matrix matrix, TLR_Matrix *mortonMatrix) {
 
     for(unsigned int i = 0; i < matrix.numTilesInAxis*matrix.numTilesInAxis; ++i){
         int MOIndex = columnMajor2Morton(matrix.numTilesInAxis, i);
+
         int CMScanRank = (i == 0) ? 0 : h_matrix_offsets[i - 1];
+
         int mortonScanRank = (MOIndex == 0) ? 0 : h_mortonMatrix_offsets[MOIndex - 1];
+        
         int rank = h_mortonMatrix_offsets[MOIndex] - mortonScanRank;
 
         assert(rank >= 0);

@@ -106,6 +106,18 @@ int main(int argc, char *argv[]) {
     #endif
 
     #if EXPAND_MATRIX
+
+    for (int i = 0; i < hierarchicalMatrix.structure.tileIndices.size(); i++) {
+        printf("[ ");
+        for (int j = 0; j < hierarchicalMatrix.structure.tileIndices[i].size(); j++) {
+            printf("%d ", hierarchicalMatrix.structure.tileIndices[i][j]);
+        }
+        printf(" ]");
+        printf("\n");
+    }
+    printf("\n");
+
+
     printKDTree(config.N, config.nDim, config.divMethod, config.leafSize, kDTree, d_pointCloud);
     printMatrixStructure(hierarchicalMatrix.structure);
     #endif
@@ -150,7 +162,7 @@ int main(int argc, char *argv[]) {
         unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
         printf("piece level: %d\n", pieceLevel);
         buildHMatrixPiece <H2Opus_Real> (
-            hierarchicalMatrix,
+            &hierarchicalMatrix,
             mortonOrderedMatrix,
             maxRanks,
             config.lowestLevelTolerance,
@@ -158,6 +170,7 @@ int main(int argc, char *argv[]) {
         );
 
         freeTLRPiece(&TLRMatrix);
+        freeTLRPiece(&mortonOrderedMatrix);
     }
 
     maxRanks.clear();

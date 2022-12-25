@@ -5,6 +5,7 @@
 #include "kDTreeHelpers.cuh"
 #include "precision.h"
 
+#include <algorithm>
 #include <functional>
 #include <vector>
 
@@ -67,6 +68,11 @@ void constructHMatrixStructure(
             rowTree.nDim,
             0,
             admissibility);
+
+        // sort tile indices
+        for(unsigned int level = 1; level < HMatrixStruct->numLevels; ++level) {
+            sort(HMatrixStruct->tileIndices[level - 1].begin(), HMatrixStruct->tileIndices[level - 1].end());
+        }
 }
 
 void allocateHMatrixStructure(HMatrixStructure *HMatrixStruct, unsigned int numLevels) {

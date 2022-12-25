@@ -20,7 +20,6 @@ std::pair<int, int> getTilesInPiece(
         // unsigned int levelDiff = tileLevel/pieceLevel;
         // unsigned int numBLocksInPieceAxis = 1<<(levelDiff - 1);
         unsigned int numBLocksInPieceAxis = (1<<tileLevel)/(1<<pieceLevel);
-        printf("numBLocksInPieceAxis: %d\n", numBLocksInPieceAxis);
         unsigned int left = pieceMortonIndex*numBLocksInPieceAxis*numBLocksInPieceAxis;
         unsigned int right = (pieceMortonIndex + 1)*numBLocksInPieceAxis*numBLocksInPieceAxis - 1;
 
@@ -48,6 +47,19 @@ __global__ void fillBatchPtrs(
     int tileLevel) {
 
         unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+
+        if(i == 0) {
+            printf("batchUnitSize: %d\n", batchUnitSize);
+            printf("batchSize: %d\n", batchSize);
+            printf("tileSize: %d\n", tileSize);
+            printf("tileLevel: %d\n", tileLevel);
+            printf("tileIndices\n");
+            for(unsigned int j = 0; j < batchSize; ++j) {
+                printf("%d ", tileIndices[j]);
+            }
+            printf("\n\n");
+        }
+
         if(i < batchSize) {
             unsigned int numTilesInAxis = 1<<tileLevel;
             // unsigned int tileCol, tileRow;
@@ -97,7 +109,7 @@ void allocateTilePtrs(
 
         dim3 numThreadsPerBlock(1024);
         dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
-        fillBatchPtrs <<< numBlocks, numThreadsPerBlock >>> (tilePtrs, d_UPtr, d_VPtr, TLRPiece.d_tileOffsets, batchSize, tileSize, batchUnitSize, d_tileIndices, tileLevel);
+        fillBatchPtrs <T> <<< numBlocks, numThreadsPerBlock >>> (tilePtrs, d_UPtr, d_VPtr, TLRPiece.d_tileOffsets, batchSize, tileSize, batchUnitSize, d_tileIndices, tileLevel);
 }
 
 template void allocateTilePtrs <H2Opus_Real> (

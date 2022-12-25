@@ -18,7 +18,7 @@
 // TODO: add TLRtolerance as a parameter. if eps(TLR) == eps(HMatrix) skip finest level, else: do kblas_ara on finest level to produce a finer tile
 template <class T>
 void buildHMatrixPiece (
-    HMatrix <T> HMat,
+    HMatrix <T> *HMat,
     TLR_Matrix TLRMatrix,
     std::vector<unsigned int> maxRanks,
     float lowestLevelTolerance,
@@ -40,39 +40,35 @@ void buildHMatrixPiece (
         H2Opus_Real *d_A, *d_B;
         H2Opus_Real **d_APtrs, **d_BPtrs;
 
-        printf("here 1\n");
-
         int *d_blockRanks;
         cudaMalloc((void**) &d_blockRanks, TLRMatrix.numTilesInAxis*TLRMatrix.numTilesInAxis*sizeof(int));
         getRanks(d_blockRanks, TLRMatrix.d_tileOffsets, TLRMatrix.numTilesInAxis*TLRMatrix.numTilesInAxis);
 
-        printf("here 2\n");
-
         // TODO: allocate memory outside the loop
-        for(unsigned int tileLevel = HMat.structure.numLevels - 2; tileLevel > 0; --tileLevel) {
-            printf("here 3\n");
+        for(unsigned int tileLevel = HMat->structure.numLevels - 2; tileLevel > 0; --tileLevel) {
             assert(pieceLevel <= tileLevel);
-            printf("4\n");
+            printf("beginning of for loop\n");
             std::pair<int, int> tilesInPiece = getTilesInPiece(
-                HMat.structure.tileIndices[tileLevel],
+                HMat->structure.tileIndices[tileLevel - 1],
                 tileLevel,
                 pieceMortonIndex, pieceLevel);
 
-            printf("here 5\n");
+            printf("batchSize: %d    %d\n", tilesInPiece.first, tilesInPiece.second);
+
 
             if(tilesInPiece.first != 0) {
-                printf("here\n");
+                printf("in if statement\n");
 
-                unsigned int batchUnitSize = 1 << (HMat.structure.numLevels - (tileLevel + 1));
+                unsigned int batchUnitSize = 1 << (HMat->structure.numLevels - (tileLevel + 1));
                 int* d_tileIndices;
                 cudaMalloc((void**) &d_tileIndices, tilesInPiece.first*sizeof(int));
                 cudaMemcpy(
                     d_tileIndices,
-                    &HMat.structure.tileIndices[tileLevel - 1][tilesInPiece.second],
+                    &HMat->structure.tileIndices[tileLevel - 1][tilesInPiece.second],
                     tilesInPiece.first*sizeof(int),
                     cudaMemcpyHostToDevice);
 
-
+                #if 0
                 LevelTilePtrs <T> tilePtrs;
                 allocateTilePtrs <T> (
                     tilesInPiece.first,
@@ -96,14 +92,17 @@ void buildHMatrixPiece (
                     d_scanRanks,
                     d_scanRanksPtrs,
                     &HMat.structure.tileIndices[tileLevel - 1][tilesInPiece.second]);
+                
+                #endif
             }
+
 
         }
         cudaFree(d_blockRanks);
 }
 
 template void buildHMatrixPiece <H2Opus_Real> (
-    HMatrix <H2Opus_Real> HMat,
+    HMatrix <H2Opus_Real> *HMat,
     TLR_Matrix TLRMatrix,
     std::vector<unsigned int> maxRanks,
     float lowestLevelTolerance,
