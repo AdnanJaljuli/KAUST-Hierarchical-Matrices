@@ -37,8 +37,8 @@ void buildHMatrixPiece (
         int maxCols;
         int *d_rowsBatch, *d_colsBatch, *d_ranks;
         int *d_LDABatch, *d_LDBBatch;
-        H2Opus_Real *d_A, *d_B;
-        H2Opus_Real **d_APtrs, **d_BPtrs;
+        T *d_A, *d_B;
+        T **d_APtrs, **d_BPtrs;
 
         int *d_blockRanks;
         cudaMalloc((void**) &d_blockRanks, TLRMatrix.numTilesInAxis*TLRMatrix.numTilesInAxis*sizeof(int));
@@ -55,7 +55,6 @@ void buildHMatrixPiece (
 
             printf("batchSize: %d    %d\n", tilesInPiece.first, tilesInPiece.second);
 
-
             if(tilesInPiece.first != 0) {
                 printf("in if statement\n");
 
@@ -68,7 +67,6 @@ void buildHMatrixPiece (
                     tilesInPiece.first*sizeof(int),
                     cudaMemcpyHostToDevice);
 
-                #if 0
                 LevelTilePtrs <T> tilePtrs;
                 allocateTilePtrs <T> (
                     tilesInPiece.first,
@@ -78,7 +76,6 @@ void buildHMatrixPiece (
                     d_tileIndices,
                     &tilePtrs,
                     TLRMatrix);
-
 
                 // scan the ranks array
                 int *d_scanRanks;
@@ -91,11 +88,21 @@ void buildHMatrixPiece (
                     d_blockRanks,
                     d_scanRanks,
                     d_scanRanksPtrs,
-                    &HMat.structure.tileIndices[tileLevel - 1][tilesInPiece.second]);
-                
-                #endif
-            }
+                    &HMat->structure.tileIndices[tileLevel - 1][tilesInPiece.second]);
 
+                lowestLevelTolerance *= 2;
+                maxRows = batchUnitSize*TLRMatrix.tileSize;
+                maxCols = maxRows;
+                cudaMalloc((void**) &d_ranks, tilesInPiece.first*sizeof(int)); // TODO: allocate and free outside loop and reuse memory pools across levels
+                cudaMalloc((void**) &d_rowsBatch, tilesInPiece.first*sizeof(int));
+                cudaMalloc((void**) &d_colsBatch, tilesInPiece.first*sizeof(int));
+                cudaMalloc((void**) &d_LDABatch, tilesInPiece.first*sizeof(int));
+                cudaMalloc((void**) &d_LDBBatch, tilesInPiece.first*sizeof(int));
+                cudaMalloc((void**) &d_APtrs, tilesInPiece.first*sizeof(T*));
+                cudaMalloc((void**) &d_BPtrs, tilesInPiece.first*sizeof(T*));
+                cudaMalloc((void**) &d_A, static_cast<uint64_t>(tilesInPiece.first)*maxRows*maxRanks[HMat->structure.numLevels - (tileLevel + 2)]*sizeof(T));
+                cudaMalloc((void**) &d_B, static_cast<uint64_t>(tilesInPiece.first)*maxRows*maxRanks[HMat->structure.numLevels - (tileLevel + 2)]*sizeof(T));
+            }
 
         }
         cudaFree(d_blockRanks);

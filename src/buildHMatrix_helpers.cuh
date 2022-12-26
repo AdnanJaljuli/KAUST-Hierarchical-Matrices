@@ -7,7 +7,7 @@
 #include <vector>
 #include <utility>
 
-void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> maxRanks);
+void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> *maxRanks);
 
 std::pair<int, int> getTilesInPiece(
     std::vector<int> tileIndices,

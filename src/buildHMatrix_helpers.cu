@@ -6,9 +6,9 @@
 #include <vector>
 #include <utility>
 
-void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> maxRanks) {
+void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> *maxRanks) {
     for(unsigned int i = 0; i < numLevels - 2; ++i) {
-        maxRanks.push_back(tileSize*(1 << i));
+        maxRanks->push_back(tileSize*(1 << i));
     }
 }
 
@@ -36,7 +36,7 @@ std::pair<int, int> getTilesInPiece(
 
 template <class T>
 __global__ void fillBatchPtrs(
-    LevelTilePtrs <T> *tilePtrs,
+    LevelTilePtrs <T> tilePtrs,
     T *UPtr,
     T *VPtr,
     int *tileOffsets,
@@ -71,10 +71,10 @@ __global__ void fillBatchPtrs(
                 //         tileOffsets[tileCol*numTilesInAxis*batchUnitSize*batchUnitSize + 
                 //         tileRow*batchUnitSize*batchUnitSize])*
                 //     tileSize];
-                tilePtrs->d_U[i] = &UPtr[
-                    static_cast<uint64_t>(tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize])
-                    *tileSize
-                ];
+                printf("tile indices: %d\n", tileIndices[i]);
+                printf("tile offsets: %d\n", tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*tileSize);
+                printf("uptr %lf\n", UPtr[tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*tileSize]);
+                tilePtrs.d_U[i] = &UPtr[tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*tileSize];
             }
             else {
                 // tilePtrs->d_V[i] = &VPtr[
@@ -82,11 +82,10 @@ __global__ void fillBatchPtrs(
                 //         tileOffsets[tileCol*numTilesInAxis*batchUnitSize*batchUnitSize + 
                 //         tileRow*batchUnitSize*batchUnitSize])*
                 //     tileSize];
-                tilePtrs->d_V[i] = &VPtr[
-                    static_cast<uint64_t>(
-                        tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]
-                    )*tileSize
-                ];
+                printf("tile indices: %d\n", tileIndices[i]);
+                printf("tile offsets: %d\n", tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*tileSize);
+                printf("vptr %lf\n", VPtr[tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*tileSize]);
+                tilePtrs.d_V[i] = &VPtr[tileOffsets[tileIndices[i]*batchUnitSize*batchUnitSize]*tileSize];
             }
         }
 }
@@ -104,12 +103,25 @@ void allocateTilePtrs(
         cudaMalloc((void**) &tilePtrs->d_U, batchSize*sizeof(T*));
         cudaMalloc((void**) &tilePtrs->d_V, batchSize*sizeof(T*));
 
-        T *d_UPtr = thrust::raw_pointer_cast(TLRPiece.d_U.data());
-        T *d_VPtr = thrust::raw_pointer_cast(TLRPiece.d_V.data());
+        T *d_UPtr = thrust::raw_pointer_cast(&TLRPiece.d_U[0]);
+        T *d_VPtr = thrust::raw_pointer_cast(&TLRPiece.d_V[0]);
+
+        printf("d_Usize: %d\n", TLRPiece.d_U.size());
+        printf("d_Vsize: %d\n", TLRPiece.d_V.size());
+        printf("\n");
 
         dim3 numThreadsPerBlock(1024);
         dim3 numBlocks((batchSize + numThreadsPerBlock.x - 1)/numThreadsPerBlock.x, 2);
-        fillBatchPtrs <T> <<< numBlocks, numThreadsPerBlock >>> (tilePtrs, d_UPtr, d_VPtr, TLRPiece.d_tileOffsets, batchSize, tileSize, batchUnitSize, d_tileIndices, tileLevel);
+        fillBatchPtrs <T> <<< numBlocks, numThreadsPerBlock >>> (
+            *tilePtrs,
+            d_UPtr,
+            d_VPtr,
+            TLRPiece.d_tileOffsets,
+            batchSize,
+            tileSize,
+            batchUnitSize,
+            d_tileIndices,
+            tileLevel);
 }
 
 template void allocateTilePtrs <H2Opus_Real> (

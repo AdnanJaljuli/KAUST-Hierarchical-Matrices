@@ -2,6 +2,7 @@
 #include "admissibilityFunctions.cuh"
 #include "buildTLRPiece.cuh"
 #include "buildHMatrixPiece.cuh"
+#include "buildHMatrix_helpers.cuh"
 #include "config.h"
 #include "counters.h"
 #include "generateDataset.cuh"
@@ -125,7 +126,13 @@ int main(int argc, char *argv[]) {
     // build TLR and Hmatrix piece
     allocateHMatrix <H2Opus_Real> (hierarchicalMatrix, kDTree.maxLeafSize, kDTree.numLeaves);
     vector<unsigned int> maxRanks;
-    generateHMatMaxRanks(hierarchicalMatrix.structure.numLevels, kDTree.maxLeafSize, maxRanks);
+    generateHMatMaxRanks(hierarchicalMatrix.structure.numLevels, kDTree.maxLeafSize, &maxRanks);
+
+    printf("maxRanks size: %d\n", maxRanks.size());
+    for(int i = 0; i < maxRanks.size(); ++i) {
+        printf("%d ", maxRanks[i]);
+    }
+    printf("\n");
 
     for(unsigned int piece = 0; piece < config.numPiecesInAxis*config.numPiecesInAxis; ++piece) {
         TLR_Matrix TLRMatrix;
