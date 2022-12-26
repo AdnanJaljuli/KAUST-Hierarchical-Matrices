@@ -6,6 +6,20 @@
 #include <vector>
 #include <utility>
 
+__global__ void fillLRARAArrays(
+    int batchSize,
+    int maxRows,
+    int* d_rowsBatch, int* d_colsBatch,
+    int* d_LDABatch, int* d_LDBBatch) {
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i < batchSize){
+        d_rowsBatch[i] = maxRows;
+        d_colsBatch[i] = maxRows;
+        d_LDABatch[i] = maxRows;
+        d_LDBBatch[i] = maxRows;
+    }
+}
+
 void generateHMatMaxRanks(unsigned int numLevels, unsigned int tileSize, std::vector<unsigned int> *maxRanks) {
     for(unsigned int i = 0; i < numLevels - 2; ++i) {
         maxRanks->push_back(tileSize*(1 << i));

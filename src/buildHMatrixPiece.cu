@@ -102,6 +102,15 @@ void buildHMatrixPiece (
                 cudaMalloc((void**) &d_BPtrs, tilesInPiece.first*sizeof(T*));
                 cudaMalloc((void**) &d_A, static_cast<uint64_t>(tilesInPiece.first)*maxRows*maxRanks[HMat->structure.numLevels - (tileLevel + 2)]*sizeof(T));
                 cudaMalloc((void**) &d_B, static_cast<uint64_t>(tilesInPiece.first)*maxRows*maxRanks[HMat->structure.numLevels - (tileLevel + 2)]*sizeof(T));
+
+                unsigned int numThreadsPerBlock = 1024;
+                unsigned int numBlocks = (tilesInPiece.first + numThreadsPerBlock - 1)/numThreadsPerBlock;
+                fillLRARAArrays <<< numBlocks, numThreadsPerBlock >>> (tilesInPiece.first, maxRows, d_rowsBatch, d_colsBatch, d_LDABatch, d_LDBBatch);
+
+                generateArrayOfPointersT<T>(d_A, d_APtrs, maxRows*maxRanks[HMat->structure.numLevels - (tileLevel + 2)], tilesInPiece.first, 0);
+                generateArrayOfPointersT<T>(d_B, d_BPtrs, maxRows*maxRanks[HMat->structure.numLevels - (tileLevel + 2)], tilesInPiece.first, 0);
+                kblas_ara_batch_wsquery<T>(kblasHandle, maxRows, tilesInPiece.first);
+                kblasAllocateWorkspace(kblasHandle);
             }
 
         }
@@ -114,10 +123,3 @@ template void buildHMatrixPiece <H2Opus_Real> (
     std::vector<unsigned int> maxRanks,
     float lowestLevelTolerance,
     unsigned int pieceMortonIndex, unsigned int pieceLevel);
-
-// void generateScanRanks(int batchSize, int batchUnitSize, int *scanRanks, int **scanRanksPtrs, int *levelTileIndices) {
-//     // fillScanRanksPtrs
-//     unsigned int numThreadsPerBlock = 1024;
-//     unsigned int numBlocks = (batchSize + numThreadsPerBlock - 1)/numThreadsPerBlock;
-//     fillScanRankPtrs <<< numBlocks, numThreadsPerBlock >>> (scanRanksPtrs, scanRanks, batchUnitSize, batchSize);
-// }

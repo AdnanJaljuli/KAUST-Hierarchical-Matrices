@@ -35,6 +35,18 @@ void freeLevelTilePtrs(LevelTilePtrs <T> tilePtrs);
 
 void getRanks(int *d_blockRanks, int *d_blockScanRanks, int size);
 
-void generateScanRanks(int batchSize, int batchUnitSize, int *ranks, int *scanRanks, int **scanRanksPtrs, int *levelTileIndices);
+void generateScanRanks(
+    int batchSize,
+    int batchUnitSize,
+    int *ranks,
+    int *scanRanks,
+    int **scanRanksPtrs,
+    int *levelTileIndices);
+
+__global__ void fillLRARAArrays(
+    int batchSize,
+    int maxRows,
+    int* d_rowsBatch, int* d_colsBatch,
+    int* d_LDABatch, int* d_LDBBatch);
 
 #endif
