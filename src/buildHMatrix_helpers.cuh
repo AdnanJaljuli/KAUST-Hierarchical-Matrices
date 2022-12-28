@@ -14,10 +14,9 @@ std::pair<int, int> getTilesInPiece(
     unsigned int tileLevel,
     unsigned int pieceMortonIndex, unsigned int pieceLevel);
 
-template <class T>
 struct LevelTilePtrs {
-    T **d_U;
-    T **d_V;
+    H2Opus_Real **d_U;
+    H2Opus_Real **d_V;
 };
 
 template <class T>
@@ -27,11 +26,11 @@ void allocateTilePtrs(
     int tileSize,
     int tileLevel,
     int *d_tileIndices,
-    LevelTilePtrs<T> *tilePtrs,
+    LevelTilePtrs &tilePtrs,
     TLR_Matrix TLRPiece);
 
 template <class T>
-void freeLevelTilePtrs(LevelTilePtrs <T> tilePtrs);
+void freeLevelTilePtrs(LevelTilePtrs tilePtrs);
 
 void getRanks(int *d_blockRanks, int *d_blockScanRanks, int size);
 

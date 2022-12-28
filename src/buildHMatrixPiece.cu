@@ -3,6 +3,7 @@
 #include "buildHMatrix_helpers.cuh"
 #include "cublas_v2.h"
 #include "HMatrix.cuh"
+#include "helperKernels.cuh"
 #include "TLRMatrix.cuh"
 #include "precision.h"
 #include "kblas.h"
@@ -25,6 +26,7 @@ void buildHMatrixPiece (
     unsigned int pieceMortonIndex, unsigned int pieceLevel) {
 
         unsigned int numPiecesInAxis = 1<<pieceLevel;
+        int ARA_R = 10;
 
         kblasHandle_t kblasHandle;
         kblasRandState_t randState;
@@ -67,14 +69,14 @@ void buildHMatrixPiece (
                     tilesInPiece.first*sizeof(int),
                     cudaMemcpyHostToDevice);
 
-                LevelTilePtrs <T> tilePtrs;
+                LevelTilePtrs tilePtrs;
                 allocateTilePtrs <T> (
                     tilesInPiece.first,
                     batchUnitSize,
                     TLRMatrix.tileSize,
                     tileLevel,
                     d_tileIndices,
-                    &tilePtrs,
+                    tilePtrs,
                     TLRMatrix);
 
                 // scan the ranks array
@@ -111,8 +113,14 @@ void buildHMatrixPiece (
                 generateArrayOfPointersT<T>(d_B, d_BPtrs, maxRows*maxRanks[HMat->structure.numLevels - (tileLevel + 2)], tilesInPiece.first, 0);
                 kblas_ara_batch_wsquery<T>(kblasHandle, maxRows, tilesInPiece.first);
                 kblasAllocateWorkspace(kblasHandle);
-            }
 
+                #if 1
+                int LRARAReturnVal = lr_kblas_ara_batch(kblasHandle, TLRMatrix.tileSize, batchUnitSize, d_rowsBatch, d_colsBatch, tilePtrs.d_U, tilePtrs.d_V, d_scanRanksPtrs,
+                    d_APtrs, d_LDABatch, d_BPtrs, d_LDBBatch, d_ranks,
+                    lowestLevelTolerance, maxRows, maxCols, maxRanks[HMat->structure.numLevels - (tileLevel + 2)], 16, ARA_R, randState, 0, tilesInPiece.first);
+                assert(LRARAReturnVal == 1);
+                #endif
+            }
         }
         cudaFree(d_blockRanks);
 }
