@@ -74,7 +74,7 @@ static const char *asString(DIVISION_METHOD divMethod) {
     switch (divMethod)
     {
         case POWER_OF_TWO_ON_LEFT:
-            return "ppwer of two on left";
+            return "power of two on left";
         case DIVIDE_IN_HALF:
             return "div in half";
         case FULL_TREE:
@@ -120,7 +120,7 @@ struct Config {
 static Config parseArgs(int argc, char **argv) {
     Config config;
     config.divMethod = FULL_TREE;
-    config.admissibilityCondition = WEAK_ADMISSIBILITY;
+    config.admissibilityCondition = BOX_CENTER_ADMISSIBILITY;
     config.N = 1024;
     config.nDim = 2;
     config.numPiecesInAxis = 1;

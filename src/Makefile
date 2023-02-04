@@ -1,6 +1,6 @@
 
 # specify the gpu architecture (volta, ampere)
-GPU_ARCH = ampere
+GPU_ARCH = volta
 ifeq (${GPU_ARCH}, volta)
 	NVOPTS = arch=compute_70,code=sm_70
 else ifeq (${GPU_ARCH}, ampere)
@@ -22,7 +22,7 @@ INC += -I$(_CUTLASS_ROOT_)/tools/util/include
 
 LIB_DIR = -L$(_CUDA_ROOT_)/lib64
 LIB_DIR += -L$(_MAGMA_ROOT_)/lib
-LIB_DIR += -L$(_OPENBLAS_ROOT_)/lib64
+LIB_DIR += -L$(_OPENBLAS_ROOT_)/lib
 LIB_DIR += -L$(_KBLAS_ROOT_)/lib
 
 LIB = -lcublas -lcuda -lcudadevrt -lcurand -lcusolver -lkblas-gpu -lmagma_sparse -lmagma -lopenblas

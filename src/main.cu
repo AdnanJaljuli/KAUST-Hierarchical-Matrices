@@ -108,7 +108,8 @@ int main(int argc, char *argv[]) {
 
     #if EXPAND_MATRIX
 
-    for (int i = 0; i < hierarchicalMatrix.structure.tileIndices.size(); i++) {
+    for (int i = 0; i < hierarchicalMatrix.structure.tileIndices.size() - 1; i++) {
+        printf("number of tiles in level %d     is %d: ", i + 1, hierarchicalMatrix.structure.tileIndices[i].size());
         printf("[ ");
         for (int j = 0; j < hierarchicalMatrix.structure.tileIndices[i].size(); j++) {
             printf("%d ", hierarchicalMatrix.structure.tileIndices[i][j]);
@@ -166,6 +167,8 @@ int main(int argc, char *argv[]) {
             piece, config.numPiecesInAxis);
         #endif
 
+        #if 0
+
         unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
         printf("piece level: %d\n", pieceLevel);
         buildHMatrixPiece <H2Opus_Real> (
@@ -175,6 +178,8 @@ int main(int argc, char *argv[]) {
             config.lowestLevelTolerance,
             piece, pieceLevel
         );
+        
+        #endif
 
         freeTLRPiece(&TLRMatrix);
         freeTLRPiece(&mortonOrderedMatrix);

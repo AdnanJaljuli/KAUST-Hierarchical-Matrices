@@ -64,8 +64,7 @@ void buildHMatrixPiece (
                 int* d_tileIndices;
                 cudaMalloc((void**) &d_tileIndices, tilesInPiece.first*sizeof(int));
                 cudaMemcpy(
-                    d_tileIndices,
-                    &HMat->structure.tileIndices[tileLevel - 1][tilesInPiece.second],
+                    d_tileIndices, &HMat->structure.tileIndices[tileLevel - 1][tilesInPiece.second],
                     tilesInPiece.first*sizeof(int),
                     cudaMemcpyHostToDevice);
 
