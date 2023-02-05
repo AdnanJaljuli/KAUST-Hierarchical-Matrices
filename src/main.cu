@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
             piece, config.numPiecesInAxis);
         #endif
 
-        #if 0
+        #if 1
 
         unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
         printf("piece level: %d\n", pieceLevel);
@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
             config.lowestLevelTolerance,
             piece, pieceLevel
         );
-        
+
         #endif
 
         freeTLRPiece(&TLRMatrix);
