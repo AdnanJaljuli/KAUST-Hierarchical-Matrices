@@ -9,9 +9,8 @@ This is an imlpementation of generating hierarchical matrices on GPUs. This code
 
 Go to  [lr-kblas-gpu](https://github.com/AdnanJaljuli/lr-kblas-gpu.git) and follow the installation instructions
 
-All of the below commands should be executed in the src folder
 
-todo: write about lr_kblas_gpu
+All of the below commands should be executed in the src folder
 
 - To compile:
 ```make```
