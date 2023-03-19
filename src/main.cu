@@ -178,9 +178,10 @@ int main(int argc, char *argv[]) {
 
     cudaFree(d_inputVectors);
     cudaFree(d_resultVectors);
+    #endif
+    
     freeKDTree(kDTree);
     freeHMatrix(hierarchicalMatrix);
-    #endif
     
     magma_finalize();
     #if EXPAND_MATRIX
