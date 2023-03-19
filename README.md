@@ -7,11 +7,6 @@ This is an imlpementation of generating hierarchical matrices on GPUs. This code
 
 # Instructions
 
-
-
-Installation
-============
-
 To build KAUST_GEMM, please follow these instructions:
 
 1.  Go to  [lr-kblas-gpu](https://github.com/AdnanJaljuli/lr-kblas-gpu.git) and follow the installation instructions.
