@@ -13,7 +13,8 @@ To build KAUST_GEMM, please follow these instructions:
 
 2.  Edit file Makefile to:
     - Provide path for third party libraries (_KBLAS_ROOT_, _MAGMA_ROOT_, _CUDA_ROOT_, _OPENBLAS_ROOT_, _CUTLASS_ROOT_).
-    - Specify CUDA architecture to compile for (_CUDA_ARCH_).
+    - Specify CUDA architecture to compile for (GPU_ARCH).
+    - Remove DEBUG_FLAGS if wanted.
 
     or
 
