@@ -14,18 +14,16 @@ Installation
 
 To build KAUST_GEMM, please follow these instructions:
 
-1.  Go to  [lr-kblas-gpu](https://github.com/AdnanJaljuli/lr-kblas-gpu.git) and follow the installation instructions
+1.  Go to  [lr-kblas-gpu](https://github.com/AdnanJaljuli/lr-kblas-gpu.git) and follow the installation instructions.
 
-2.  Edit file make.inc to:
-    - Enable / disable KBLAS sub modules (_SUPPORT_BLAS2_, _SUPPORT_BLAS3_, _SUPPORT_BATCH_TR_, _SUPPORT_SVD_, _SUPPORT_TLR_).
-    - Enable / disable usage of third party libraries (_USE_MKL_, _USE_MAGMA_) for performance comparisons.
-    - Provide path for third party libraries if required (_CUB_DIR_, _MAGMA_ROOT_).
+2.  Edit file Makefile to:
+    - Provide path for third party libraries (_KBLAS_ROOT_, _MAGMA_ROOT_, _CUDA_ROOT_, _OPENBLAS_ROOT_, _CUTLASS_ROOT_).
     - Specify CUDA architecture to compile for (_CUDA_ARCH_).
 
     or
 
     - Provide equivalent environment variables.
 
-3.  Build KBLAS
+3.  Build KAUST_GEMM
 
         make
