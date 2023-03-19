@@ -21,13 +21,18 @@ To build KAUST_GEMM, please follow these instructions:
     - Provide equivalent environment variables.
 
 3.  Build KAUST_GEMM
-    - make
+    - ```make```
 
     or
     
     
-    - with counters: make USE_COUNTERS=1
+    - with counters: ```make USE_COUNTERS=1```
 
     and/or
     
-    - with error checking (won't run efficiently): make EXPAND_MATRIX=1
+    - with error checking (won't run efficiently): ```make EXPAND_MATRIX=1```
+
+4.  To run:
+    - ```./output <args>```
+
+    - For help on how to configure arguments: ```./output -h ```
