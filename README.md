@@ -7,19 +7,25 @@ This is an imlpementation of generating hierarchical matrices on GPUs. This code
 
 # Instructions
 
-Go to  [lr-kblas-gpu](https://github.com/AdnanJaljuli/lr-kblas-gpu.git) and follow the installation instructions
 
 
-All of the below commands should be executed in the src folder
+Installation
+============
 
-- To compile:
-```make```
+To build KAUST_GEMM, please follow these instructions:
 
-- To clean:
-```make clean```
+1.  Go to  [lr-kblas-gpu](https://github.com/AdnanJaljuli/lr-kblas-gpu.git) and follow the installation instructions
 
-- To run:
-```./output <args>```
+2.  Edit file make.inc to:
+    - Enable / disable KBLAS sub modules (_SUPPORT_BLAS2_, _SUPPORT_BLAS3_, _SUPPORT_BATCH_TR_, _SUPPORT_SVD_, _SUPPORT_TLR_).
+    - Enable / disable usage of third party libraries (_USE_MKL_, _USE_MAGMA_) for performance comparisons.
+    - Provide path for third party libraries if required (_CUB_DIR_, _MAGMA_ROOT_).
+    - Specify CUDA architecture to compile for (_CUDA_ARCH_).
 
-- For help on how to configure arguments:
-```./output -h ```
+    or
+
+    - Provide equivalent environment variables.
+
+3.  Build KBLAS
+
+        make
