@@ -28,6 +28,6 @@ To build KAUST_GEMM, please follow these instructions:
     
     - with counters: make USE_COUNTERS=1
 
-    or    
+    and/or
     
     - with error checking (won't run efficiently): make EXPAND_MATRIX=1
