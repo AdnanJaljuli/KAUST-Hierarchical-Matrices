@@ -41,6 +41,10 @@ static void usage() {
             "   -a <admissibility condition>        Used to set the admissibility condition that builds hierarchical matrix structure\n"
             "                                  - Options: weak, boxCenter\n"
             "                                  - Default: weak\n"
+            "\n"
+            "   -p <num pieces per dimension>       Used to set the number of pieces that the matrix will be seperated into per dimension\n"
+            "                                       This must be an integer.\n"
+            "                                  - Default: 1\n"
             "\n");
 }
 
