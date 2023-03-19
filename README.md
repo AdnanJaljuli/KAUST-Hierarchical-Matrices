@@ -14,7 +14,7 @@ To build KAUST_GEMM, please follow these instructions:
 1.  Go to  [lr-kblas-gpu](https://github.com/AdnanJaljuli/lr-kblas-gpu.git) and follow the installation instructions.
 
 2.  Edit file Makefile to:
-    - Provide path for third party libraries (__KBLAS_ROOT__, _MAGMA_ROOT_, _CUDA_ROOT_, _OPENBLAS_ROOT_, _CUTLASS_ROOT_).
+    - Provide path for third party libraries (_KBLAS_ROOT_, _MAGMA_ROOT_, _CUDA_ROOT_, _OPENBLAS_ROOT_, _CUTLASS_ROOT_).
     - Specify CUDA architecture to compile for (_GPU_ARCH_).
     - Remove DEBUG_FLAGS if wanted.
 
