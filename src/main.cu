@@ -167,8 +167,7 @@ int main(int argc, char *argv[]) {
             piece, config.numPiecesInAxis);
         #endif
 
-        #if 1
-
+        #if 0
         unsigned int pieceLevel = __builtin_ctz(config.numPiecesInAxis);
         printf("piece level: %d\n", pieceLevel);
         buildHMatrixPiece <H2Opus_Real> (
@@ -178,7 +177,6 @@ int main(int argc, char *argv[]) {
             config.lowestLevelTolerance,
             piece, pieceLevel
         );
-
         #endif
 
         freeTLRPiece(&TLRMatrix);
