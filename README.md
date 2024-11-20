@@ -1,11 +1,11 @@
 # Overview
-This is an imlpementation of generating hierarchical matrices on GPUs. This code is written using CUDA and C/C++.
-- The "main" branch generates a hierarchical matrix. It processes the entire matrix in one piece. (It also does H-matrix vector multiplication using Cutlass grouped_gemm, but the code for that needs some work)
-- The "large-matrices" branch breaks the matrix into smaller pxp smaller matrices. It process each piece at a time and builds each piece's TLR-matrix. (There is a bug in generating the hierarchical matrix from the smaller TLR-matrices)
+This is an imlpementation of generating hierarchical matrices on GPUs, and hierarchical matrix-vector multiplication. This code is written using CUDA and C/C++.
+- The "main" branch generates a hierarchical matrix. It processes the entire matrix in one piece. (It also does H-matrix vector multiplication using Cutlass grouped_gemm).
+- The "large-matrices" branch breaks the matrix into smaller pxp smaller matrices. It process each piece at a time and builds each piece's TLR-matrix. (There is a bug in generating the hierarchical matrix from the smaller TLR-matrices).
 
 # Folders
-- src: contains the source code of the project
-- test: you can disregard this folder
+- src: contains the source code of the project.
+- test: for testing the code.
 
 # Instructions
 
